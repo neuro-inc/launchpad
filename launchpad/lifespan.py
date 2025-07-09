@@ -1,0 +1,26 @@
+import logging
+import typing as t
+from contextlib import asynccontextmanager, AsyncExitStack
+
+import aiohttp
+from launchpad.app import App
+from launchpad.db.lifespan import create_db
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def create_aiohttp_session(app: App) -> t.AsyncIterator[None]:
+    app.http = aiohttp.ClientSession()
+    try:
+        yield
+    finally:
+        await app.http.close()
+
+
+@asynccontextmanager
+async def lifespan(app: App) -> t.AsyncIterator[None]:
+    async with AsyncExitStack() as stack:
+        await stack.enter_async_context(create_db(app))
+        await stack.enter_async_context(create_aiohttp_session(app))
+        yield

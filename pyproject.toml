@@ -1,0 +1,71 @@
+[tool.ruff]
+target-version = "py313"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+lines-after-imports = 2
+known-first-party = ["launchpad", "tests"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+log_level = "DEBUG"
+testpaths = ["tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["launchpad"]
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+follow_imports = "silent"
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+strict = true
+pretty = true
+extra_checks = true
+# disallow_any_explicit = true
+plugins = "pydantic.mypy"
+
+[[tool.mypy.overrides]]
+module = "asyncpg.*"
+ignore_missing_imports = true
+
+[tool.poetry]
+name = "launchpad"
+version = "0.1.0"
+description = ""
+authors = ["apolo.us"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.13"
+fastapi = "^0.116.0"
+uvicorn = "^0.35.0"
+neuro-logging = "^25.6.1"
+alembic = "^1.16.2"
+sqlalchemy = {extras = ["asyncio", "postgresql-asyncpg"], version = "^2.0.41"}
+orjson = "^3.10.18"
+python-dotenv = "^1.1.1"
+fastapi-pagination = "^0.13.3"
+aiohttp = "^3.12.13"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+ruff = "^0.12.2"
+pre-commit = "^4.2.0"
+mypy = "^1.16.1"
+pytest-cov = "^6.2.1"
+pytest-asyncio = "0.24.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+launchpad = "launchpad.main:main"
