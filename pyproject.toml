@@ -61,7 +61,7 @@ ruff = "^0.12.2"
 pre-commit = "^4.2.0"
 mypy = "^1.16.1"
 pytest-cov = "^6.2.1"
-pytest-asyncio = "0.24.0"
+pytest-asyncio = "1.0.0"
 
 [build-system]
 requires = ["poetry-core"]
