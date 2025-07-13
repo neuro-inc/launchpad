@@ -19,9 +19,31 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@actions/*": ["./src/actions/*"],
+      "@components": ["./src/components"],
+      "@components/*": ["./src/components/*"],
+      "@constants": ["./src/constants"],
+      "@constants/*": ["./src/constants/*"],
+      "@content": ["./src/content"],
+      "@content/*": ["./src/content/*"],
+      "@features": ["./src/features"],
+      "@features/*": ["./src/features/*"],
+      "@hooks/*": ["./src/hooks/*"],
+      "@images": ["./src/images"],
+      "@images/*": ["./src/images/*"],
+      "@layouts": ["./src/layouts"],
+      "@layouts/*": ["./src/layouts/*"],
+      "@providers/*": ["./src/providers/*"],
+      "@selectors/*": ["./src/redux/selectors/*"],
+      "@services/*": ["./src/services/*"],
+      "@slices/*": ["./src/redux/slices/*"],
+      "@store": ["./src/redux/store"],
+      "@styles/*": ["./src/styles/*"],
+      "@typings": ["./src/types"],
+      "@utils": ["./src/utils"],
+      "@utils/*": ["./src/utils/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": ["src/dev-types/**/*.d.ts", "src", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
 }

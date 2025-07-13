@@ -1,0 +1,136 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "root": true,
+  "ignorePatterns": [
+    "tailwind.config.js",
+    "postcss.config.js",
+    "_app.js",
+    "src/middleware.d.ts"
+  ],
+  "plugins": [
+    "react",
+    "simple-import-sort",
+    "import",
+    "@typescript-eslint",
+    "prettier"
+  ],
+  "extends": [
+    "next/core-web-vitals",
+    "airbnb",
+    "airbnb/hooks",
+    "airbnb-typescript",
+    "next/typescript",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:tailwindcss/recommended",
+    "plugin:prettier/recommended"
+  ],
+  "env": {
+    "browser": true,
+    "node": true,
+    "es6": true
+  },
+  "parserOptions": {
+    "parser": "@typescript-eslint/parser",
+    "ecmaVersion": 2021,
+    "sourceType": "module",
+    "project": true,
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "settings": {
+    "sourceType": "module",
+    "react": {
+      "version": "detect"
+    },
+    "tailwindcss": {
+      "callees": ["clsx", "cn"],
+      "config": "tailwind.config.ts",
+      "cssFiles": [
+        "**/*.css",
+        "!**/node_modules",
+        "!**/.*",
+        "!**/dist",
+        "!**/build"
+      ],
+      "removeDuplicates": true,
+      "skipClassAttribute": false,
+      "whitelist": [
+        "(text|leading)\\-\\d+$",
+        "space-(before|after|both)",
+        "fade",
+        "splide__[\\w\\-]+$"
+      ]
+    }
+  },
+  "rules": {
+    "@typescript-eslint/ban-ts-comment": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-namespace": "off",
+    "@typescript-eslint/no-shadow": "off",
+    "@typescript-eslint/no-unused-vars": "warn",
+    "consistent-return": "off",
+    "global-require": "off",
+    "import/no-cycle": "off",
+    "import/prefer-default-export": "off",
+    "no-param-reassign": "off",
+    "react/function-component-definition": "off",
+    "react/jsx-props-no-spreading": "off",
+    "react/prop-types": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/require-default-props": "off",
+    "react/jsx-filename-extension": [
+      "error",
+      { "extensions": [".jsx", ".tsx"] }
+    ],
+    "@typescript-eslint/no-restricted-imports": [
+      "warn",
+      {
+        "name": "react-redux",
+        "importNames": ["useSelector", "useDispatch"],
+        "message": "Use Redux typed hooks instead"
+      }
+    ],
+    "no-restricted-exports": "off",
+    "simple-import-sort/exports": "error",
+    "simple-import-sort/imports": [
+      "error",
+      {
+        "groups": [
+          [
+            "^(fs|path|punycode|querystring|readline|repl|stream|string_decoder|sys|timers|tls|tty|url|vm|zlib|freelist|v8|process|async_hooks|http2|perf_hooks)(/.*|$)"
+          ],
+          ["^react", "^next", "^", "^@fortawesome", "clsx"],
+          [
+            "^@?typings",
+            "^@?constants",
+            "^@?configs",
+            "^@?features",
+            "^@?actions",
+            "^@?services",
+            "^@?store",
+            "^@?slices",
+            "^@?thunks",
+            "^@?selectors",
+            "^@?hooks",
+            "^@?utils",
+            "^@?content"
+          ],
+          [
+            "^@?providers",
+            "^@?layouts",
+            "^@?pages",
+            "^@?components",
+            "^@?icons",
+            "^@?images",
+            "^@?assets",
+            "^@?styles"
+          ],
+          ["^\\u0000"],
+          ["^\\.\\.(?!/?$)", "^\\.\\./?$"],
+          ["^\\./(?=.*/)(?!/?$)", "^\\.(?!/?$)", "^\\./?$", "^.+\\.s?css$"]
+        ]
+      }
+    ]
+  }
+}

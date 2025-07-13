@@ -1,26 +1,30 @@
-@import "tailwindcss";
+@import url('../styles/index.css');
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply text-rebecca;
+}
+
+.space-before::before,
+.space-after::after,
+.space-both:before,
+.space-both:after {
+  content: '\00a0';
+}
+
+.required-label:after {
+  content: '*';
+  display: inline-block;
+  font-size: smaller;
+  @apply inline-block relative left-0.5 -top-0.5 text-error;
+}
+
+/**
+ * Tailwindcss's `break-words` rule is not that expeted
+ */
+.word-break-case {
+  word-break: break-word;
 }
