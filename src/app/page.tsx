@@ -1,3 +1,3 @@
-export default function Home() {
-  return <p>Apolo Launchpad</p>;
-}
+import { HomePage } from './HomePage';
+
+export default HomePage;
