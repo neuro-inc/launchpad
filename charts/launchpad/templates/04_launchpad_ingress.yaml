@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: launchpad
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: {{ .Values.launchpadHostPrefix }}.apps.dev.apolo.us
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "launchpad.fullname" $ }}
+                port:
+                  name: http

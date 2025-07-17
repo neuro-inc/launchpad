@@ -40,13 +40,6 @@ class PostgresConfig:
 class Config:
     postgres: PostgresConfig
     server: ServerConfig = ServerConfig()
-    env: str = "dev"
-
-    def is_local_mode(self) -> bool:
-        return self.env == "local"
-
-    def is_prod(self) -> bool:
-        return self.env not in ("dev", "local", "test")
 
 
 class EnvironConfigFactory:
@@ -62,7 +55,6 @@ class EnvironConfigFactory:
         return Config(
             server=self.create_server(),
             postgres=self.create_postgres(),
-            env=self._environ.get("ENV", "dev"),
         )
 
     def create_server(self) -> ServerConfig:
@@ -72,8 +64,16 @@ class EnvironConfigFactory:
         )
 
     def create_postgres(self) -> PostgresConfig:
-        dsn = DSN.with_asyncpg_schema(self._environ["PSQL_DSN"])
-        return PostgresConfig(dsn=dsn, alembic=self.create_alembic(dsn))
+        db_host = self._environ["DB_HOST"]
+        db_user = self._environ["DB_USER"]
+        db_password = self._environ["DB_PASSWORD"]
+        db_name = self._environ["DB_NAME"]
+        db_port = self._environ.get("DB_PORT", 5432)
+        postgres_dsn = (
+            f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        )
+        dsn = DSN.with_asyncpg_schema(postgres_dsn)
+        return PostgresConfig(dsn=dsn, alembic=self.create_alembic(postgres_dsn))
 
     def create_alembic(self, postgres_dsn: str) -> AlembicConfig:
         parent_path = pathlib.Path(__file__).resolve().parent.parent
