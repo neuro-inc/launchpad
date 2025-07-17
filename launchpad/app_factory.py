@@ -7,6 +7,7 @@ from starlette.responses import JSONResponse
 from launchpad.api import root_router
 from launchpad.app import App
 from launchpad.config import Config
+from launchpad.db.sync import sync_db
 from launchpad.lifespan import lifespan
 
 
@@ -20,6 +21,9 @@ class AppConfig(TypedDict):
 
 
 def create_app(config: Config) -> App:
+    # keep db up-to-date by running migrations
+    sync_db(dsn=config.postgres.dsn)
+
     app_kwargs: AppConfig = {
         "default_response_class": ORJSONResponse,
         "openapi_url": "/openapi/openapi.json",
