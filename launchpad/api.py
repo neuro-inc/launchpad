@@ -1,10 +1,13 @@
 from fastapi import APIRouter
+from fastapi.params import Depends
 from starlette.responses import Response
 
 from launchpad.apps.api import apps_router
+from launchpad.auth.dependencies import auth_required
 
 root_router = APIRouter()
-api_v1_router = APIRouter()
+
+api_v1_router = APIRouter(dependencies=[Depends(auth_required)])
 
 
 api_v1_router.include_router(apps_router, prefix="/apps")
