@@ -54,7 +54,7 @@ orjson = "^3.11.0"
 python-dotenv = "^1.1.1"
 fastapi-pagination = "^0.13.3"
 aiohttp = "^3.12.14"
-python-keycloak = "^5.6.0"
+python-keycloak = "^5.7.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
