@@ -51,3 +51,7 @@ spec:
                   key: DB_PASSWORD
             - name: DB_NAME
               value: "launchpad"
+            - name: KEYCLOAK_URL
+              value: {{ .Values.keycloakHostPrefix }}
+            - name: KEYCLOAK_REALM
+              value: {{ .Values.keycloak.defaultRealm }}

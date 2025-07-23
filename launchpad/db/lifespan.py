@@ -3,14 +3,14 @@ from typing import AsyncIterator
 
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from launchpad.app import App
+from launchpad.app import Launchpad
 from contextlib import asynccontextmanager
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def create_db(app: App) -> AsyncIterator[None]:
+async def create_db(app: Launchpad) -> AsyncIterator[None]:
     logger.info("creating db engine")
 
     app.db_engine = create_async_engine(
