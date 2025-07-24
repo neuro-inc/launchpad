@@ -90,11 +90,11 @@ class AppsApiClient:
         except ClientResponseError as e:
             match e.status:
                 case 404:
-                    raise NotFound()
+                    raise NotFound() from e
                 case 500:
-                    raise ServerError()
+                    raise ServerError() from e
                 case _:
-                    raise AppsApiError()
+                    raise AppsApiError() from e
 
         try:
             response = await response.json()
