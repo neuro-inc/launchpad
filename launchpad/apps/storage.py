@@ -5,7 +5,10 @@ from sqlalchemy import select, and_, delete
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from launchpad.apps.models import InstalledApp, UNIQUE__APP_ID
+from launchpad.apps.models import (
+    InstalledApp,
+    UNIQUE__INSTALLED_APPS__LAUNCHPAD_APP_NAME__USER_ID,
+)
 
 
 async def select_app(
@@ -20,7 +23,7 @@ async def select_app(
     if id is not None:
         where.append(InstalledApp.app_id == id)
     if name is not None:
-        where.append(InstalledApp.launchpad_name == name)
+        where.append(InstalledApp.launchpad_app_name == name)
     if is_internal is not None:
         where.append(InstalledApp.is_internal.is_(is_internal))
     if is_shared is not None:
@@ -58,7 +61,14 @@ async def insert_app(
             )
         )
         # possible update a URL of an app
-        .on_conflict_do_update(constraint=UNIQUE__APP_ID, set_=dict(url=url))
+        .on_conflict_do_update(
+            constraint=UNIQUE__INSTALLED_APPS__LAUNCHPAD_APP_NAME__USER_ID,
+            set_=dict(
+                app_id=app_id,
+                app_name=app_name,
+                url=url,
+            ),
+        )
         .returning(InstalledApp)
     )
     cursor = await db.execute(query)

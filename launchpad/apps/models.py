@@ -6,13 +6,17 @@ from sqlalchemy.orm import Mapped, mapped_column
 from launchpad.db.base import Base
 
 
-UNIQUE__APP_ID = UniqueConstraint("app_id", name="unique__installed_apps__app_id")
+UNIQUE__INSTALLED_APPS__LAUNCHPAD_APP_NAME__USER_ID = UniqueConstraint(
+    "app_id",
+    name="unique__installed_apps__launchpad_app_name__user_id",
+    postgresql_nulls_not_distinct=True,
+)
 
 
 class InstalledApp(Base):
     __tablename__ = "installed_apps"
 
-    __table_args__ = (UNIQUE__APP_ID,)
+    __table_args__ = (UNIQUE__INSTALLED_APPS__LAUNCHPAD_APP_NAME__USER_ID,)
 
     app_id: Mapped[UUID]
     """ID returned by an apps api
@@ -20,7 +24,7 @@ class InstalledApp(Base):
     app_name: Mapped[str]
     """Name returned by an apps api
     """
-    launchpad_name: Mapped[str] = mapped_column(index=True)
+    launchpad_app_name: Mapped[str] = mapped_column(index=True)
     """Internal launchpad app name
     """
     is_internal: Mapped[bool]
