@@ -48,3 +48,8 @@ app.kubernetes.io/name: {{ include "launchpad.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 service: launchpad
 {{- end }}
+
+{{- define "launchpad.apoloPodLabels" -}}
+platform.apolo.us/preset: {{ .Values.preset_name }}
+platform.apolo.us/component: app
+{{- end }}

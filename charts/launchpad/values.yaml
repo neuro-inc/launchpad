@@ -13,7 +13,9 @@ image:
 replicas: 1
 port: 8080
 
+# apolo specific values
 APOLO_PASSED_CONFIG: null
+preset_name: cpu-medium
 
 postgresql:
   enabled: true
