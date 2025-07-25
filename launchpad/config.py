@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import json
 import os
-import pathlib
+from base64 import b64decode
 from dataclasses import dataclass
 from pathlib import Path
 
-from alembic.config import Config as AlembicConfig
 from dotenv import load_dotenv
 
 from launchpad.db.base import DSN
@@ -21,14 +21,31 @@ class ServerConfig:
 
 
 @dataclass
+class KeycloakConfig:
+    url: str
+    realm: str
+
+
+@dataclass
+class ApoloConfig:
+    cluster: str
+    org_name: str
+    project_name: str
+    apps_api_url: str
+    token: str
+
+
+@dataclass
+class AppsConfig:
+    llm_inference_preset: str
+    postgres_preset: str
+    embeddings_preset: str
+
+
+@dataclass
 class PostgresConfig:
     dsn: str
 
-    alembic: AlembicConfig
-    run_migrations: bool = False
-
-    # based on defaults
-    # https://magicstack.github.io/asyncpg/current/api/index.html#asyncpg.connection.connect
     pool_min_size: int = 10
     pool_max_size: int = 10
 
@@ -39,6 +56,9 @@ class PostgresConfig:
 @dataclass(frozen=True)
 class Config:
     postgres: PostgresConfig
+    keycloak: KeycloakConfig
+    apolo: ApoloConfig
+    apps: AppsConfig
     server: ServerConfig = ServerConfig()
 
 
@@ -54,6 +74,9 @@ class EnvironConfigFactory:
     def create(self) -> Config:
         return Config(
             server=self.create_server(),
+            keycloak=self.create_keycloak(),
+            apolo=self.create_apolo(),
+            apps=self.create_apps(),
             postgres=self.create_postgres(),
         )
 
@@ -73,13 +96,28 @@ class EnvironConfigFactory:
             f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
         )
         dsn = DSN.with_asyncpg_schema(postgres_dsn)
-        return PostgresConfig(dsn=dsn, alembic=self.create_alembic(postgres_dsn))
+        return PostgresConfig(dsn=dsn)
 
-    def create_alembic(self, postgres_dsn: str) -> AlembicConfig:
-        parent_path = pathlib.Path(__file__).resolve().parent.parent
-        ini_path = str(parent_path / "alembic.ini")
-        script_path = str(parent_path / "alembic")
-        config = AlembicConfig(ini_path)
-        config.set_main_option("script_location", script_path)
-        config.set_main_option("sqlalchemy.url", postgres_dsn.replace("%", "%%"))
-        return config
+    def create_keycloak(self) -> KeycloakConfig:
+        return KeycloakConfig(
+            url=self._environ["KEYCLOAK_URL"],
+            realm=self._environ["KEYCLOAK_REALM"],
+        )
+
+    def create_apolo(self) -> ApoloConfig:
+        passed_config = os.environ["APOLO_PASSED_CONFIG"]
+        parsed_config = json.loads(b64decode(passed_config))
+        return ApoloConfig(
+            cluster=parsed_config["cluster"],
+            org_name=parsed_config["org_name"],
+            project_name=parsed_config["project_name"],
+            apps_api_url=parsed_config["url"],
+            token=parsed_config["token"],
+        )
+
+    def create_apps(self) -> AppsConfig:
+        return AppsConfig(
+            llm_inference_preset=os.environ["PRESET_LLM_INFERENCE"],
+            postgres_preset=os.environ["PRESET_POSTGRES"],
+            embeddings_preset=os.environ["PRESET_EMBEDDINGS"],
+        )

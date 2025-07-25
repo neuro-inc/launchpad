@@ -1,11 +1,13 @@
+import re
 from typing import Any, TypedDict
 
 from fastapi.responses import ORJSONResponse
 from fastapi_pagination import add_pagination
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 from launchpad.api import root_router
-from launchpad.app import App
+from launchpad.app import Launchpad
 from launchpad.config import Config
 from launchpad.db.sync import sync_db
 from launchpad.lifespan import lifespan
@@ -20,8 +22,8 @@ class AppConfig(TypedDict):
     redirect_slashes: bool
 
 
-def create_app(config: Config) -> App:
-    # keep db up-to-date by running migrations
+def create_app(config: Config) -> Launchpad:
+    # keep db up to date by running migrations
     sync_db(dsn=config.postgres.dsn)
 
     app_kwargs: AppConfig = {
@@ -33,7 +35,16 @@ def create_app(config: Config) -> App:
         "redirect_slashes": False,
     }
 
-    app = App(**app_kwargs)
+    app = Launchpad(**app_kwargs)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[],
+        # todo: remove localhost after testing the app
+        allow_origin_regex=re.compile(r"https?://(localhost|127.0.0.1):3000/?"),  # type: ignore[arg-type]
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.config = config
     app.include_router(root_router)
     add_pagination(app)

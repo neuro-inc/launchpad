@@ -1,2 +1,2 @@
-async def test__dummy():
+async def test__dummy() -> None:
     assert 1 == 1

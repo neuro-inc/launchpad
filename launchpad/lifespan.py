@@ -1,16 +1,19 @@
+import asyncio
 import logging
 import typing as t
 from contextlib import asynccontextmanager, AsyncExitStack
 
 import aiohttp
-from launchpad.app import App
+from launchpad.app import Launchpad
+from launchpad.apps.lifecycle import init_internal_apps
 from launchpad.db.lifespan import create_db
+from launchpad.ext.apps_api import AppsApiClient
 
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def create_aiohttp_session(app: App) -> t.AsyncIterator[None]:
+async def create_aiohttp_session(app: Launchpad) -> t.AsyncIterator[None]:
     app.http = aiohttp.ClientSession()
     try:
         yield
@@ -19,8 +22,17 @@ async def create_aiohttp_session(app: App) -> t.AsyncIterator[None]:
 
 
 @asynccontextmanager
-async def lifespan(app: App) -> t.AsyncIterator[None]:
+async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
     async with AsyncExitStack() as stack:
         await stack.enter_async_context(create_db(app))
         await stack.enter_async_context(create_aiohttp_session(app))
+        app.apps_api_client = AppsApiClient(
+            http=app.http,
+            base_url=app.config.apolo.apps_api_url,
+            token=app.config.apolo.token,
+            cluster=app.config.apolo.cluster,
+            org_name=app.config.apolo.org_name,
+            project_name=app.config.apolo.project_name,
+        )
+        launchpad_init_task = asyncio.create_task(init_internal_apps(app))  # noqa: F841
         yield

@@ -1,23 +1,37 @@
 from uuid import UUID
 
-from sqlalchemy import true, ForeignKey
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from launchpad.db.base import Base
 
 
-class AppPool(Base):
-    __tablename__ = "apps_pool"
-
-    name: Mapped[str]
-    description: Mapped[str]
-    is_internal: Mapped[bool] = mapped_column(server_default=true())
-    is_shared: Mapped[bool] = mapped_column(server_default=true())
+UNIQUE__INSTALLED_APPS__LAUNCHPAD_APP_NAME__USER_ID = UniqueConstraint(
+    "app_id",
+    name="unique__installed_apps__launchpad_app_name__user_id",
+    postgresql_nulls_not_distinct=True,
+)
 
 
-class AppInstance(Base):
-    __tablename__ = "apps_instances"
+class InstalledApp(Base):
+    __tablename__ = "installed_apps"
 
-    app_id: Mapped[UUID] = mapped_column(ForeignKey("apps_pool.id"))
-    state: Mapped[int]
-    url: Mapped[str]
+    __table_args__ = (UNIQUE__INSTALLED_APPS__LAUNCHPAD_APP_NAME__USER_ID,)
+
+    app_id: Mapped[UUID]
+    """ID returned by an apps api
+    """
+    app_name: Mapped[str]
+    """Name returned by an apps api
+    """
+    launchpad_app_name: Mapped[str] = mapped_column(index=True)
+    """Internal launchpad app name
+    """
+    is_internal: Mapped[bool]
+    """Internal apps are not visible for end-users, but required by other apps
+    """
+    is_shared: Mapped[bool]
+    """This app can be used in a shared mode by all launchpad users without having an app instance per user.
+    """
+    user_id: Mapped[str | None]
+    url: Mapped[str | None]
