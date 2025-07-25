@@ -13,6 +13,7 @@ image:
 replicas: 1
 port: 8080
 
+APOLO_PASSED_CONFIG: null
 
 postgresql:
   enabled: true
