@@ -11,6 +11,7 @@ spec:
     metadata:
       labels:
         {{- include "launchpad.selectorLabels" . | nindent 8 }}
+        {{- include "launchpad.apoloPodLabels" . | nindent 8 }}
     spec:
       imagePullSecrets:
         - name: "ghcr"
