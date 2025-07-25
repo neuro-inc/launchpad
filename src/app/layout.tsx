@@ -2,7 +2,7 @@ import { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 
-import { ToastContainer } from '@components/UI/Toast';
+import { ToastContainer } from '@components/Ui/Toast';
 
 import '@features/dayjs.feature';
 
