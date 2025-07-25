@@ -17,6 +17,16 @@ port: 8080
 APOLO_PASSED_CONFIG: null
 preset_name: cpu-medium
 
+# application specific values example
+LAUNCHPAD_INITIAL_CONFIG: >
+  {
+    "llm_config": {
+      "llm_model": "meta-llama/Llama-3.1-8B-Instruct",
+      "ui_preset": "cpu-medium",
+      "llm_preset": "gpu-a100-x1"
+    }
+  }
+
 postgresql:
   enabled: true
   fullnameOverride: launchpad-db

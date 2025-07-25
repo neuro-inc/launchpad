@@ -58,3 +58,5 @@ spec:
               value: {{ .Values.keycloak.defaultRealm }}
             - name: APOLO_PASSED_CONFIG
               value: {{ .Values.APOLO_PASSED_CONFIG | quote }}
+            - name: LAUNCHPAD_INITIAL_CONFIG
+              value: {{ .Values.LAUNCHPAD_INITIAL_CONFIG | quote }}
