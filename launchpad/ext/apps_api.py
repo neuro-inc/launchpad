@@ -36,7 +36,7 @@ class AppsApiClient:
 
     @property
     def v1_url(self) -> str:
-        return f"{self._base_url}/v1"
+        return f"{self._base_url}/v1/cluster/{self._cluster}/org/{self._org_name}/project/{self._project_name}"
 
     @property
     def v2_url(self) -> str:
@@ -60,8 +60,13 @@ class AppsApiClient:
             url=f"{self.v2_url}/instances/{app_id}",
         )
 
+    async def get_outputs(self, app_id: UUID) -> dict[str, Any]:
+        return await self._request(
+            method="GET", url=f"{self.v1_url}/instances/{app_id}/output"
+        )
+
     async def install_app(self, payload: dict[str, Any]) -> dict[str, Any]:
-        url = f"{self.v1_url}/cluster/{self._cluster}/org/{self._org_name}/project/{self._project_name}/instances"
+        url = f"{self.v1_url}/instances"
         return await self._request(
             method="POST",
             url=url,
