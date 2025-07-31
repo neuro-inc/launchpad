@@ -1,42 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-import { IS_LOCAL, IS_PRODUCTION, PATH } from '@constants';
+import { NEXTAUTH_SECRET, PATH } from '@constants';
 
-export const middleware = (request: NextRequest) => {
+const paths = Object.values(PATH);
+const protectedPaths = paths.filter((path) => path !== PATH.AUTH) as string[];
+
+export const middleware = async (request: NextRequest) => {
   const { pathname } = request.nextUrl;
 
-  /**
-   * Temporary partners slug
-   */
-  if (IS_PRODUCTION && pathname !== PATH.HOME) {
-    return NextResponse.redirect(new URL(PATH.HOME, request.url));
+  const isProtected = protectedPaths.includes(pathname);
+
+  const token = await getToken({
+    req: request,
+    secret: NEXTAUTH_SECRET,
+    raw: true,
+  });
+
+  if (!token && isProtected) {
+    const url = new URL(PATH.AUTH, request.url);
+
+    return NextResponse.redirect(url);
   }
 
-  const setCookieHeader = request.headers.get('X-Set-Cookie');
+  if (token && !isProtected) {
+    const url = new URL(PATH.HOME, request.url);
 
-  const response = NextResponse.next();
-
-  if (setCookieHeader) {
-    try {
-      setCookieHeader.split(',').forEach((cookieString) => {
-        const [name, value] = cookieString.split(';')[0].split('=');
-        response.cookies.set({
-          name: name.trim(),
-          value: value.trim(),
-          secure: !IS_LOCAL,
-          path: '/',
-          sameSite: 'lax',
-        });
-      });
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to set cookies in middleware:', error);
-    }
+    return NextResponse.redirect(url);
   }
 
-  request.headers.append('x-pathname', pathname);
-
-  return response;
+  return NextResponse.next();
 };
 
 export const config = {

@@ -1,3 +1,3 @@
-import { HomePage } from './HomePage';
+import { AppsPage } from './apps/AppsPage';
 
-export default HomePage;
+export default AppsPage;

@@ -1,16 +1,6 @@
 import Color from 'color';
 import type { Config } from 'tailwindcss';
 
-const orderedSpacing = Array.from({ length: 101 }).reduce<
-  Record<string, string>
->((acc, _, index) => ({ ...acc, [index]: `${index}px` }), {});
-
-const RATIO = 0.4;
-const darken = (color: string, ratio = RATIO) =>
-  Color(color).darken(ratio).hex();
-const lighten = (color: string, ratio = RATIO) =>
-  Color(color).lighten(ratio).hex();
-
 const fontSize = {
   h0: [
     '100px',
@@ -134,8 +124,11 @@ export default {
   content: ['./src/**/*.{ts,tsx,mdx}'],
   theme: {
     extend: {
-      fontSize: orderedSpacing,
-      lineHeight: orderedSpacing,
+      fontFamily: {
+        inter: ['Inter', 'sans-serif'],
+      },
+      // @ts-expect-error todo: fix tailwindcss compatible version config type
+      fontSize,
 
       colors: {
         /**
@@ -279,5 +272,5 @@ export default {
     },
   },
 
-  plugins: [],
+  plugins: [require('tailwindcss-animate')],
 } satisfies Config;

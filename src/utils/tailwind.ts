@@ -2,16 +2,7 @@ import { extendTailwindMerge } from 'tailwind-merge';
 import { TV, tv as tailwindVariants } from 'tailwind-variants';
 import clsx, { ClassValue } from 'clsx';
 
-const fontSizeList = Array.from({ length: 101 }).map((_, index) => `${index}`);
-
-const twMergeConfig = {
-  extend: {
-    classGroups: {
-      'font-size': [{ text: fontSizeList }],
-      borderRadius: ['rounded', 'rounded-theme', 'rounded-theme-lg'],
-    },
-  },
-};
+const twMergeConfig = {};
 
 const twMerge = extendTailwindMerge(twMergeConfig);
 

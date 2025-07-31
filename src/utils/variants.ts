@@ -1,47 +1,27 @@
 import { tv } from './tailwind';
 
 export const buttonVariants = tv({
-  base: 'relative flex cursor-pointer items-center justify-center rounded-md py-1 transition-colors h-10 border border-transparent',
+  base: 'relative inline-flex cursor-pointer items-center justify-center rounded-xl py-1 px-5 transition-colors text-button h-12 gap-2',
   variants: {
     variant: {
-      /**
-       * Solid
-       */
-      primary:
-        'bg-primary text-white hover:bg-serenity disabled:bg-ash disabled:text-[#999999]',
+      rebecca:
+        'bg-rebecca text-white  hover:bg-rebecca-dark active:bg-rebecca disabled:bg-neural-01 disabled:text-neural-03',
       secondary:
-        'bg-gradient-to-r from-[#EB001B] via-[#9F0075] to-[#EB001B] bg-[length:200%_200%] text-white hover:bg-[100%_100%] disabled:bg-ash disabled:bg-none disabled:text-[#999999] transition-all',
-      'white-primary': 'bg-white text-primary hover:text-serenity',
-      'white-secondary':
-        'bg-white text-secondary hover:text-success disabled:bg-ash disabled:text-[#999999]',
-
-      /**
-       * Outline
-       */
-      'outline-primary':
-        'bg-transparent border border-primary hover:border-primary-dark text-primary hover:text-primary-dark',
-      'outline-secondary':
-        'bg-transparent border border-secondary hover:border-secondary-light hover:bg-secondary-light text-primary hover:text-white',
-
-      /**
-       * Ghost
-       */
-      ghost: 'text-primary hover:text-primary-light',
-
-      /**
-       * Theme
-       */
-      'primary-gradient':
-        'bg-secondary text-white hover:bg-secondary-dark disabled:bg-ash disabled:text-[#999999] bg-gradient-to-l from-red-500 to-purple-500 hover:bg-gradient-to-r hover:from-purple-500 hover:to-red-500',
-    },
-    size: {
-      /**
-       * There is some conflict for using
-       * `size` text-{number} and `variant` text-${color}
-       * with tailwind-merge and tailwind-variants
-       */
-      larger: 'px-8 text-[14px] font-400',
-      medium: 'px-4 text-[11px]',
+        'bg-neural-01 text-black hover:bg-neural-02 active:bg-neural-03 disabled:bg-neural-01 disabled:text-neural-03',
+      ghost:
+        'text-black hover:text-primary active:text-[#010A1B] disabled:text-neural-03',
+      'ghost-primary':
+        'text-primary hover:text-primary-medium active:text-primary-dark disabled:text-neural-03',
+      'ghost-error':
+        'text-error hover:text-error-dark active:text-error disabled:text-error-light',
+      'error-outline':
+        'text-error hover:text-error-dark border border-error hover:border-error-dark active:border-error active:text-error disabled:text-error-light disabled:border-error-light',
+      'primary-outline':
+        'text-primary hover:text-white active:text-white bg-transparent hover:bg-primary-medium active:bg-primary-dark border border-primary hover:border-primary-medium active:border-primary-dark disabled:text-neural-03 disabled:border-neural-01 disabled:bg-neural-01',
+      primary:
+        'bg-primary text-white hover:bg-primary-medium active:bg-primary-dark disabled:bg-neural-01 disabled:text-neural-03',
+      error:
+        'bg-error-subtle text-error hover:text-white active:text-white hover:bg-error active:bg-error-dark disabled:bg-neural-01 disabled:text-neural-02',
     },
     withIcon: {
       true: 'pl-4',
@@ -50,7 +30,6 @@ export const buttonVariants = tv({
   },
   defaultVariants: {
     variant: 'primary',
-    size: 'medium',
     withIcon: false,
   },
 });
