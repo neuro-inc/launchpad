@@ -90,11 +90,11 @@ class AppService:
         self,
         app: T_App,
     ) -> InstalledApp:
-        installation_response = await self._apps_api_client.install_app(
-            payload=await app.to_apps_api_payload()
-        )
         async with self._db() as db:
             async with db.begin():
+                installation_response = await self._apps_api_client.install_app(
+                    payload=await app.to_apps_api_payload()
+                )
                 return await insert_app(
                     db=db,
                     app_id=installation_response["id"],
