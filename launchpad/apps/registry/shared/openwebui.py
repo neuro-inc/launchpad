@@ -9,11 +9,7 @@ from launchpad.apps.registry.base import BaseContext
 from launchpad.apps.registry.internal.embeddings import APP_NAME_EMBEDDINGS
 from launchpad.apps.registry.internal.llm_inference import APP_NAME_LLM_INFERENCE
 from launchpad.apps.registry.internal.postgres import APP_NAME_POSTGRES
-from launchpad.apps.service import (
-    get_installed_app,
-    AppNotInstalledError,
-    AppUnhealthyError,
-)
+from launchpad.apps.service import AppNotInstalledError, AppUnhealthyError
 from launchpad.errors import BadRequest
 
 APP_NAME_OPEN_WEB_UI = "openwebui"
@@ -30,27 +26,23 @@ class OpenWebUIAppContext(BaseContext):
         cls,
         request: Request,
     ) -> Self:
-        apps_api_client = request.app.apps_api_client
-        sessionmaker = request.app.db
+        app_service = request.app.app_service
         params: dict[str, UUID] = {}
 
-        async with sessionmaker() as db:
-            for required_app_name, context_property_name in (
-                (APP_NAME_LLM_INFERENCE, "llm_inference_app_id"),
-                (APP_NAME_EMBEDDINGS, "embeddings_app_id"),
-                (APP_NAME_POSTGRES, "postgres_app_id"),
-            ):
-                try:
-                    installed_app = await get_installed_app(
-                        db, apps_api_client, required_app_name
-                    )
-                except AppNotInstalledError:
-                    raise BadRequest(f"Missing required app: {required_app_name}")
-                except AppUnhealthyError:
-                    raise BadRequest(
-                        f"Dependant app is not healthy: {required_app_name}"
-                    )
-                params[context_property_name] = installed_app.app_id
+        for required_app_name, context_property_name in (
+            (APP_NAME_LLM_INFERENCE, "llm_inference_app_id"),
+            (APP_NAME_EMBEDDINGS, "embeddings_app_id"),
+            (APP_NAME_POSTGRES, "postgres_app_id"),
+        ):
+            try:
+                installed_app = await app_service.get_installed_app(
+                    required_app_name, with_url=False
+                )
+            except AppNotInstalledError:
+                raise BadRequest(f"Missing required dependency: {required_app_name}")
+            except AppUnhealthyError:
+                raise BadRequest(f"Dependant app is not healthy: {required_app_name}")
+            params[context_property_name] = installed_app.app_id
 
         return cls(**params)
 

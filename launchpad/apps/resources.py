@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class LaunchpadAppRead(BaseModel):
@@ -10,3 +10,12 @@ class LaunchpadAppRead(BaseModel):
     documentation_urls: list[str] = Field(serialization_alias="documentationUrls")
     external_urls: list[str] = Field(serialization_alias="externalUrls")
     tags: list[str]
+
+
+class LaunchpadInstalledAppRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    launchpad_app_name: str
+    is_shared: bool
+    user_id: str | None
+    url: str | None

@@ -73,6 +73,12 @@ class AppsApiClient:
             json=payload,
         )
 
+    async def delete_app(self, app_id: UUID) -> None:
+        await self._request(
+            method="DELETE",
+            url=f"{self.v1_url}/instances/{app_id}",
+        )
+
     async def _request(
         self, method: str, url: str, *args: Any, **kwargs: Any
     ) -> dict[str, Any]:

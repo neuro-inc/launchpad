@@ -1,16 +1,12 @@
 import logging
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-
 from launchpad.app import Launchpad
-from launchpad.apps.registry.internal.context import InternalAppContext
 from launchpad.apps.registry.base import App
+from launchpad.apps.registry.internal.context import InternalAppContext
 from launchpad.apps.registry.internal.embeddings import EmbeddingsApp
 from launchpad.apps.registry.internal.llm_inference import LlmInferenceApp
 from launchpad.apps.registry.internal.postgres import PostgresApp
-from launchpad.apps.storage import select_app, insert_app, delete_app
-from launchpad.apps.service import is_healthy
-from launchpad.ext.apps_api import AppsApiClient
+from launchpad.apps.service import AppService, AppNotInstalledError, AppUnhealthyError
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +26,7 @@ async def init_internal_apps(app: Launchpad) -> None:
     ):
         try:
             await init_internal_app(
-                sessionmaker=app.db,
-                apps_api_client=app.apps_api_client,
+                app_service=app.app_service,
                 internal_app=internal_app,
             )
         except Exception:
@@ -40,40 +35,28 @@ async def init_internal_apps(app: Launchpad) -> None:
 
 
 async def init_internal_app(
-    sessionmaker: async_sessionmaker[AsyncSession],
-    apps_api_client: AppsApiClient,
+    app_service: AppService,
     internal_app: App[InternalAppContext],
 ) -> None:
     """
     Initializes a single internal app
     """
-    async with sessionmaker() as db:
-        existing_app = await select_app(db, name=internal_app.name, is_internal=True)
+    try:
+        await app_service.get_installed_app(
+            launchpad_app_name=internal_app.name,
+            with_url=False,  # internal apps doesn't expose apps URLs
+        )
+    except AppNotInstalledError:
+        logger.info(f"internal app {internal_app} is not yet installed.")
+    except AppUnhealthyError as e:
+        # delete so we can try to re-install
+        logger.info(f"internal app {internal_app} is unhealthy. trying to recreate")
+        await app_service.delete(e.app_id)
+    else:
+        # an app is installed and is healthy
+        logger.info(f"internal app {internal_app} is already installed and running")
+        return
 
-    if existing_app is not None:
-        if await is_healthy(apps_api_client, existing_app):
-            # app is healthy, so nothing to do more here
-            return
-
-        # an app is not healthy, but exists in a DB. let's remove it
-        async with sessionmaker() as db:
-            async with db.begin():
-                await delete_app(db, existing_app.app_id)
-
-    installation_response = await apps_api_client.install_app(
-        payload=await internal_app.to_apps_api_payload()
-    )
-
-    # persist record in a DB
-    async with sessionmaker() as db:
-        async with db.begin():
-            await insert_app(
-                db=db,
-                app_id=installation_response["id"],
-                app_name=installation_response["name"],
-                launchpad_app_name=internal_app.name,
-                is_internal=internal_app.is_internal,
-                is_shared=internal_app.is_shared,
-                user_id=None,
-                url=None,
-            )
+    logger.info(f"installing internal app {internal_app}")
+    await app_service.install(internal_app)
+    logger.info(f"installed an internal app {internal_app}")
