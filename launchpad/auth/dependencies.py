@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Annotated
 
 import aiohttp
 import backoff
@@ -7,6 +7,7 @@ import jwt
 from aiohttp import ClientSession
 from asyncache import cached
 from cachetools import LRUCache
+from fastapi import Depends
 from starlette.requests import Request
 
 from launchpad.auth.models import User
@@ -24,6 +25,7 @@ async def auth_required(
     """
     decoded_token = await _token_from_request(request)
     return User(
+        id=decoded_token["email"],
         email=decoded_token["email"],
         name=decoded_token["name"],
     )
@@ -117,3 +119,6 @@ async def _get_jwks(
     )  # todo: see what we can do here with cert
     response.raise_for_status()
     return await response.json()
+
+
+Auth = Annotated[User, Depends(auth_required)]
