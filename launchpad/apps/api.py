@@ -12,6 +12,7 @@ from launchpad.apps.service import (
     AppTemplateNotFound,
     DepAppService,
 )
+from launchpad.auth.dependencies import Auth
 from launchpad.errors import NotFound
 
 apps_router = APIRouter()
@@ -31,8 +32,12 @@ async def view_post_run_app(
     request: Request,
     app_name: str,
     app_service: DepAppService,
+    user: Auth,
 ) -> Any:
-    installed_app = await app_service.get_installed_app(launchpad_app_name=app_name)
+    installed_app = await app_service.get_installed_app(
+        launchpad_app_name=app_name,
+        user_id=user.id,
+    )
     if installed_app is not None:
         return installed_app
 

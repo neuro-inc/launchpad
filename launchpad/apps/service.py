@@ -9,6 +9,7 @@ from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App
 from launchpad.apps.storage import select_app, insert_app, delete_app
+from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import NotFound, AppsApiError
 
 
@@ -47,8 +48,16 @@ class AppService:
         *,
         with_url: bool = True,
     ) -> InstalledApp:
+        try:
+            app_class = APPS[launchpad_app_name]
+        except KeyError:
+            raise NotFound(f"Unknown app {launchpad_app_name}")
+
         select_params: dict[str, Any] = {"name": launchpad_app_name}
-        if user_id is not None:
+        if not app_class.is_shared and not app_class.is_internal:
+            # personal app, let's add user ID to a selection and validate it exists.
+            if user_id is None:
+                raise BadRequest("Access to a personal app without user ID provided")
             select_params["user_id"] = user_id
 
         async with self._db() as db:
