@@ -5,7 +5,8 @@ from contextlib import asynccontextmanager, AsyncExitStack
 
 import aiohttp
 from launchpad.app import Launchpad
-from launchpad.apps.lifecycle import init_internal_apps
+from launchpad.apps.lifespan import init_internal_apps
+from launchpad.apps.service import AppService
 from launchpad.db.lifespan import create_db
 from launchpad.ext.apps_api import AppsApiClient
 
@@ -34,5 +35,6 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
             org_name=app.config.apolo.org_name,
             project_name=app.config.apolo.project_name,
         )
+        app.app_service = AppService(app=app)
         launchpad_init_task = asyncio.create_task(init_internal_apps(app))  # noqa: F841
         yield

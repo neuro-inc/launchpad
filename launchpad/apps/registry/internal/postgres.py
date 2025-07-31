@@ -1,26 +1,35 @@
-from launchpad.apps.registry.model import App
+from typing import Any
 
+from launchpad.apps.registry.base import App
+from launchpad.apps.registry.internal.context import InternalAppContext
 
 APP_NAME_POSTGRES = "postgres"
 
 
-def gen_postgres_definition(preset: str) -> App:
-    return App(
-        template_name="postgres",
-        template_version="v25.5.0",
-        name=APP_NAME_POSTGRES,
-        is_internal=True,
-        is_shared=True,
-        input={
+class PostgresApp(App[InternalAppContext]):
+    name = APP_NAME_POSTGRES
+    template_name = "postgres"
+    template_version = "v25.5.0"
+    is_internal = True
+    is_shared = True
+    verbose_name = "PostgreSQL"
+    description_short = "PostgreSQL"
+    description_long = "PostgreSQL"
+    logo = ""
+    documentation_urls = []
+    external_urls = []
+    tags = []
+
+    async def _generate_inputs(self) -> dict[str, Any]:
+        return {
             "postgres_config": {
                 "postgres_version": "16",
                 "instance_replicas": 1,
                 "instance_size": 1,
                 "db_users": [{"name": "user", "db_names": ["openwebui"]}],
             },
-            "pg_bouncer": {"replicas": 1, "preset": {"name": preset}},
+            "pg_bouncer": {"replicas": 1, "preset": {"name": self._context.preset}},
             "backup": {"enable": False},
             "displayName": APP_NAME_POSTGRES,
-            "preset": {"name": preset},
-        },
-    )
+            "preset": {"name": self._context.preset},
+        }

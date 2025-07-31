@@ -3,6 +3,7 @@ from typing import Any, TypedDict
 
 from fastapi.responses import ORJSONResponse
 from fastapi_pagination import add_pagination
+from fastapi_pagination.utils import disable_installed_extensions_check
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
@@ -48,4 +49,5 @@ def create_app(config: Config) -> Launchpad:
     app.config = config
     app.include_router(root_router)
     add_pagination(app)
+    disable_installed_extensions_check()  # disable pagination warnings
     return app

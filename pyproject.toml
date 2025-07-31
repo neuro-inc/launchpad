@@ -55,6 +55,8 @@ python-dotenv = "^1.1.1"
 fastapi-pagination = "^0.13.3"
 aiohttp = "^3.12.14"
 python-keycloak = "^5.7.0"
+pydantic = "^2.11.7"
+ujson = "^5.10.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
