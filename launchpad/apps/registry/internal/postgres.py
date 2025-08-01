@@ -21,15 +21,16 @@ class PostgresApp(App[InternalAppContext]):
     tags = []
 
     async def _generate_inputs(self) -> dict[str, Any]:
-        return {
-            "postgres_config": {
-                "postgres_version": "16",
-                "instance_replicas": 1,
-                "instance_size": 1,
-                "db_users": [{"name": "user", "db_names": ["openwebui"]}],
-            },
-            "pg_bouncer": {"replicas": 1, "preset": {"name": self._context.preset}},
-            "backup": {"enable": False},
-            "displayName": APP_NAME_POSTGRES,
-            "preset": {"name": self._context.preset},
-        }
+        return self._context.merge_with_inputs(
+            inputs={
+                "postgres_config": {
+                    "postgres_version": "16",
+                    "instance_replicas": 1,
+                    "instance_size": 1,
+                    "db_users": [{"name": "user", "db_names": ["openwebui"]}],
+                },
+                "pg_bouncer": {"replicas": 1},
+                "backup": {"enable": False},
+                "displayName": APP_NAME_POSTGRES,
+            }
+        )

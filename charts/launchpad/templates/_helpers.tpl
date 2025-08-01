@@ -37,6 +37,9 @@ Common labels
 helm.sh/chart: {{ include "launchpad.chart" . }}
 app.kubernetes.io/name: {{ include "launchpad.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- if .Values.apolo_app_id }}
+platform.apolo.us/app-id: {{ .Values.apolo_app_id | quote }}
+{{- end }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -47,4 +50,17 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/name: {{ include "launchpad.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 service: launchpad
+{{- end }}
+
+{{- define "launchpad.apoloPodLabels" -}}
+platform.apolo.us/preset: {{ .Values.preset_name }}
+platform.apolo.us/component: app
+{{- end }}
+
+{{- define "launchpad.domain" -}}
+{{- printf "%s.%s" .Values.launchpadHostPrefix "apps.dev.apolo.us" }}
+{{- end }}
+
+{{- define "keycloak.domain" -}}
+{{- printf "%s.%s" .Values.keycloakHostPrefix "apps.dev.apolo.us" }}
 {{- end }}

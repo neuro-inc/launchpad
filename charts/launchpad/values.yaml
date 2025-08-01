@@ -13,6 +13,48 @@ image:
 replicas: 1
 port: 8080
 
+# apolo specific values
+APOLO_PASSED_CONFIG: null
+preset_name: cpu-medium
+# apolo_app_id: app-id-12345
+
+# application specific values example
+LAUNCHPAD_INITIAL_CONFIG: >
+  {
+      "vllm": {
+          "hugging_face_model": {
+              "model_hf_name": "microsoft/DialoGPT-medium",
+              "hf_token": null
+          },
+          "preset": {
+              "name": "gpu-large"
+          },
+          "server_extra_args": [
+              "--max-model-len=2048",
+              "--gpu-memory-utilization=0.9"
+          ]
+      },
+      "postgres": {
+          "preset": {
+              "name": "cpu-small"
+          },
+          "pg_bouncer": {
+              "preset": {
+                  "name": "cpu-small"
+              }
+          }
+      },
+      "text-embeddings": {
+          "model": {
+              "model_hf_name": "BAAI/bge-m3",
+              "hf_token": null
+          },
+          "preset": {
+              "name": "gpu-small"
+          },
+          "server_extra_args": []
+      }
+  }
 
 postgresql:
   enabled: true

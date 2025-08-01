@@ -101,7 +101,7 @@ def cache_key_getter(*args: Any, **kwargs: str) -> str:
 
 
 @backoff.on_exception(wait_gen=backoff.expo, exception=aiohttp.ClientError, max_tries=5)
-@cached(cache=LRUCache(maxsize=32), key=cache_key_getter)
+@cached(cache=LRUCache(maxsize=32), key=cache_key_getter)  # type: ignore[misc]
 async def _get_jwks(
     *,
     http: ClientSession,
@@ -114,7 +114,7 @@ async def _get_jwks(
     Therefore, we cache the response by a token `kid`.
     """
     url = f"{keycloak_config.url}/realms/{keycloak_config.realm}/protocol/openid-connect/certs"
-    response = await http.get(
+    response = await http.get(  # type: ignore[call-arg]
         url, verify_ssl=False
     )  # todo: see what we can do here with cert
     response.raise_for_status()

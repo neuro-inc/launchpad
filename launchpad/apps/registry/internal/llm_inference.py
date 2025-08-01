@@ -21,18 +21,12 @@ class LlmInferenceApp(App[InternalAppContext]):
     tags = []
 
     async def _generate_inputs(self) -> dict[str, Any]:
-        return {
-            "ingress_http": None,
-            "hugging_face_model": {
-                "hf_token": {"key": "HF_TOKEN"},
-                "model_hf_name": "meta-llama/Llama-3.1-8B-Instruct",
-            },
-            "tokenizer_hf_name": "meta-llama/Llama-3.1-8B-Instruct",
-            "cache_config": None,
-            "displayName": APP_NAME_LLM_INFERENCE,
-            "preset": {
-                "name": self._context.preset,
-            },
-            "server_extra_args": [],
-            "extra_env_vars": [],
-        }
+        return self._context.merge_with_inputs(
+            inputs={
+                "ingress_http": None,
+                "tokenizer_hf_name": "meta-llama/Llama-3.1-8B-Instruct",
+                "cache_config": None,
+                "displayName": APP_NAME_LLM_INFERENCE,
+                "extra_env_vars": [],
+            }
+        )

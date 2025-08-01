@@ -13,11 +13,9 @@ logger = logging.getLogger(__name__)
 
 # todo: make this a periodic task to sync the statuses of the internal apps with the apps api ?
 async def init_internal_apps(app: Launchpad) -> None:
-    llm_inference_context = InternalAppContext(
-        preset=app.config.apps.llm_inference_preset
-    )
-    embeddings_context = InternalAppContext(preset=app.config.apps.embeddings_preset)
-    postgres_context = InternalAppContext(preset=app.config.apps.postgres_preset)
+    llm_inference_context = InternalAppContext(config=app.config.apps.vllm)
+    embeddings_context = InternalAppContext(config=app.config.apps.embeddings)
+    postgres_context = InternalAppContext(config=app.config.apps.postgres)
 
     for internal_app in (
         LlmInferenceApp(context=llm_inference_context),

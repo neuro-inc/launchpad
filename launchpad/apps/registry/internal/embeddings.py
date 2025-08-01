@@ -21,11 +21,10 @@ class EmbeddingsApp(App[InternalAppContext]):
     tags = []
 
     async def _generate_inputs(self) -> dict[str, Any]:
-        return {
-            "ingress_http": None,
-            "model": {"hf_token": {"key": "HF_TOKEN"}, "model_hf_name": "BAAI/bge-m3"},
-            "displayName": APP_NAME_EMBEDDINGS,
-            "preset": {"name": self._context.preset},
-            "server_extra_args": [],
-            "extra_env_vars": [],
-        }
+        return self._context.merge_with_inputs(
+            inputs={
+                "ingress_http": None,
+                "displayName": APP_NAME_EMBEDDINGS,
+                "extra_env_vars": [],
+            }
+        )

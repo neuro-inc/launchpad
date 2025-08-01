@@ -9,7 +9,6 @@ from launchpad.apps.registry.base import BaseContext
 from launchpad.apps.registry.internal.embeddings import APP_NAME_EMBEDDINGS
 from launchpad.apps.registry.internal.llm_inference import APP_NAME_LLM_INFERENCE
 from launchpad.apps.registry.internal.postgres import APP_NAME_POSTGRES
-from launchpad.apps.service import AppNotInstalledError, AppUnhealthyError
 from launchpad.errors import BadRequest
 
 APP_NAME_OPEN_WEB_UI = "openwebui"
@@ -26,6 +25,9 @@ class OpenWebUIAppContext(BaseContext):
         cls,
         request: Request,
     ) -> Self:
+        # todo: fix this circular import
+        from launchpad.apps.service import AppNotInstalledError, AppUnhealthyError
+
         app_service = request.app.app_service
         params: dict[str, UUID] = {}
 

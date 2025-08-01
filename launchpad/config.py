@@ -5,8 +5,10 @@ import os
 from base64 import b64decode
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
+from yarl import URL
 
 from launchpad.db.base import DSN
 
@@ -22,7 +24,7 @@ class ServerConfig:
 
 @dataclass
 class KeycloakConfig:
-    url: str
+    url: URL
     realm: str
 
 
@@ -37,9 +39,9 @@ class ApoloConfig:
 
 @dataclass
 class AppsConfig:
-    llm_inference_preset: str
-    postgres_preset: str
-    embeddings_preset: str
+    vllm: dict[str, Any]
+    postgres: dict[str, Any]
+    embeddings: dict[str, Any]
 
 
 @dataclass
@@ -100,7 +102,7 @@ class EnvironConfigFactory:
 
     def create_keycloak(self) -> KeycloakConfig:
         return KeycloakConfig(
-            url=self._environ["KEYCLOAK_URL"],
+            url=URL(f"https://{self._environ['KEYCLOAK_URL']}"),
             realm=self._environ["KEYCLOAK_REALM"],
         )
 
@@ -116,8 +118,9 @@ class EnvironConfigFactory:
         )
 
     def create_apps(self) -> AppsConfig:
+        initial_config = json.loads(os.environ["LAUNCHPAD_INITIAL_CONFIG"])
         return AppsConfig(
-            llm_inference_preset=os.environ["PRESET_LLM_INFERENCE"],
-            postgres_preset=os.environ["PRESET_POSTGRES"],
-            embeddings_preset=os.environ["PRESET_EMBEDDINGS"],
+            vllm=initial_config["vllm"],
+            postgres=initial_config["postgres"],
+            embeddings=initial_config["text-embeddings"],
         )

@@ -11,6 +11,7 @@ spec:
     metadata:
       labels:
         {{- include "launchpad.selectorLabels" . | nindent 8 }}
+        {{- include "launchpad.apoloPodLabels" . | nindent 8 }}
     spec:
       imagePullSecrets:
         - name: "ghcr"
@@ -52,6 +53,10 @@ spec:
             - name: DB_NAME
               value: "launchpad"
             - name: KEYCLOAK_URL
-              value: {{ .Values.keycloakHostPrefix }}
+              value: {{ include "keycloak.domain" . }}
             - name: KEYCLOAK_REALM
               value: {{ .Values.keycloak.defaultRealm }}
+            - name: APOLO_PASSED_CONFIG
+              value: {{ .Values.APOLO_PASSED_CONFIG | quote }}
+            - name: LAUNCHPAD_INITIAL_CONFIG
+              value: {{ .Values.LAUNCHPAD_INITIAL_CONFIG | quote }}
