@@ -51,6 +51,13 @@ const fontSize = {
       lineHeight: '27px',
     },
   ],
+  h7: [
+    '16px',
+    {
+      fontWeight: '600',
+      lineHeight: '24px',
+    },
+  ],
   headline: [
     '17px',
     {

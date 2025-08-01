@@ -1,10 +1,5 @@
-import Logout from '@components/Logout';
+import { Layout } from '@components/Ui';
 
 export const AppsPage: React.FC = () => {
-  return (
-    <div className="flex flex-col items-start gap-2">
-      AppsPage
-      <Logout />
-    </div>
-  );
+  return <Layout> </Layout>;
 };
