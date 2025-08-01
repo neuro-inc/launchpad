@@ -37,6 +37,9 @@ Common labels
 helm.sh/chart: {{ include "launchpad.chart" . }}
 app.kubernetes.io/name: {{ include "launchpad.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
+{{- if .Values.apolo_app_id }}
+platform.apolo.us/app-id: {{ .Values.apolo_app_id | quote }}
+{{- end }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
