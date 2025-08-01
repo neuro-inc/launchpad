@@ -7,7 +7,7 @@ from starlette.requests import Request
 
 from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
-from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App
+from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App, USER_FACING_APPS
 from launchpad.apps.storage import select_app, insert_app, delete_app
 from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import NotFound, AppsApiError
@@ -138,7 +138,7 @@ class AppService:
         request: Request,
         launchpad_app_name: str,
     ) -> T_App:
-        app_class = APPS.get(launchpad_app_name)
+        app_class = USER_FACING_APPS.get(launchpad_app_name)
         if not app_class:
             raise AppTemplateNotFound()
 

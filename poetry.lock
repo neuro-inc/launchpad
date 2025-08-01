@@ -2291,6 +2291,18 @@ anyio = ">=3.6.2,<5"
 full = ["httpx (>=0.27.0,<0.29.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.18)", "pyyaml"]
 
 [[package]]
+name = "types-cachetools"
+version = "6.1.0.20250717"
+description = "Typing stubs for cachetools"
+optional = false
+python-versions = ">=3.9"
+groups = ["dev"]
+files = [
+    {file = "types_cachetools-6.1.0.20250717-py3-none-any.whl", hash = "sha256:bba4b8d42262460d24e570097d2d9040e60311934603caa642efd971f3658ed0"},
+    {file = "types_cachetools-6.1.0.20250717.tar.gz", hash = "sha256:4acc8e25de9f5f84dd176ea81dcffa7cb24393869bb2e59e692dfd0139a1e66f"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.14.1"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -2585,4 +2597,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.13"
-content-hash = "7da524e47be6ccd97a74778c5056607f7d712e7812c1d0415efc77f3c6f0d51d"
+content-hash = "e6c157b85ee0e6153ba9949d7d543df2446b03ad7a0caa7de3f29566e553bd79"

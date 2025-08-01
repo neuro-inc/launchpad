@@ -53,7 +53,7 @@ spec:
             - name: DB_NAME
               value: "launchpad"
             - name: KEYCLOAK_URL
-              value: {{ .Values.keycloakHostPrefix }}
+              value: {{ include "keycloak.domain" . }}
             - name: KEYCLOAK_REALM
               value: {{ .Values.keycloak.defaultRealm }}
             - name: APOLO_PASSED_CONFIG

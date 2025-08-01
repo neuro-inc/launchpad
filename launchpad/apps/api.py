@@ -6,7 +6,7 @@ from fastapi_pagination import paginate
 from starlette.requests import Request
 from starlette.status import HTTP_200_OK
 
-from launchpad.apps.registry import APPS
+from launchpad.apps.registry import USER_FACING_APPS
 from launchpad.apps.resources import LaunchpadAppRead, LaunchpadInstalledAppRead
 from launchpad.apps.service import (
     AppTemplateNotFound,
@@ -20,7 +20,7 @@ apps_router = APIRouter()
 
 @apps_router.get("", response_model=Page[LaunchpadAppRead])
 async def view_get_apps_pool() -> Any:
-    return paginate(list(APPS.values()))
+    return paginate(list(USER_FACING_APPS.values()))
 
 
 @apps_router.post(
