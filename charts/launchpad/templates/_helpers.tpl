@@ -53,3 +53,11 @@ service: launchpad
 platform.apolo.us/preset: {{ .Values.preset_name }}
 platform.apolo.us/component: app
 {{- end }}
+
+{{- define "launchpad.domain" -}}
+{{- printf "%s.%s" .Values.launchpadHostPrefix "apps.dev.apolo.us" }}
+{{- end }}
+
+{{- define "keycloak.domain" -}}
+{{- printf "%s.%s" .Values.keycloakHostPrefix "apps.dev.apolo.us" }}
+{{- end }}

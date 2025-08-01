@@ -20,11 +20,39 @@ preset_name: cpu-medium
 # application specific values example
 LAUNCHPAD_INITIAL_CONFIG: >
   {
-    "llm_config": {
-      "llm_model": "meta-llama/Llama-3.1-8B-Instruct",
-      "ui_preset": "cpu-medium",
-      "llm_preset": "gpu-a100-x1"
-    }
+      "vllm": {
+          "hugging_face_model": {
+              "model_hf_name": "microsoft/DialoGPT-medium",
+              "hf_token": null
+          },
+          "preset": {
+              "name": "gpu-large"
+          },
+          "server_extra_args": [
+              "--max-model-len=2048",
+              "--gpu-memory-utilization=0.9"
+          ]
+      },
+      "postgres": {
+          "preset": {
+              "name": "cpu-small"
+          },
+          "pg_bouncer": {
+              "preset": {
+                  "name": "cpu-small"
+              }
+          }
+      },
+      "text-embeddings": {
+          "model": {
+              "model_hf_name": "BAAI/bge-m3",
+              "hf_token": null
+          },
+          "preset": {
+              "name": "gpu-small"
+          },
+          "server_extra_args": []
+      }
   }
 
 postgresql:
