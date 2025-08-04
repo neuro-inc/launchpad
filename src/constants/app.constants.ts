@@ -13,3 +13,4 @@ export const KEYCLOAK_CLIENT_SECRET = process.env.KEYCLOAK_CLIENT_SECRET ?? '';
 export const KEYCLOAK_ISSUER = process.env.KEYCLOAK_ISSUER ?? '';
 
 export const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET ?? '';
+export const NEXTAUTH_URL = process.env.NEXTAUTH_URL ?? '';

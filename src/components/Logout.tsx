@@ -5,5 +5,11 @@ import { signOut } from 'next-auth/react';
 import { Button } from '@components';
 
 export default function Logout() {
-  return <Button onClick={signOut}>Signout of Keycloak</Button>;
+  const handleLogout = async () => {
+    await signOut({ redirect: false });
+
+    window.location.href = '/api/auth/logout';
+  };
+
+  return <Button onClick={handleLogout}>Signout of Keycloak</Button>;
 }

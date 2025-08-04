@@ -1,4 +1,4 @@
-export const getNameInitials = (value: string) =>
+export const getNameInitials = (value: string = '') =>
   value
     .replace(/[^a-zA-Z-\s]+/g, '')
     .split(' ')
