@@ -13,10 +13,26 @@ export const authOptions: AuthOptions = {
       clientId: KEYCLOAK_CLIENT_ID,
       clientSecret: '',
       issuer: KEYCLOAK_ISSUER,
+      authorization: {
+        params: {
+          scope: 'openid profile email offline_access',
+        },
+      },
     }),
   ],
   secret: NEXTAUTH_SECRET,
-  session: {
-    strategy: 'jwt',
+  callbacks: {
+    async jwt({ token, account }) {
+      if (account) {
+        token.accessToken = account.access_token;
+      }
+
+      return token;
+    },
+    async session({ session, token }) {
+      session.accessToken = token.accessToken;
+
+      return session;
+    },
   },
 };

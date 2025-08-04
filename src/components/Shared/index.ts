@@ -4,6 +4,7 @@ export * from './ChaseSpinner';
 export * as Field from './Fields';
 export * from './HighlightExcerpt';
 export * from './Icon';
+export * from './Image';
 export * from './Link';
 export * from './Modal';
 export * from './Popover';

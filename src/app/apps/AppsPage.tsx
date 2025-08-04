@@ -1,5 +1,31 @@
+import { App, WithPagination } from '@typings';
+import { request } from '@utils/helpers';
+
+import { AppItem } from '@components/Apps/AppItem';
 import { Layout } from '@components/Ui';
 
-export const AppsPage: React.FC = () => {
-  return <Layout> </Layout>;
+export const AppsPage: React.FC = async () => {
+  let apps: App[] = [];
+
+  try {
+    const { items } = await request<WithPagination<App>>('/api/v1/apps');
+
+    apps = items;
+  } catch (error) {
+    /**
+     * Continue regardless of error
+     */
+  }
+
+  const makeApp = (app: App) => {
+    return <AppItem key={app.title} app={app} />;
+  };
+
+  return (
+    <Layout>
+      <Layout.Container className="grid grid-cols-3 gap-6">
+        {apps.map(makeApp)}
+      </Layout.Container>
+    </Layout>
+  );
 };

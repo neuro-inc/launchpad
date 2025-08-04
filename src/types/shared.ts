@@ -38,3 +38,9 @@ export type FieldProps = {
 export type ModalProps = {
   closeModal?: () => void;
 };
+
+export type WithPagination<Item> = {
+  page: number;
+  pages: number;
+  items: Item[];
+};

@@ -1,7 +1,7 @@
 import { tv } from './tailwind';
 
 export const buttonVariants = tv({
-  base: 'relative inline-flex cursor-pointer items-center justify-center rounded-xl py-1 px-5 transition-colors text-button h-12 gap-2',
+  base: 'relative inline-flex cursor-pointer items-center justify-center rounded-lg py-1 px-5 transition-colors text-button h-12 gap-2',
   variants: {
     variant: {
       rebecca:
@@ -19,7 +19,7 @@ export const buttonVariants = tv({
       'primary-outline':
         'text-primary hover:text-white active:text-white bg-transparent hover:bg-primary-medium active:bg-primary-dark border border-primary hover:border-primary-medium active:border-primary-dark disabled:text-neural-03 disabled:border-neural-01 disabled:bg-neural-01',
       primary:
-        'bg-primary text-white hover:bg-primary-medium active:bg-primary-dark disabled:bg-neural-01 disabled:text-neural-03',
+        'bg-primary-light text-white hover:bg-primary-medium active:bg-primary disabled:bg-neural-01 disabled:text-neural-03',
       error:
         'bg-error-subtle text-error hover:text-white active:text-white hover:bg-error active:bg-error-dark disabled:bg-neural-01 disabled:text-neural-02',
     },

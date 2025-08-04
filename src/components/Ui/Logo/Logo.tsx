@@ -1,10 +1,12 @@
 import { cn } from '@utils';
 
+import { LogoIcon } from './LogoIcon';
+
 type Props = {
   className?: string;
 };
 
-export const Logo: React.FC<Props> = ({ className }) => {
+export const Logo = ({ className }: Props) => {
   return (
     <svg
       className={cn('h-[198px] w-[32px] text-black', className)}
@@ -58,3 +60,5 @@ export const Logo: React.FC<Props> = ({ className }) => {
     </svg>
   );
 };
+
+Logo.Icon = LogoIcon;
