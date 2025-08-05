@@ -9,11 +9,11 @@ class AppsApiError(Exception):
     pass
 
 
-class NotFound(Exception):
+class NotFound(AppsApiError):
     pass
 
 
-class ServerError(Exception):
+class ServerError(AppsApiError):
     pass
 
 
