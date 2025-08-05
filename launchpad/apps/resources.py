@@ -7,8 +7,8 @@ class LaunchpadAppRead(BaseModel):
     description_short: str
     description_long: str
     logo: str
-    documentation_urls: list[str]
-    external_urls: list[str]
+    documentation_urls: list[dict[str, str]]
+    external_urls: list[dict[str, str]]
     tags: list[str]
 
 
