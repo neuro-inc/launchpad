@@ -56,12 +56,31 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
     is_internal = False
     is_shared = True
     verbose_name = "OpenWebUI"
-    description_short = "OpenWebUI"
-    description_long = "OpenWebUI"
-    logo = ""
-    documentation_urls = []
-    external_urls = []
-    tags = []
+    description_short = (
+        "An extensible, self-hosted AI interface that adapts to your workflow."
+    )
+    description_long = (
+        "Open WebUI is an extensible, feature-rich, and user-friendly "
+        "self-hosted AI platform designed to operate entirely offline. "
+        "It supports various LLM runners like Ollama and "
+        "OpenAI-compatible APIs, with built-in inference engine for RAG, "
+        "making it a powerful AI deployment solution."
+    )
+    logo = "https://storage.googleapis.com/development-421920-assets/app-logos/openwebui-logo.png"
+    documentation_urls = [
+        {
+            "text": "OpenWebUI Repository",
+            "url": "https://github.com/open-webui/open-webui",
+        },
+        {"text": "OpenWebUI Documentation", "url": "https://docs.openwebui.com/"},
+    ]
+    external_urls = [
+        {
+            "text": "OpenWebUI Repository",
+            "url": "https://github.com/open-webui/open-webui",
+        }
+    ]
+    tags = ["Text", "Chat", "RAG"]
 
     async def _generate_inputs(self) -> dict[str, Any]:
         return {

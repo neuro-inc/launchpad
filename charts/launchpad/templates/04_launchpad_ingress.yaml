@@ -8,7 +8,7 @@ spec:
     - host: {{ include "launchpad.domain" . }}
       http:
         paths:
-          - path: /
+          - path: /api
             pathType: Prefix
             backend:
               service:

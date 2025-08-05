@@ -11,6 +11,8 @@ from launchpad.apps.resources import LaunchpadAppRead, LaunchpadInstalledAppRead
 from launchpad.apps.service import (
     AppTemplateNotFound,
     DepAppService,
+    AppNotInstalledError,
+    AppUnhealthyError,
 )
 from launchpad.auth.dependencies import Auth
 from launchpad.errors import NotFound
@@ -34,15 +36,22 @@ async def view_post_run_app(
     app_service: DepAppService,
     user: Auth,
 ) -> Any:
-    installed_app = await app_service.get_installed_app(
-        launchpad_app_name=app_name,
-        user_id=user.id,
-    )
-    if installed_app is not None:
-        return installed_app
-
-    # app is not running yet, lets generated app and install it
     try:
+        installed_app = await app_service.get_installed_app(
+            launchpad_app_name=app_name,
+            user_id=user.id,
+        )
+    except AppNotInstalledError:
+        # app is not running yet, lets generated app and install it
+        try:
+            return await app_service.install_from_request(request, app_name)
+        except AppTemplateNotFound:
+            raise NotFound(f"App {app_name} does not exist in the pool")
+
+    except AppUnhealthyError as e:
+        # an app exists, but it is not healthy. let's try to re-install
+        await app_service.delete(e.app_id)
         return await app_service.install_from_request(request, app_name)
-    except AppTemplateNotFound:
-        raise NotFound(f"App {app_name} does not exist in the pool")
+
+    else:
+        return installed_app
