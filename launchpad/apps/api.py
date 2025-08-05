@@ -42,7 +42,7 @@ async def view_post_run_app(
             user_id=user.id,
         )
     except AppNotInstalledError:
-        # app is not running yet, lets generated app and install it
+        # app is not running yet, lets do an installation
         try:
             return await app_service.install_from_request(request, app_name)
         except AppTemplateNotFound:
