@@ -1,4 +1,5 @@
 import { App, WithPagination } from '@typings';
+import { formatToCamelCase } from '@utils/formatters';
 import { request } from '@utils/helpers';
 
 import { AppItem } from '@components/Apps/AppItem';
@@ -10,7 +11,7 @@ export const AppsPage: React.FC = async () => {
   try {
     const { items } = await request<WithPagination<App>>('/api/v1/apps');
 
-    apps = items;
+    apps = formatToCamelCase(items) as App[];
   } catch (error) {
     /**
      * Continue regardless of error

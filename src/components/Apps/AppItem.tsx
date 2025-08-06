@@ -1,7 +1,7 @@
 import { faArrowRight } from '@fortawesome/pro-regular-svg-icons';
 
 import { App } from '@typings';
-import { cn } from '@utils';
+import { cn, path } from '@utils';
 
 import { AppModal } from '@components/Modals/AppModal';
 import { Button, Icon, Image, Link, Modal, Render } from '@components/Shared';
@@ -14,7 +14,7 @@ type Props = {
 };
 
 export const AppItem: React.FC<Props> = ({
-  app: { title, shortDescription, logo, tags },
+  app: { title, descriptionShort, logo, tags, launchpadAppName },
   app,
 }) => {
   return (
@@ -22,7 +22,7 @@ export const AppItem: React.FC<Props> = ({
       <div className="relative flex min-w-0 gap-3">
         <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neural-02 bg-white">
           <Render if={logo}>
-            <Image src={logo} alt="Logo" />
+            <Image transition src={logo} width={48} height={48} alt="Logo" />
           </Render>
           <Render if={!logo}>
             <Logo.Icon />
@@ -31,7 +31,7 @@ export const AppItem: React.FC<Props> = ({
 
         <div
           className={cn('flex basis-full flex-col justify-center gap-1', {
-            'justify-between': !!shortDescription,
+            'justify-between': !!descriptionShort,
           })}
         >
           <div className="flex items-start justify-between gap-4">
@@ -40,8 +40,8 @@ export const AppItem: React.FC<Props> = ({
             </p>
           </div>
 
-          <Render if={shortDescription}>
-            <p className="-translate-y-1 text-neural-04">{shortDescription}</p>
+          <Render if={descriptionShort}>
+            <p className="-translate-y-1 text-neural-04">{descriptionShort}</p>
           </Render>
         </div>
       </div>
@@ -58,8 +58,11 @@ export const AppItem: React.FC<Props> = ({
           </Button>
         </Modal>
 
-        <Link className="h-10 flex-1 capitalize" href="/">
-          Install
+        <Link
+          className="h-10 flex-1 capitalize"
+          href={path.app(launchpadAppName)}
+        >
+          Open
         </Link>
       </div>
     </div>

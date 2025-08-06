@@ -1,9 +1,10 @@
 import { faLink } from '@fortawesome/pro-light-svg-icons';
 
 import { App } from '@typings';
+import { path } from '@utils/path';
 
 import { AppItemLink } from '@components/Apps/AppItemLink';
-import { Button, Image, Render } from '@components/Shared';
+import { Image, Link, Render } from '@components/Shared';
 import { Logo } from '@components/Ui/Logo';
 
 type Props = {
@@ -14,10 +15,11 @@ export const AppModal: React.FC<Props> = ({
   app: {
     logo,
     title,
-    shortDescription,
-    description,
+    descriptionShort,
+    descriptionLong,
     documentationUrls,
     externalUrls,
+    launchpadAppName,
   },
 }) => {
   const makeDocumentationLink = ({
@@ -36,7 +38,7 @@ export const AppModal: React.FC<Props> = ({
       <div className="relative flex min-w-0 gap-9">
         <div className="flex size-[160px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neural-02 bg-white">
           <Render if={logo}>
-            <Image src={logo} alt="Logo" />
+            <Image transition src={logo} width={160} height={160} alt="Logo" />
           </Render>
           <Render if={!logo}>
             <Logo.Icon className="size-28" />
@@ -45,16 +47,18 @@ export const AppModal: React.FC<Props> = ({
 
         <div className="flex basis-full flex-col gap-3">
           <p className="text-h4">{title}</p>
-          <Render if={shortDescription}>
-            <p className="text-neural-04">{shortDescription}</p>
+          <Render if={descriptionShort}>
+            <p className="text-neural-04">{descriptionShort}</p>
           </Render>
           <div className="mt-auto flex justify-end">
-            <Button className="px-10">Open</Button>
+            <Link className="px-10" href={path.app(launchpadAppName)}>
+              Open
+            </Link>
           </div>
         </div>
       </div>
-      <Render if={description}>
-        <p className="text-neural-04">{description}</p>
+      <Render if={descriptionLong}>
+        <p className="text-neural-04">{descriptionLong}</p>
       </Render>
       <Render if={documentationUrls}>
         <div className="flex flex-col gap-3">

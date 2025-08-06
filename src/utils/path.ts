@@ -1,4 +1,5 @@
 import { Primitive } from '@typings';
+import { PATH } from '@constants';
 import { as, isNumber, isObject, isString } from '@utils';
 
 type Options = Partial<{
@@ -53,4 +54,6 @@ export const p = (...args: Array<Primitive | Options>): string => {
   return concatinatedPath;
 };
 
-export const path = {};
+export const path = {
+  app: (appName: string) => p(PATH.APPS, appName),
+};

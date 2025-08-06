@@ -3,13 +3,12 @@ import { getToken } from 'next-auth/jwt';
 
 import { PATH } from '@constants';
 
-const paths = Object.values(PATH);
-const protectedPaths = paths.filter((path) => path !== PATH.AUTH) as string[];
+const protectedPaths = [PATH.APPS];
 
 export const middleware = async (request: NextRequest) => {
   const { pathname } = request.nextUrl;
 
-  const isProtected = protectedPaths.includes(pathname);
+  const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
 
   const token = await getToken({
     req: request,
@@ -23,7 +22,7 @@ export const middleware = async (request: NextRequest) => {
   }
 
   if (token && !isProtected) {
-    const url = new URL(PATH.HOME, request.url);
+    const url = new URL(PATH.APPS, request.url);
 
     return NextResponse.redirect(url);
   }
