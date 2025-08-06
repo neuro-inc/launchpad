@@ -3,12 +3,10 @@ import { getToken } from 'next-auth/jwt';
 
 import { PATH } from '@constants';
 
-const protectedPaths = [PATH.APPS];
-
 export const middleware = async (request: NextRequest) => {
   const { pathname } = request.nextUrl;
 
-  const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
+  const isProtected = pathname !== PATH.AUTH;
 
   const token = await getToken({
     req: request,
