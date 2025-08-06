@@ -8,10 +8,13 @@ keycloakHostPrefix: "launchpad-keycloak"
 # todo: switch to env vars later
 image:
   repository: "ghcr.io/neuro-inc/launchpad"
-  tag: "3"
+  tag: "latest"
 
 replicas: 1
 port: 8080
+
+domain: "apps.dev.apolo.us"
+netlifyDomain: "launchpad-web-ui-dev-apolo-us.netlify.app"
 
 # apolo specific values
 APOLO_PASSED_CONFIG: null

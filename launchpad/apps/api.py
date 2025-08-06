@@ -16,6 +16,7 @@ from launchpad.apps.service import (
 )
 from launchpad.auth.dependencies import Auth
 from launchpad.errors import NotFound
+from launchpad.ext.apps_api import NotFound as AppsApiNotFound
 
 apps_router = APIRouter()
 
@@ -41,6 +42,8 @@ async def view_post_run_app(
             launchpad_app_name=app_name,
             user_id=user.id,
         )
+    except AppsApiNotFound:
+        raise NotFound(f"Unknown app {app_name}")
     except AppNotInstalledError:
         # app is not running yet, lets do an installation
         try:
@@ -52,6 +55,5 @@ async def view_post_run_app(
         # an app exists, but it is not healthy. let's try to re-install
         await app_service.delete(e.app_id)
         return await app_service.install_from_request(request, app_name)
-
     else:
         return installed_app

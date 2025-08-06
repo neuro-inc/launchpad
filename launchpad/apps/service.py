@@ -79,7 +79,10 @@ class AppService:
                 try:
                     async with self._db() as db:
                         async with db.begin():
-                            installed_app.url = outputs["external_web_app_url"]["host"]
+                            output_url = outputs["external_web_app_url"]
+                            installed_app.url = (
+                                f"{output_url['protocol']}://{output_url['host']}"
+                            )
                 except KeyError:
                     logger.error(
                         f"App {launchpad_app_name} does not declare external web app url"
