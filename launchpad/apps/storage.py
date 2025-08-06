@@ -18,6 +18,7 @@ async def select_app(
     is_internal: bool | None = None,
     is_shared: bool | None = None,
     user_id: str | None = None,
+    url: str | None = None,
 ) -> InstalledApp | None:
     where = []
     if id is not None:
@@ -30,6 +31,8 @@ async def select_app(
         where.append(InstalledApp.is_shared.is_(is_shared))
     if user_id is not None:
         where.append(InstalledApp.user_id == user_id)
+    if url is not None:
+        where.append(InstalledApp.url == url)
 
     query = select(InstalledApp).where(and_(*where))
     cursor = await db.execute(query)

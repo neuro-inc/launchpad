@@ -58,9 +58,13 @@ platform.apolo.us/component: app
 {{- end }}
 
 {{- define "launchpad.domain" -}}
-{{- printf "%s.%s" .Values.launchpadHostPrefix "apps.dev.apolo.us" }}
+{{- printf "%s.%s" .Values.launchpadHostPrefix .Values.domain }}
+{{- end }}
+
+{{- define "launchpad.apiDomain" -}}
+{{- printf "%s-api.%s" .Values.launchpadHostPrefix .Values.domain }}
 {{- end }}
 
 {{- define "keycloak.domain" -}}
-{{- printf "%s.%s" .Values.keycloakHostPrefix "apps.dev.apolo.us" }}
+{{- printf "%s.%s" .Values.keycloakHostPrefix .Values.domain }}
 {{- end }}
