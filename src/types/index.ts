@@ -1,4 +1,5 @@
 export * from './apps';
+export * from './auth';
 export * from './context';
 export * from './helpers';
 export * from './params';

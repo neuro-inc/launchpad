@@ -74,6 +74,7 @@
     "import/no-cycle": "off",
     "import/prefer-default-export": "off",
     "no-param-reassign": "off",
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
     "react/function-component-definition": "off",
     "react/jsx-props-no-spreading": "off",
     "react/prop-types": "off",

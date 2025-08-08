@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 
 import { User } from '@typings';
-import { authOptions } from '@features';
+import { getAuthOptions } from '@features';
 import { isObject } from '@utils';
 
 import { Render, Theme } from '@components';
@@ -15,6 +15,7 @@ type Props = {
 };
 
 export const LayoutHeader: React.FC<Props> = async ({ className }) => {
+  const authOptions = await getAuthOptions();
   const data = (await getServerSession(authOptions)) as Session;
 
   const isAuthenticated = isObject(data?.user);

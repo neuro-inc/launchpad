@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
-import { KEYCLOAK_ISSUER, NEXTAUTH_URL } from '@constants';
-import { authOptions } from '@features/auth.feature';
+import { NEXTAUTH_URL } from '@constants';
+import { getAuthConfig, getAuthOptions } from '@features';
+import { getKeycloakIssuer } from '@utils/helpers';
 
 export async function GET() {
+  const config = await getAuthConfig();
+  const authOptions = await getAuthOptions();
   const session = await getServerSession(authOptions);
+
   const idToken = session?.idToken;
 
   const logoutUrl = new URL(
-    `${KEYCLOAK_ISSUER}/protocol/openid-connect/logout`,
+    `${getKeycloakIssuer(config)}/protocol/openid-connect/logout`,
   );
 
   if (idToken) {

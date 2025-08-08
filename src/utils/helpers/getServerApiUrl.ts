@@ -1,0 +1,42 @@
+const isLocalhostHost = (host: string): boolean => {
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host.endsWith('.localhost')
+  );
+};
+
+export const getServerApiUrl = (): string => {
+  let origin: string;
+
+  if (typeof window !== 'undefined') {
+    origin = window.location.origin;
+  } else {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { headers } = require('next/headers');
+
+      const hdrs = headers();
+      const host = hdrs.get('host');
+      const protocol = hdrs.get('x-forwarded-proto') || 'http';
+
+      origin = `${protocol}://${host}`;
+    } catch {
+      origin = 'http://localhost:3000';
+    }
+  }
+
+  const current = new URL(origin);
+  if (isLocalhostHost(current.hostname)) {
+    origin = 'https://launchpad.apps.dev.apolo.us';
+  }
+
+  const url = new URL(origin);
+  const parts = url.hostname.split('.');
+
+  parts[0] = `${parts[0]}-api`;
+  url.hostname = parts.join('.');
+
+  return url.toString().replace(/\/$/, '');
+};

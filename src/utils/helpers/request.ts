@@ -1,8 +1,8 @@
 import { getServerSession } from 'next-auth';
 import { getSession } from 'next-auth/react';
 
-import { SERVER_API_URL } from '@constants';
-import { authOptions } from '@features/auth.feature';
+import { IS_PRODUCTION, SERVER_API_URL } from '@constants';
+import { getAuthOptions } from '@features';
 
 async function makeRequest<T>(
   url: string,
@@ -27,10 +27,12 @@ async function makeRequest<T>(
   if (!response.ok) {
     const error = await response.json().catch(() => null);
 
-    // eslint-disable-next-line no-console
-    console.log(`Error in request ${url}:`, { error });
-    // eslint-disable-next-line no-console
-    console.log('Request failed with status: ', response.status);
+    if (!IS_PRODUCTION) {
+      // eslint-disable-next-line no-console
+      console.log(`Error in request ${url}:`, { error });
+      // eslint-disable-next-line no-console
+      console.log('Request failed with status: ', response.status);
+    }
 
     throw new Error(error);
   }
@@ -42,6 +44,7 @@ export async function serverRequest<T>(
   url: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const authOptions = await getAuthOptions();
   const session = await getServerSession(authOptions);
 
   return makeRequest<T>(url, options, session?.accessToken);

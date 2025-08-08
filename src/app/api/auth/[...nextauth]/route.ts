@@ -1,7 +1,10 @@
 import NextAuth from 'next-auth';
 
-import { authOptions } from '@features/auth.feature';
+import { getAuthOptions } from '@features';
 
-const handler = NextAuth(authOptions);
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const handler = NextAuth({ ...(await getAuthOptions()), debug: true });
 
 export { handler as GET, handler as POST };
