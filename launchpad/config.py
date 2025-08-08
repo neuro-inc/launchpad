@@ -26,6 +26,7 @@ class ServerConfig:
 class KeycloakConfig:
     url: URL
     realm: str
+    client_id: str = "frontend"
 
 
 @dataclass
@@ -35,6 +36,8 @@ class ApoloConfig:
     project_name: str
     apps_api_url: str
     token: str
+    self_domain: str
+    base_domain: str
 
 
 @dataclass
@@ -115,6 +118,8 @@ class EnvironConfigFactory:
             project_name=parsed_config["project_name"],
             apps_api_url=parsed_config["url"],
             token=parsed_config["token"],
+            self_domain=self._environ["SELF_DOMAIN"],
+            base_domain=self._environ["BASE_DOMAIN"],
         )
 
     def create_apps(self) -> AppsConfig:

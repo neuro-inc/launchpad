@@ -60,3 +60,7 @@ spec:
               value: {{ .Values.APOLO_PASSED_CONFIG | quote }}
             - name: LAUNCHPAD_INITIAL_CONFIG
               value: {{ .Values.LAUNCHPAD_INITIAL_CONFIG | quote }}
+            - name: SELF_DOMAIN
+              value: {{ include "launchpad.apiDomain" . }}
+            - name: BASE_DOMAIN
+              value: {{ .Values.domain }}

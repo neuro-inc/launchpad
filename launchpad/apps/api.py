@@ -15,7 +15,7 @@ from launchpad.apps.service import (
     AppUnhealthyError,
 )
 from launchpad.auth.dependencies import Auth
-from launchpad.errors import NotFound
+from launchpad.errors import NotFound, BadRequest
 from launchpad.ext.apps_api import NotFound as AppsApiNotFound
 
 apps_router = APIRouter()
@@ -51,9 +51,7 @@ async def view_post_run_app(
         except AppTemplateNotFound:
             raise NotFound(f"App {app_name} does not exist in the pool")
 
-    except AppUnhealthyError as e:
-        # an app exists, but it is not healthy. let's try to re-install
-        await app_service.delete(e.app_id)
-        return await app_service.install_from_request(request, app_name)
+    except AppUnhealthyError:
+        raise BadRequest(f"App {app_name} is unhealthy")
     else:
         return installed_app

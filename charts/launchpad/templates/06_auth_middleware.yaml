@@ -1,0 +1,12 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  labels:
+    application: launchpad
+  name: {{ include "launchpad.fullname" . }}-auth-middleware
+  namespace: platform
+spec:
+  forwardAuth:
+    address: {{ include "launchpad.apiDomain" . }}/auth/authorize
+    trustForwardHeader: true
+    authResponseHeadersRegex: ^X-

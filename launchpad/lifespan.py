@@ -7,6 +7,7 @@ import aiohttp
 from launchpad.app import Launchpad
 from launchpad.apps.lifespan import init_internal_apps
 from launchpad.apps.service import AppService
+from launchpad.auth.oauth import Oauth
 from launchpad.db.lifespan import create_db
 from launchpad.ext.apps_api import AppsApiClient
 
@@ -36,5 +37,11 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
             project_name=app.config.apolo.project_name,
         )
         app.app_service = AppService(app=app)
+        app.oauth = Oauth(
+            http=app.http,
+            keycloak_config=app.config.keycloak,
+            cookie_domain=app.config.apolo.base_domain,
+            launchpad_domain=app.config.apolo.self_domain,
+        )
         launchpad_init_task = asyncio.create_task(init_internal_apps(app))  # noqa: F841
         yield

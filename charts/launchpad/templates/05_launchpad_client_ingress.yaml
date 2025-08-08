@@ -13,4 +13,4 @@ spec:
               service:
                 name: {{ include "launchpad.fullname" $ }}-client
                 port:
-                  name: http
+                  name: https
