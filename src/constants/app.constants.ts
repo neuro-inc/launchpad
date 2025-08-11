@@ -1,4 +1,4 @@
-import { getServerApiUrl } from '@utils/helpers/getServerApiUrl';
+import { getServerApiUrl, getSiteUrl } from '@utils/helpers/getSiteUrl';
 
 export const ENVIRONMENT = process.env.ENVIRONMENT ?? 'local';
 export const IS_PRODUCTION = ENVIRONMENT === 'production';
@@ -9,6 +9,6 @@ export const SENTRY_DSN = process.env.SENTRY_DSN ?? '';
 export const SENTRY_AUTH_TOKEN = process.env.SENTRY_AUTH_TOKEN ?? '';
 
 export const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET ?? '';
-export const NEXTAUTH_URL = process.env.NEXTAUTH_URL ?? '';
+export const NEXTAUTH_URL = getSiteUrl();
 
 export const SERVER_API_URL = getServerApiUrl();

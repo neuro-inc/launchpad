@@ -7,7 +7,7 @@ const isLocalhostHost = (host: string): boolean => {
   );
 };
 
-export const getServerApiUrl = (): string => {
+export const getSiteUrl = (): string => {
   let origin: string;
 
   if (typeof window !== 'undefined') {
@@ -28,11 +28,17 @@ export const getServerApiUrl = (): string => {
   }
 
   const current = new URL(origin);
+
   if (isLocalhostHost(current.hostname)) {
     origin = 'https://launchpad.apps.dev.apolo.us';
   }
 
-  const url = new URL(origin);
+  return origin;
+};
+
+export const getServerApiUrl = (): string => {
+  const siteUrl = getSiteUrl();
+  const url = new URL(siteUrl);
   const parts = url.hostname.split('.');
 
   parts[0] = `${parts[0]}-api`;

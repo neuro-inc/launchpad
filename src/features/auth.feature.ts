@@ -123,6 +123,17 @@ export async function getAuthOptions(): Promise<AuthOptions> {
     ],
     secret: NEXTAUTH_SECRET,
     callbacks: {
+      async redirect({ url, baseUrl }) {
+        if (url.startsWith('/')) {
+          return `${baseUrl}${url}`;
+        }
+
+        if (new URL(url).origin === baseUrl) {
+          return url;
+        }
+
+        return baseUrl;
+      },
       async jwt({ token, account, profile }) {
         const now = Date.now();
 
