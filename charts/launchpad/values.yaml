@@ -99,3 +99,26 @@ keycloak:
     initialDelaySeconds: 60
     periodSeconds: 30
     failureThreshold: 5
+  initContainers:
+    - name: fetch-theme
+      image: alpine/git:2.45.2
+      imagePullPolicy: IfNotPresent
+      command: [ "/bin/sh","-lc" ]
+      args:
+        - |
+          set -euxo pipefail
+          git clone --depth 1 --branch "keycloak-theme" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
+          mkdir -p "/opt/bitnami/keycloak/themes/apolo"
+          cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
+          # Make sure the KC (1001) user can read the files
+          chown -R 1001:0 /opt/bitnami/keycloak/themes
+      volumeMounts:
+        - name: empty-dir
+          mountPath: /opt/bitnami/keycloak/themes
+          subPath: app-themes-dir
+      securityContext:
+        runAsUser: 0
+  extraStartupArgs: >-
+    --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false
+
+
