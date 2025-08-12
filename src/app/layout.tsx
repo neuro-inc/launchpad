@@ -10,7 +10,55 @@ import '@fortawesome/fontawesome-svg-core/styles.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Apolo Launchpad',
+  title: {
+    default: 'Launchpad',
+    template: '%s | Launchpad',
+  },
+  description:
+    'Launchpad - Your gateway to cloud-native application management. Deploy, monitor, and scale applications with ease.',
+  keywords: [
+    'launchpad',
+    'kubernetes',
+    'cloud-native',
+    'applications',
+    'deployment',
+    'monitoring',
+    'development',
+  ],
+  authors: [{ name: 'Neuro Inc' }],
+  creator: 'Neuro Inc',
+  publisher: 'Neuro Inc',
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    title: 'Launchpad',
+    description:
+      'Your gateway to cloud-native application management. Deploy, monitor, and scale applications with ease.',
+    siteName: 'Launchpad',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Launchpad',
+    description:
+      'Your gateway to cloud-native application management. Deploy, monitor, and scale applications with ease.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
 };
 
 const inter = Inter({
