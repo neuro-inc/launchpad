@@ -36,20 +36,20 @@ async def _token_from_request(request: Request) -> dict[str, Any]:
         _, access_token = request.headers["Authorization"].split(" ")
     except Exception:
         raise Unauthorized()
-    return await _token_from_string(
+    return await token_from_string(
         http=request.app.http,
         keycloak_config=request.app.config.keycloak,
         access_token=access_token,
     )
 
 
-async def _token_from_string(
+async def token_from_string(
     http: ClientSession, keycloak_config: KeycloakConfig, access_token: str
 ) -> dict[str, Any]:
     """
     Extracts and decodes the token from the request
     """
-    # get header so we can obtain a proper JWKS and determine the hashing algorithm
+    # get header so we can get a proper JWKS and determine the hashing algorithm
     try:
         header = jwt.get_unverified_header(access_token)
     except jwt.PyJWTError:
@@ -65,7 +65,7 @@ async def _token_from_string(
         logger.exception("can't obtain JWKS")
         raise Unauthorized()
 
-    # obtain a secret key from a JWKS
+    # get a secret key from a JWKS
     for key in jwks["keys"]:
         if key["kid"] == kid:
             secret_key = alg_obj.from_jwk(key)

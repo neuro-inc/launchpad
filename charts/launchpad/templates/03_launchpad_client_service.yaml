@@ -7,6 +7,7 @@ spec:
     - protocol: TCP
       port: 443
       targetPort: 443
+      name: https
   type: ExternalName
   sessionAffinity: None
   externalName: {{ .Values.netlifyDomain }}

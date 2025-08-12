@@ -1,3 +1,5 @@
+# todo: we need to generate a unique suffix for each launchpad instance
+
 appName: "launchpad"
 dbPassword: "Passw0rd!123"  # todo: should we autogenerate this, or pass as arg ?
 

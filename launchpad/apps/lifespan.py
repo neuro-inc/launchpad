@@ -46,10 +46,9 @@ async def init_internal_app(
         )
     except AppNotInstalledError:
         logger.info(f"internal app {internal_app} is not yet installed.")
-    except AppUnhealthyError as e:
-        # delete so we can try to re-install
-        logger.info(f"internal app {internal_app} is unhealthy. trying to recreate")
-        await app_service.delete(e.app_id)
+    except AppUnhealthyError:
+        logger.error(f"internal app {internal_app} is unhealthy")
+        return
     else:
         # an app is installed and is healthy
         logger.info(f"internal app {internal_app} is already installed and running")
