@@ -7,7 +7,7 @@ const isLocalhostHost = (host: string): boolean => {
   );
 };
 
-export const getSiteUrl = (): string => {
+export const getSiteUrl = async (): Promise<string> => {
   let origin: string;
 
   if (typeof window !== 'undefined') {
@@ -17,7 +17,7 @@ export const getSiteUrl = (): string => {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { headers } = require('next/headers');
 
-      const hdrs = headers();
+      const hdrs = await headers();
       const host = hdrs.get('host');
       const protocol = hdrs.get('x-forwarded-proto') || 'http';
 
@@ -36,8 +36,8 @@ export const getSiteUrl = (): string => {
   return origin;
 };
 
-export const getServerApiUrl = (): string => {
-  const siteUrl = getSiteUrl();
+export const getServerApiUrl = async (): Promise<string> => {
+  const siteUrl = await getSiteUrl();
   const url = new URL(siteUrl);
   const parts = url.hostname.split('.');
 

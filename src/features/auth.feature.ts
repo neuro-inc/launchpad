@@ -2,8 +2,8 @@ import { AuthOptions } from 'next-auth';
 import KeycloakProvider from 'next-auth/providers/keycloak';
 
 import { KeycloakConfig } from '@typings';
-import { NEXTAUTH_SECRET, SERVER_API_URL } from '@constants';
-import { getKeycloakIssuer } from '@utils/helpers';
+import { NEXTAUTH_SECRET } from '@constants';
+import { getKeycloakIssuer, getServerApiUrl } from '@utils/helpers';
 
 type AuthConfig = KeycloakConfig;
 
@@ -15,7 +15,8 @@ export async function getAuthConfig(): Promise<AuthConfig> {
   }
 
   try {
-    const response = await fetch(`${SERVER_API_URL}/config`);
+    const serverApiUrl = await getServerApiUrl();
+    const response = await fetch(`${serverApiUrl}/config`);
 
     if (!response.ok) {
       const errorText = await response.text();

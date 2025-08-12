@@ -1,14 +1,17 @@
 import { getServerSession } from 'next-auth';
 import { getSession } from 'next-auth/react';
 
-import { IS_PRODUCTION, SERVER_API_URL } from '@constants';
+import { IS_PRODUCTION } from '@constants';
 import { getAuthOptions } from '@features';
+
+import { getServerApiUrl } from './getSiteUrl';
 
 async function makeRequest<T>(
   url: string,
   options: RequestInit = {},
   token?: string,
 ): Promise<T> {
+  const serverApiUrl = await getServerApiUrl();
   const headers = new Headers(options.headers);
 
   if (token) {
@@ -19,7 +22,7 @@ async function makeRequest<T>(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${SERVER_API_URL}${url}`, {
+  const response = await fetch(`${serverApiUrl}${url}`, {
     ...options,
     headers,
   });
