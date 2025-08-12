@@ -1,0 +1,14 @@
+/* Replace brand logo on v2 theme (PatternFly brand element) */
+.pf-c-brand {
+  content: url("../img/logo.svg");
+  width: 180px;
+  height: auto;
+}
+
+/* Add a small tagline under the form (we'll inject a div in login.ftl) */
+.kc-tagline {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  opacity: 0.85;
+  text-align: center;
+}
