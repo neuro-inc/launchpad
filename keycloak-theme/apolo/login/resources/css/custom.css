@@ -1,6 +1,6 @@
 /* Replace brand logo on v2 theme (PatternFly brand element) */
 .pf-c-brand {
-  content: url("../img/logo.svg");
+  content: url("../img/lauchpand-logo-icon.svg");
   width: 180px;
   height: auto;
 }
