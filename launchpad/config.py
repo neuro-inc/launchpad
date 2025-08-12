@@ -38,7 +38,6 @@ class ApoloConfig:
     token: str
     self_domain: str
     base_domain: str
-    client_domain: str
 
 
 @dataclass
@@ -121,7 +120,6 @@ class EnvironConfigFactory:
             token=parsed_config["token"],
             self_domain=self._environ["SELF_DOMAIN"],
             base_domain=self._environ["BASE_DOMAIN"],
-            client_domain=self._environ["CLIENT_DOMAIN"],
         )
 
     def create_apps(self) -> AppsConfig:
