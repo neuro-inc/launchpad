@@ -7,9 +7,7 @@ type Props = {
 
 export const LayoutWrapper: React.FC<Props> = ({ className, children }) => {
   return (
-    <div
-      className={cn('flex size-full flex-1 flex-col bg-background', className)}
-    >
+    <div className={cn('flex size-full flex-1 flex-col', className)}>
       {children}
     </div>
   );

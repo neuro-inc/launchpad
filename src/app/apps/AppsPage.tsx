@@ -24,7 +24,7 @@ export const AppsPage: React.FC = async () => {
 
   return (
     <Layout>
-      <Layout.Container className="grid grid-cols-3 gap-6">
+      <Layout.Container className="grid grid-cols-3 gap-6 pb-10 sm:grid-cols-1 md:grid-cols-2 hd:gap-4">
         {apps.map(makeApp)}
       </Layout.Container>
     </Layout>

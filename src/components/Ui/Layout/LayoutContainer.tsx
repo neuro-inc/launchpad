@@ -6,7 +6,12 @@ type Props = {
 };
 
 export const LayoutContainer: React.FC<Props> = ({ className, children }) => (
-  <div className={cn('mx-auto w-full max-w-[1512px] px-20', className)}>
+  <div
+    className={cn(
+      'mx-auto w-full max-w-[1512px] px-20 hd:px-16 sm-md:px-4',
+      className,
+    )}
+  >
     {children}
   </div>
 );

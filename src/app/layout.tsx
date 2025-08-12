@@ -24,7 +24,7 @@ type Props = {
 
 export default async function RootLayout({ children }: Props) {
   return (
-    <html lang="en">
+    <html lang="en" className="bg-background">
       <body className={inter.className}>
         <NuqsAdapter>{children}</NuqsAdapter>
         <ToastContainer />

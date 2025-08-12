@@ -34,9 +34,9 @@ export const AppModal: React.FC<Props> = ({
   );
 
   return (
-    <div className="relative flex w-[800px] max-w-full flex-col gap-8 overflow-auto rounded-2xl bg-white p-14">
-      <div className="relative flex min-w-0 gap-9">
-        <div className="flex size-[160px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neural-02 bg-white">
+    <div className="relative flex w-[800px] max-w-full flex-col gap-8 overflow-auto rounded-2xl bg-white p-14 sm:px-4 md:px-8">
+      <div className="relative flex min-w-0 gap-9 sm:gap-5">
+        <div className="flex size-[160px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neural-02 bg-white sm:size-20">
           <Render if={logo}>
             <Image transition src={logo} width={160} height={160} alt="Logo" />
           </Render>
@@ -48,10 +48,10 @@ export const AppModal: React.FC<Props> = ({
         <div className="flex basis-full flex-col gap-3">
           <p className="text-h4">{title}</p>
           <Render if={descriptionShort}>
-            <p className="text-neural-04">{descriptionShort}</p>
+            <p className="text-neural-04 sm:-mt-2">{descriptionShort}</p>
           </Render>
           <div className="mt-auto flex justify-end">
-            <Link className="px-10" href={path.app(launchpadAppName)}>
+            <Link className="px-10 sm:w-full" href={path.app(launchpadAppName)}>
               Open
             </Link>
           </div>
