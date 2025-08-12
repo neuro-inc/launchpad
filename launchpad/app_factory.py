@@ -39,7 +39,9 @@ def create_app(config: Config) -> Launchpad:
     app = Launchpad(**app_kwargs)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[],
+        allow_origins=[
+            f"https://{config.apolo.client_domain}",
+        ],
         # todo: remove localhost after testing the app
         allow_origin_regex=re.compile(r"https?://(localhost|127.0.0.1):3000/?"),  # type: ignore[arg-type]
         allow_credentials=True,
