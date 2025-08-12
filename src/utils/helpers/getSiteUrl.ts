@@ -1,3 +1,5 @@
+console.log('process.env.VERCEL_URL', process.env.VERCEL_URL);
+
 const isLocalhostHost = (host: string): boolean => {
   return (
     host === 'localhost' ||
@@ -19,9 +21,12 @@ export const getSiteUrl = async (): Promise<string> => {
 
       const hdrs = await headers();
       const host = hdrs.get('host');
-      const protocol = hdrs.get('x-forwarded-proto') || 'http';
+      const protocol = hdrs.get('x-forwarded-proto') || 'https';
 
       origin = `${protocol}://${host}`;
+
+      // eslint-disable-next-line no-console
+      console.log('origin', origin);
     } catch {
       origin = 'http://localhost:3000';
     }

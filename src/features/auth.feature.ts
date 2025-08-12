@@ -3,7 +3,7 @@ import KeycloakProvider from 'next-auth/providers/keycloak';
 
 import { KeycloakConfig } from '@typings';
 import { NEXTAUTH_SECRET } from '@constants';
-import { getKeycloakIssuer, getServerApiUrl } from '@utils/helpers';
+import { getKeycloakIssuer, getServerApiUrl, getSiteUrl } from '@utils/helpers';
 
 type AuthConfig = KeycloakConfig;
 
@@ -124,7 +124,9 @@ export async function getAuthOptions(): Promise<AuthOptions> {
     ],
     secret: NEXTAUTH_SECRET,
     callbacks: {
-      async redirect({ url, baseUrl }) {
+      async redirect({ url }) {
+        const baseUrl = await getSiteUrl();
+
         if (url.startsWith('/')) {
           return `${baseUrl}${url}`;
         }

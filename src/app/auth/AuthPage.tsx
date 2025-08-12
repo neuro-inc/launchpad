@@ -11,6 +11,7 @@ export const AuthPage = () => {
           <h2 className="text-center text-h3 sm-md:text-h4">
             Welcome to <span className="inline-block">Launchpad</span>!
           </h2>
+          <p>Vercel URL: {process.env.VERCEL_URL}</p>
           <LoginButton />
         </Theme.Container>
       </Layout.Container>
