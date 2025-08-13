@@ -1,27 +1,10 @@
 {{/*
-Expand the name of the chart.
+Name of this particular launchpad instance
 */}}
 {{- define "launchpad.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- default .Values.appName | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
-*/}}
-{{- define "launchpad.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-{{- end }}
 
 {{/*
 Create chart name and version as used by the chart label.
@@ -58,13 +41,13 @@ platform.apolo.us/component: app
 {{- end }}
 
 {{- define "launchpad.domain" -}}
-{{- printf "%s.%s" .Values.launchpadHostPrefix .Values.domain }}
+{{- printf "%s.%s" .Values.appName .Values.domain }}
 {{- end }}
 
 {{- define "launchpad.apiDomain" -}}
-{{- printf "%s-api.%s" .Values.launchpadHostPrefix .Values.domain }}
+{{- printf "%s-api.%s" .Values.appName .Values.domain }}
 {{- end }}
 
 {{- define "keycloak.domain" -}}
-{{- printf "%s.%s" .Values.keycloakHostPrefix .Values.domain }}
+{{- printf "%s-keycloak.%s" .Values.appName .Values.domain }}
 {{- end }}

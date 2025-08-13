@@ -1,17 +1,17 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: keycloak
+  name: {{ include "launchpad.name" . }}
 spec:
   ingressClassName: traefik
   rules:
-    - host: {{ include "keycloak.domain" . }}
+    - host: {{ include "launchpad.apiDomain" . }}
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: launchpad-keycloak
+                name: {{ include "launchpad.name" $ }}
                 port:
                   name: http

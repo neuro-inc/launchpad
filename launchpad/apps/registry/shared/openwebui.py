@@ -20,6 +20,7 @@ class OpenWebUIAppContext(BaseContext):
     llm_inference_app_id: UUID
     embeddings_app_id: UUID
     postgres_app_id: UUID
+    auth_middleware_name: str
 
     @classmethod
     async def from_request(
@@ -30,7 +31,9 @@ class OpenWebUIAppContext(BaseContext):
         from launchpad.apps.service import AppNotInstalledError, AppUnhealthyError
 
         app_service = request.app.app_service
-        params: dict[str, UUID] = {}
+        params = {
+            "auth_middleware_name": request.app.config.apolo.auth_middleware_name,
+        }
 
         for required_app_name, context_property_name in (
             (APP_NAME_LLM_INFERENCE, "llm_inference_app_id"),
@@ -85,7 +88,12 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
 
     async def _generate_inputs(self) -> dict[str, Any]:
         return {
-            "ingress_http": {"auth": True},
+            "networking_config": {
+                "ingress_http": {"auth": True},
+                "advanced_networking": {
+                    "ingress_middleware": {"name": self._context.auth_middleware_name}
+                },
+            },
             "embeddings_api": {
                 "type": "app-instance-ref",
                 "instance_id": str(self._context.embeddings_app_id),

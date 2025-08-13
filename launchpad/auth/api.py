@@ -2,7 +2,7 @@ import logging
 
 from fastapi import APIRouter
 from starlette.requests import Request
-from starlette.responses import Response, PlainTextResponse, RedirectResponse
+from starlette.responses import Response, PlainTextResponse
 
 from launchpad.apps.storage import select_app
 from launchpad.auth import (
@@ -25,7 +25,7 @@ async def view_post_authorize(
     request: Request,
     db: Db,
     oauth: DepOauth,
-) -> RedirectResponse | PlainTextResponse:
+) -> Response:
     app_url = f"https://{request.headers[HEADER_X_FORWARDED_HOST]}"
     installed_app = await select_app(db=db, url=app_url)
     if installed_app is None:
@@ -77,7 +77,7 @@ async def view_post_authorize(
 async def callback(
     request: Request,
     oauth: DepOauth,
-) -> RedirectResponse:
+) -> Response:
     try:
         return await oauth.callback(request)
     except OauthError as e:

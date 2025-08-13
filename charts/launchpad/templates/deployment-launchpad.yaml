@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "launchpad.fullname" . }}
+  name: {{ include "launchpad.name" . }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
@@ -48,7 +48,7 @@ spec:
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.appName }}-db-secret
+                  name: {{ .Values.dbSecretName }}
                   key: DB_PASSWORD
             - name: DB_NAME
               value: "launchpad"
@@ -64,3 +64,5 @@ spec:
               value: {{ include "launchpad.apiDomain" . }}
             - name: BASE_DOMAIN
               value: {{ .Values.domain }}
+            - name: AUTH_MIDDLEWARE_NAME
+              value: platform-{{ include "launchpad.name" . }}-auth-middleware
