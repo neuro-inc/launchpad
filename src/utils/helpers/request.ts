@@ -40,7 +40,7 @@ async function makeRequest<T>(
     throw new Error(error);
   }
 
-  return response.json() as Promise<T>;
+  return response.json().catch(() => null) as Promise<T>;
 }
 
 export async function serverRequest<T>(

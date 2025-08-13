@@ -27,18 +27,18 @@ export const getSiteUrl = async (): Promise<string> => {
     }
   }
 
-  const current = new URL(origin);
-
-  if (isLocalhostHost(current.hostname)) {
-    origin = 'https://launchpad.apps.dev.apolo.us';
-  }
-
   return origin;
 };
 
 export const getServerApiUrl = async (): Promise<string> => {
   const siteUrl = await getSiteUrl();
-  const url = new URL(siteUrl);
+
+  let url = new URL(siteUrl);
+
+  if (isLocalhostHost(url.hostname)) {
+    url = new URL('https://launchpad.apps.dev.apolo.us');
+  }
+
   const parts = url.hostname.split('.');
 
   parts[0] = `${parts[0]}-api`;
