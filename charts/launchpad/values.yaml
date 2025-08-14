@@ -4,7 +4,7 @@ dbSecretName: launchpad-db-secret  # in real app will be f"launchpad-{apolo_app_
 
 image:
   repository: "ghcr.io/neuro-inc/launchpad"
-  tag: "latest"
+  tag: ""  # will be populated by apps
 
 replicas: 1
 port: 8080
