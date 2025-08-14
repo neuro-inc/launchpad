@@ -2,7 +2,7 @@
 Name of this particular launchpad instance
 */}}
 {{- define "launchpad.name" -}}
-{{- default .Values.appName | trunc 63 | trimSuffix "-" }}
+{{- printf "launchpad-%s" .Values.apolo_app_id | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 
@@ -41,13 +41,13 @@ platform.apolo.us/component: app
 {{- end }}
 
 {{- define "launchpad.domain" -}}
-{{- printf "%s.%s" .Values.appName .Values.domain }}
+{{- printf "%s.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}
 
 {{- define "launchpad.apiDomain" -}}
-{{- printf "%s-api.%s" .Values.appName .Values.domain }}
+{{- printf "%s-api.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}
 
 {{- define "keycloak.domain" -}}
-{{- printf "%s-keycloak.%s" .Values.appName .Values.domain }}
+{{- printf "%s-keycloak.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}

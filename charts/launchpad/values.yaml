@@ -1,5 +1,4 @@
-apolo_app_id: null
-appName: launchpad  # in real app will be f"launchpad-{apolo_app_id}"
+apolo_app_id: ""  # passed as an input
 dbPassword: null
 dbSecretName: launchpad-db-secret  # in real app will be f"launchpad-{apolo_app_id}-db-secret"
 
