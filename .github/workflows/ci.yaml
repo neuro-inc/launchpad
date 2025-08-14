@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+
+jobs:
+
+  release:
+    name: Create release
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
+    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v25.4.0
+    with:
+      image: launchpad
+      helm_charts: launchpad
