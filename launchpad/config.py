@@ -38,6 +38,7 @@ class ApoloConfig:
     token: str
     self_domain: str
     base_domain: str
+    auth_middleware_name: str
 
 
 @dataclass
@@ -120,6 +121,7 @@ class EnvironConfigFactory:
             token=parsed_config["token"],
             self_domain=self._environ["SELF_DOMAIN"],
             base_domain=self._environ["BASE_DOMAIN"],
+            auth_middleware_name=self._environ["AUTH_MIDDLEWARE_NAME"],
         )
 
     def create_apps(self) -> AppsConfig:

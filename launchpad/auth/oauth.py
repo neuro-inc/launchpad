@@ -3,7 +3,7 @@ import hashlib
 import logging
 import os
 import typing
-from typing import Annotated
+from typing import Annotated, TYPE_CHECKING
 from urllib.parse import urlencode
 
 import backoff
@@ -12,8 +12,11 @@ from fastapi import Depends
 from starlette.requests import Request
 from starlette.responses import Response, RedirectResponse
 
-from launchpad.app import Launchpad
 from launchpad.config import KeycloakConfig
+
+if TYPE_CHECKING:
+    from launchpad.app import Launchpad
+
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +153,7 @@ class Oauth:
 
 
 def dep_oauth(request: Request) -> Oauth:
-    app: Launchpad = request.app
+    app: "Launchpad" = request.app
     return app.oauth
 
 

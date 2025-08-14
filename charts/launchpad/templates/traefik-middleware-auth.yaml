@@ -3,7 +3,7 @@ kind: Middleware
 metadata:
   labels:
     application: launchpad
-  name: {{ include "launchpad.fullname" . }}-auth-middleware
+  name: {{ include "launchpad.name" . }}-auth-middleware
   namespace: platform
 spec:
   forwardAuth:
