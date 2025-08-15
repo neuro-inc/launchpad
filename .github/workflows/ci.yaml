@@ -2,15 +2,45 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [ds/ci]
     tags: ["v*"]
+
+env:
+  IMAGE_NAME: "launchpad"
 
 jobs:
 
-  release:
-    name: Create release
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/'))
-    uses: neuro-inc/reuse/.github/workflows/release-service.yaml@v25.4.0
-    with:
-      image: launchpad
-      helm_charts: launchpad
+  release-hook-image:
+    name: Release image
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v4
+
+      - name: Purge old artifacts
+        uses: kolpav/purge-artifacts-action@v1
+        with:
+          token: ${{ github.token }}
+          expire-in: 30mins
+
+      - name: Release image
+        run: |
+          export IMAGE_TAG=${GITHUB_REF#refs/tags/v}
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build image
+        run: |
+          docker build -t $(IMAGE_NAME):latest -f Dockerfile .
+
+      - name: Push image
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        run: |
+          docker tag $(IMAGE_NAME):latest ghcr.io/neuro-inc/$(IMAGE_NAME):$(IMAGE_TAG)
+          docker push ghcr.io/neuro-inc/$(IMAGE_NAME):$(IMAGE_TAG)
