@@ -10,10 +10,19 @@ env:
 
 jobs:
 
+  debug:
+    name: Debug
+    runs-on: ubuntu-latest
+    steps:
+      - name: print
+        run: |
+          echo github.event_name
+          echo github.ref
+
   release-hook-image:
     name: Release image
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && github.ref == 'refs/heads/ds/ci'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Checkout commit
         uses: actions/checkout@v4
