@@ -113,11 +113,13 @@ class EnvironConfigFactory:
     def create_apolo(self) -> ApoloConfig:
         passed_config = os.environ["APOLO_PASSED_CONFIG"]
         parsed_config = json.loads(b64decode(passed_config))
+        url = URL(parsed_config["url"])
+        apps_api_url = f"{url.scheme}://{url.host}/apis/apps"
         return ApoloConfig(
             cluster=parsed_config["cluster"],
             org_name=parsed_config["org_name"],
             project_name=parsed_config["project_name"],
-            apps_api_url=parsed_config["url"],
+            apps_api_url=apps_api_url,
             token=parsed_config["token"],
             self_domain=self._environ["SELF_DOMAIN"],
             base_domain=self._environ["BASE_DOMAIN"],
