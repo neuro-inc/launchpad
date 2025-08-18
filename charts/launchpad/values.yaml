@@ -16,6 +16,7 @@ netlifyDomain: "launchpad-web-ui-dev-apolo-us.netlify.app"
 APOLO_PASSED_CONFIG: null
 preset_name: cpu-medium
 # apolo_app_id: app-id-12345
+application: launchpad
 
 # application specific values example
 LAUNCHPAD_INITIAL_CONFIG: >
@@ -94,3 +95,7 @@ keycloak:
     initialDelaySeconds: 60
     periodSeconds: 30
     failureThreshold: 5
+  tolerations:
+    - effect: NoSchedule              
+      key: platform.neuromation.io/job
+      operator: Exists

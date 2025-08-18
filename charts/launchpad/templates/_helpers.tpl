@@ -17,6 +17,7 @@ Create chart name and version as used by the chart label.
 Common labels
 */}}
 {{- define "launchpad.labels" -}}
+application: {{ .Values.labels.application }}
 helm.sh/chart: {{ include "launchpad.chart" . }}
 app.kubernetes.io/name: {{ include "launchpad.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
