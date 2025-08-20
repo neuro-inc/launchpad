@@ -7,13 +7,7 @@ import { getKeycloakIssuer, getServerApiUrl, getSiteUrl } from '@utils/helpers';
 
 type AuthConfig = KeycloakConfig;
 
-let cachedAuthConfig: AuthConfig | null = null;
-
 export async function getAuthConfig(): Promise<AuthConfig> {
-  if (cachedAuthConfig) {
-    return cachedAuthConfig;
-  }
-
   try {
     const serverApiUrl = await getServerApiUrl();
     const response = await fetch(`${serverApiUrl}/config`, {
@@ -52,9 +46,7 @@ export async function getAuthConfig(): Promise<AuthConfig> {
       throw new Error('Invalid response structure: keycloak config not found');
     }
 
-    cachedAuthConfig = responseJson.keycloak;
-
-    return cachedAuthConfig;
+    return responseJson.keycloak;
   } catch (error) {
     console.error('Error fetching auth config:', error);
 
