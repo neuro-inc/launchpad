@@ -16,7 +16,9 @@ export async function getAuthConfig(): Promise<AuthConfig> {
 
   try {
     const serverApiUrl = await getServerApiUrl();
-    const response = await fetch(`${serverApiUrl}/config`);
+    const response = await fetch(`${serverApiUrl}/config`, {
+      cache: 'no-store',
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
