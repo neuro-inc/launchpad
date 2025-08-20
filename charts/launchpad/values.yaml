@@ -19,6 +19,10 @@ preset_name: cpu-medium
 labels:
   application: launchpad
 
+
+podLabels: {}
+podAnnotations: {}
+
 # application specific values example
 LAUNCHPAD_INITIAL_CONFIG: >
   {
@@ -100,3 +104,7 @@ keycloak:
     - effect: NoSchedule              
       key: platform.neuromation.io/job
       operator: Exists
+  service:
+    extraLabels: {}
+    headless:
+      extraLabels: {}
