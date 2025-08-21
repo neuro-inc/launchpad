@@ -4,6 +4,7 @@ metadata:
   name: {{ include "launchpad.name" . }}
   labels:
     {{ include "launchpad.labels" . | nindent 4 }}
+    service: launchpad
 spec:
   type: ClusterIP
   ports:
