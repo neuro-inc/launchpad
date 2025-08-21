@@ -1,9 +1,9 @@
 dependencies:
 - name: mlops-keycloak
   repository: oci://ghcr.io/neuro-inc/helm-charts
-  version: 25.8.0-dev.13
+  version: 25.8.0-dev.14
 - name: postgresql
   repository: https://charts.bitnami.com/bitnami
   version: 16.7.19
-digest: sha256:159076a1456113e319bbb3a78e0ff19a7d689e1f8be88e3425f9eafa93ea4152
-generated: "2025-08-21T10:31:53.017669679-03:00"
+digest: sha256:243c917c6e7b21770d5622261db892a3fbf90b092a555538aba8ebfd37d1daa1
+generated: "2025-08-21T11:11:33.422309733-03:00"
