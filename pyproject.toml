@@ -56,7 +56,7 @@ alembic = "^1.16.4"
 sqlalchemy = {extras = ["asyncio", "postgresql-asyncpg"], version = "^2.0.41"}
 orjson = "^3.11.0"
 python-dotenv = "^1.1.1"
-fastapi-pagination = "^0.13.3"
+fastapi-pagination = "^0.14.0"
 aiohttp = "^3.12.14"
 python-keycloak = "^5.7.0"
 pydantic = "^2.11.7"
