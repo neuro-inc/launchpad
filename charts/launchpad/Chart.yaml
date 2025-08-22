@@ -5,9 +5,9 @@ kubeVersion: ">= 1.19.0-0"
 version: 1.0.0
 appVersion: 1.0.0
 dependencies:
-  - name: mlops-keycloak
-    version: "25.8.0-dev.15"
-    repository: "oci://ghcr.io/neuro-inc/helm-charts"
+  - name: keycloak
+    version: "24.7.5"
+    repository: "https://charts.bitnami.com/bitnami"
   - name: postgresql
     version: "16.7.19"
     repository: "https://charts.bitnami.com/bitnami"
