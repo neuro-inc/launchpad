@@ -106,3 +106,4 @@ keycloak:
       operator: Exists
   commonLabels:
     service: keycloak
+    application: launchpad
