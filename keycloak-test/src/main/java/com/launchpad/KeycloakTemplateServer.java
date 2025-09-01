@@ -141,7 +141,7 @@ public class KeycloakTemplateServer {
         Map<String, Object> dataModel = new HashMap<>();
         
         // Basic template variables
-        dataModel.put("title", "Login to Launchpad");
+        dataModel.put("title", "Login");
         dataModel.put("usernameLabel", "Username or Email");
         dataModel.put("passwordLabel", "Password");
         dataModel.put("loginButtonText", "Log In");
@@ -159,11 +159,6 @@ public class KeycloakTemplateServer {
         dataModel.put("noAccountText", "Don't have an account?");
         dataModel.put("registerText", "Sign up");
         
-        // Error testing - uncomment to test error display
-        // dataModel.put("errorMessage", "Invalid username or password.");
-        // dataModel.put("usernameError", "Please enter a valid username or email.");
-        // dataModel.put("passwordError", "Password is required.");
-        
         return dataModel;
     }
 
@@ -171,7 +166,7 @@ public class KeycloakTemplateServer {
         Map<String, Object> dataModel = new HashMap<>();
         
         // Basic template variables
-        dataModel.put("title", "Login to Launchpad");
+        dataModel.put("title", "Login");
         dataModel.put("usernameLabel", "Username or Email");
         dataModel.put("passwordLabel", "Password");
         dataModel.put("loginButtonText", "Log In");
