@@ -8,7 +8,6 @@
 
     <#if section = "header">
         ${msg("loginAccountTitle")}
-        <img src="${url.resourcesPath}/img/lauchpand-logo-icon.svg">
     <#elseif section = "form">
         <div id="kc-form">
           <div id="kc-form-wrapper">
@@ -20,16 +19,10 @@
                         </#assign>
                         <@field.input name="username" label=label error=kcSanitize(messagesPerField.getFirstError('username','password'))?no_esc
                             autofocus=true autocomplete="${(enableWebAuthnConditionalUI?has_content)?then('username webauthn', 'username')}" value=login.username!'' />
-                        <@field.password name="password" label=msg("password") error="" forgotPassword=realm.resetPasswordAllowed autofocus=usernameHidden?? autocomplete="current-password">
-                            <#if realm.rememberMe && !usernameHidden??>
-                                <@field.checkbox name="rememberMe" label=msg("rememberMe") value=login.rememberMe?? />
-                            </#if>
+                        <@field.password name="password" label=msg("password") error=kcSanitize(messagesPerField.getFirstError('password'))?no_esc forgotPassword=false autofocus=usernameHidden?? autocomplete="current-password">
                         </@field.password>
                     <#else>
-                        <@field.password name="password" label=msg("password") forgotPassword=realm.resetPasswordAllowed autofocus=usernameHidden?? autocomplete="current-password">
-                            <#if realm.rememberMe && !usernameHidden??>
-                                <@field.checkbox name="rememberMe" label=msg("rememberMe") value=login.rememberMe?? />
-                            </#if>
+                        <@field.password name="password" label=msg("password") error=kcSanitize(messagesPerField.getFirstError('password'))?no_esc forgotPassword=false autofocus=usernameHidden?? autocomplete="current-password">
                         </@field.password>
                     </#if>
 
