@@ -111,7 +111,7 @@ class EnvironConfigFactory:
         )
 
     def create_apolo(self) -> ApoloConfig:
-        passed_config = os.environ["APOLO_PASSED_CONFIG"]
+        passed_config = self._environ["APOLO_PASSED_CONFIG"]
         parsed_config = json.loads(b64decode(passed_config))
         url = URL(parsed_config["url"])
         apps_api_url = f"{url.scheme}://{url.host}/apis/apps"
@@ -127,7 +127,7 @@ class EnvironConfigFactory:
         )
 
     def create_apps(self) -> AppsConfig:
-        initial_config = json.loads(os.environ["LAUNCHPAD_INITIAL_CONFIG"])
+        initial_config = json.loads(self._environ["LAUNCHPAD_INITIAL_CONFIG"])
         return AppsConfig(
             vllm=initial_config["vllm"],
             postgres=initial_config["postgres"],
