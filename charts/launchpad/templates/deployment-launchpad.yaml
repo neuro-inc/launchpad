@@ -69,8 +69,6 @@ spec:
               value: {{ include "launchpad.apiDomain" . }}
             - name: BASE_DOMAIN
               value: {{ .Values.domain }}
-            - name: CLIENT_DOMAIN
-              value: {{ include "launchpad.domain" . }}
             - name: AUTH_MIDDLEWARE_NAME
               value: platform-{{ include "launchpad.name" . }}-auth-middleware
           {{- if .Values.resources }}

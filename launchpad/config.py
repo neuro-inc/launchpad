@@ -39,7 +39,6 @@ class ApoloConfig:
     self_domain: str
     base_domain: str
     auth_middleware_name: str
-    client_domain: str
 
 
 @dataclass
@@ -125,7 +124,6 @@ class EnvironConfigFactory:
             self_domain=self._environ["SELF_DOMAIN"],
             base_domain=self._environ["BASE_DOMAIN"],
             auth_middleware_name=self._environ["AUTH_MIDDLEWARE_NAME"],
-            client_domain=self._environ["CLIENT_DOMAIN"],
         )
 
     def create_apps(self) -> AppsConfig:
