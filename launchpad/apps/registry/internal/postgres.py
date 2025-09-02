@@ -30,7 +30,6 @@ class PostgresApp(App[InternalAppContext]):
                     "db_users": [{"name": "user", "db_names": ["openwebui"]}],
                 },
                 "pg_bouncer": {"replicas": 1},
-                "backup": {"enable": False},
                 "displayName": APP_NAME_POSTGRES,
             }
         )
