@@ -64,6 +64,8 @@ LAUNCHPAD_INITIAL_CONFIG: >
 postgresql:
   enabled: true
   fullnameOverride: launchpad-db  # in real app will be f"launchpad-{apolo_app_id}-db"
+  commonAnnotations:
+    argocd.argoproj.io/sync-wave: "0"
   auth:
     existingSecret: launchpad-db-secret  # # in real app will be f"launchpad-{apolo_app_id}-db-secret"
     username: postgres
@@ -84,6 +86,8 @@ keycloak:
   defaultRealm: "master" # internal variable
   fullnameOverride: launchpad-keycloak  # in real app will be f"launchpad-{apolo_app_id}-keycloak"
   replicas: 1
+  commonAnnotations:
+    argocd.argoproj.io/sync-wave: "1"
   auth:
     adminUser: "admin"
     adminPassword: "Passw0rd!123"  # todo: should be passed as an arg?
