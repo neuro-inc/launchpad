@@ -1,6 +1,7 @@
 apolo_app_id: ""  # passed as an input
 dbPassword: null
 dbSecretName: launchpad-db-secret  # in real app will be f"launchpad-{apolo_app_id}-db-secret"
+keycloakRealmImportConfigMapName: launchpad-keycloak-realm  # in real app will be f"launchpad-{apolo_app_id}-keycloak-realm"
 
 image:
   repository: "ghcr.io/neuro-inc/launchpad"
@@ -83,7 +84,7 @@ postgresql:
 
 
 keycloak:
-  defaultRealm: "master" # internal variable
+  defaultRealm: "apolo" # internal variable
   fullnameOverride: launchpad-keycloak  # in real app will be f"launchpad-{apolo_app_id}-keycloak"
   replicas: 1
   commonAnnotations:
@@ -101,7 +102,7 @@ keycloak:
     existingSecretPasswordKey: "DB_PASSWORD"
   proxy: "edge"
   readinessProbe:
-    initialDelaySeconds: 60
+    initialDelaySeconds: 120
     periodSeconds: 30
     failureThreshold: 5
   tolerations:
@@ -111,6 +112,17 @@ keycloak:
   commonLabels:
     service: keycloak
     application: launchpad
+  extraVolumes:
+    - name: realm-import
+      configMap:
+        name: launchpad-keycloak-realm  # in real app will be f"launchpad-{apolo_app_id}-keycloak-realm"
+        items:
+          - key: realm.json
+            path: realm.json
+  extraVolumeMounts:
+    - name: realm-import
+      mountPath: /opt/bitnami/keycloak/data/import
+      readOnly: true
   initContainers:
     - name: fetch-theme
       image: alpine/git:2.45.2
@@ -131,4 +143,4 @@ keycloak:
       securityContext:
         runAsUser: 0
   extraStartupArgs: >-
-    --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false
+    --import-realm --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false

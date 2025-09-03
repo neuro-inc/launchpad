@@ -24,11 +24,13 @@ async def auth_required(
     JWT authentication entry-point
     """
     decoded_token = await _token_from_request(request)
-    return User(
-        id=decoded_token["email"],
-        email=decoded_token["email"],
-        name=decoded_token["name"],
-    )
+    try:
+        email = decoded_token["email"]
+    except KeyError:
+        logger.error("Unable to extract `email` from the token")
+        raise Unauthorized("Unable to authorize a user without an email")
+    name = decoded_token.get("name") or ""
+    return User(id=email, email=email, name=name)
 
 
 async def _token_from_request(request: Request) -> dict[str, Any]:
