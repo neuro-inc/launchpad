@@ -1,8 +1,11 @@
+import logging
 import typing
 from typing import Any
 from uuid import UUID
 
 from aiohttp import ClientSession, ClientResponseError
+
+logger = logging.getLogger(__name__)
 
 
 class AppsApiError(Exception):
@@ -96,9 +99,12 @@ class AppsApiClient:
         except TimeoutError as e:
             raise AppsApiError() from e
 
+        raw_response = await response.text(errors="ignore")
+
         try:
             response.raise_for_status()
         except ClientResponseError as e:
+            logger.error(f"Bad response: {raw_response}")
             match e.status:
                 case 404:
                     raise NotFound() from e
@@ -111,4 +117,5 @@ class AppsApiClient:
             response = await response.json()
             return typing.cast(dict[str, Any], response)
         except ValueError as e:
+            logger.error(f"Bad response: {raw_response}")
             raise AppsApiError() from e
