@@ -25,15 +25,14 @@ export const metadata: Metadata = {
     'monitoring',
     'development',
   ],
-  authors: [{ name: 'Neuro Inc' }],
-  creator: 'Neuro Inc',
-  publisher: 'Neuro Inc',
+  authors: [{ name: 'Apolo' }],
+  creator: 'Apolo',
+  publisher: 'Apolo',
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
   openGraph: {
     type: 'website',
     locale: 'en_US',

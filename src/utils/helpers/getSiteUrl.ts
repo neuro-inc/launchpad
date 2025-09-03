@@ -36,7 +36,13 @@ export const getServerApiUrl = async (): Promise<string> => {
   let url = new URL(siteUrl);
 
   if (isLocalhostHost(url.hostname)) {
-    url = new URL('https://launchpad.apps.dev.apolo.us');
+    const localhostServerApiUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
+
+    url = new URL(localhostServerApiUrl);
+
+    if (!localhostServerApiUrl) {
+      console.warn('NEXT_PUBLIC_SITE_URL env var is not set for local usage');
+    }
   }
 
   const parts = url.hostname.split('.');

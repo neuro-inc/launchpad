@@ -1,3 +1,5 @@
+'use client';
+
 import { PopoverContentProps } from '@radix-ui/react-popover';
 import * as PopoverUI from '@radix-ui/react-popover';
 

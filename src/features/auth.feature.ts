@@ -82,7 +82,10 @@ export const refreshAccessToken = async (token: any) => {
       ...token,
       accessToken: refreshed.access_token,
       accessTokenExpires: Date.now() + refreshed.expires_in * 1000,
-      refreshToken: refreshed.refresh_token ?? token.refreshToken, // fallback to old refresh token
+      /**
+       * Fallback to old refresh token
+       */
+      refreshToken: refreshed.refresh_token ?? token.refreshToken,
       idToken: refreshed.id_token ?? token.idToken,
     };
   } catch (error) {
@@ -103,20 +106,31 @@ export async function getAuthOptions(): Promise<AuthOptions> {
       KeycloakProvider({
         clientId: 'frontend',
         /**
-         * There is public client authentication enabled in Keycloak,
+         * For public clients, use undefined instead of empty string
+         * This prevents NextAuth from trying to use client secret authentication
          */
-        // @ts-ignore
         clientSecret: '',
         issuer: getKeycloakIssuer(config),
+        /**
+         * Only PKCE for public clients
+         */
         checks: ['pkce'],
         authorization: {
           params: {
             scope: 'openid profile email offline_access',
+            response_type: 'code',
           },
         },
       }),
     ],
     secret: NEXTAUTH_SECRET,
+    debug: true,
+    session: {
+      /**
+       * Using JWT for public clients
+       */
+      strategy: 'jwt',
+    },
     callbacks: {
       async redirect({ url }) {
         const baseUrl = await getSiteUrl();
@@ -130,6 +144,30 @@ export async function getAuthOptions(): Promise<AuthOptions> {
         }
 
         return baseUrl;
+      },
+      async signIn({ user, account, profile }) {
+        /**
+         * Add debugging for sign-in attempts
+         */
+        // eslint-disable-next-line no-console
+        console.log('SignIn attempt:', {
+          user: user?.email,
+          account: account?.provider,
+          profile: profile?.email,
+          error: account?.error,
+        });
+
+        if (account?.error) {
+          // eslint-disable-next-line no-console
+          console.error('Account error during sign in:', account.error);
+
+          /**
+           * Reject sign in if there's an account error
+           */
+          return false;
+        }
+
+        return true;
       },
       async jwt({ token, account, profile }) {
         const now = Date.now();
