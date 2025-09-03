@@ -132,18 +132,40 @@ export async function getAuthOptions(): Promise<AuthOptions> {
       strategy: 'jwt',
     },
     callbacks: {
-      async redirect({ url }) {
-        const baseUrl = await getSiteUrl();
+      async redirect({ url, baseUrl }) {
+        const siteUrl = await getSiteUrl();
 
+        /**
+         * Log redirect parameters for debugging
+         */
+        // eslint-disable-next-line no-console
+        console.log('Redirect callback:', { url, baseUrl, siteUrl });
+
+        /**
+         * If url starts with /, it's a relative path - make it absolute
+         */
         if (url.startsWith('/')) {
-          return `${baseUrl}${url}`;
+          return `${siteUrl}${url}`;
         }
 
-        if (new URL(url).origin === baseUrl) {
+        /**
+         * If url is from the same origin as our site, allow it
+         */
+        if (new URL(url).origin === siteUrl) {
           return url;
         }
 
-        return baseUrl;
+        /**
+         * If url is from the same origin as NextAuth's baseUrl, allow it
+         */
+        if (baseUrl && new URL(url).origin === baseUrl) {
+          return url;
+        }
+
+        /**
+         * Default fallback - return to the apps page instead of auth page
+         */
+        return `${siteUrl}/apps`;
       },
       async signIn({ user, account, profile }) {
         /**
