@@ -1,29 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 
 import { Button } from '@components';
 
 export const LoginButton: React.FC = () => {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
 
   /**
-   * Get the callback URL from search params or default to /apps
+   * Get the callback URL - default to /apps if on auth page
    */
   const getCallbackUrl = () => {
-    const callbackUrl = searchParams.get('callbackUrl');
-
-    /**
-     * If we have a callbackUrl in search params, use it
-     */
-    if (callbackUrl) {
-      return callbackUrl;
-    }
-
     /**
      * If we're on auth page, default to /apps
      */
