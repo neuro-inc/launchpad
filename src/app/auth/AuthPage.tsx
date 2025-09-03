@@ -1,5 +1,5 @@
 import { getAuthConfig } from '@features';
-import { getServerApiUrl } from '@utils/helpers';
+import { getServerApiUrl, getSiteUrl } from '@utils/helpers';
 
 import { Theme } from '@components';
 import { Layout } from '@components/Ui';
@@ -8,6 +8,7 @@ import { LoginButton } from './LoginButton';
 
 export const AuthPage = async () => {
   const config = await getAuthConfig();
+  const siteUrl = await getSiteUrl();
   const serverApiUrl = await getServerApiUrl();
 
   return (
@@ -17,6 +18,7 @@ export const AuthPage = async () => {
           <h2 className="text-center text-h3 sm-md:text-h4">
             Welcome to <span className="inline-block">Launchpad</span>!
           </h2>
+          <p>Site: {siteUrl}</p>
           <p>Realm: {config?.realm}</p>
           <p>URL: {config?.url}</p>
           <p>serverApiUrl: {serverApiUrl}</p>
