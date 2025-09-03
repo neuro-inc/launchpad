@@ -19,10 +19,16 @@ export const getSiteUrl = async (): Promise<string> => {
 
       const hdrs = await headers();
       const host = hdrs.get('host');
+      // eslint-disable-next-line no-console
+      console.log('host', host);
       const protocol = hdrs.get('x-forwarded-proto') || 'https';
 
       origin = `${protocol}://${host}`;
+      // eslint-disable-next-line no-console
+      console.log('origin', origin);
     } catch {
+      // eslint-disable-next-line no-console
+      console.log('Set localhost');
       origin = 'http://localhost:3000';
     }
   }
