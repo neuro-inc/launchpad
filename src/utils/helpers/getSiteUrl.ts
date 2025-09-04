@@ -41,7 +41,7 @@ export const getSiteUrl = async (): Promise<string> => {
       /**
        * Try to get from environment variable first
        */
-      const envUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL;
+      const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
 
       if (envUrl) {
         /**
