@@ -84,7 +84,7 @@ postgresql:
 
 
 keycloak:
-  defaultRealm: "apolo" # internal variable
+  defaultRealm: "launchpad" # internal variable
   fullnameOverride: launchpad-keycloak  # in real app will be f"launchpad-{apolo_app_id}-keycloak"
   replicas: 1
   commonAnnotations:
