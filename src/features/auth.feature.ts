@@ -24,7 +24,9 @@ export async function getAuthConfig(): Promise<AuthConfig> {
       );
     }
 
-    // Check if response is actually JSON
+    /**
+     * Check if response is actually JSON
+     */
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       const responseText = await response.text();

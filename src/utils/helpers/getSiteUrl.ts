@@ -22,13 +22,6 @@ export const getSiteUrl = async (): Promise<string> => {
       // eslint-disable-next-line no-console
       console.log('host', host);
 
-      /**
-       * If no host header, fall back to environment variable
-       */
-      if (!host) {
-        throw new Error('No host header available');
-      }
-
       const protocol = hdrs.get('x-forwarded-proto') || 'https';
 
       origin = `${protocol}://${host}`;
@@ -38,24 +31,10 @@ export const getSiteUrl = async (): Promise<string> => {
       // eslint-disable-next-line no-console
       console.log('getSiteUrl error:', error);
 
-      /**
-       * Try to get from environment variable first
-       */
-      const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
-
-      if (envUrl) {
-        /**
-         * Add protocol if missing
-         */
-        origin = envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
-        // eslint-disable-next-line no-console
-        console.log('Using env URL:', origin);
-      } else {
-        // eslint-disable-next-line no-console
-        origin = 'http://foo:3000';
-        // eslint-disable-next-line no-console
-        console.log('Set localhost fallback', origin);
-      }
+      origin =
+        'https://launchpad-7ac2cc6f12bd477cb3737581adeb0d3f-api.apps.dev.apolo.us';
+      // eslint-disable-next-line no-console
+      console.log('Set localhost fallback', origin);
     }
   }
 
