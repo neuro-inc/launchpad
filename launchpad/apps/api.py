@@ -13,6 +13,7 @@ from launchpad.apps.service import (
     DepAppService,
     AppNotInstalledError,
     AppUnhealthyError,
+    AppServiceError,
 )
 from launchpad.auth.dependencies import Auth
 from launchpad.errors import NotFound, BadRequest
@@ -50,6 +51,8 @@ async def view_post_run_app(
             return await app_service.install_from_request(request, app_name)
         except AppTemplateNotFound:
             raise NotFound(f"App {app_name} does not exist in the pool")
+        except AppServiceError as e:
+            raise BadRequest(str(e))
 
     except AppUnhealthyError:
         raise BadRequest(f"App {app_name} is unhealthy")
