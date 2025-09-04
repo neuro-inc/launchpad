@@ -10,6 +10,7 @@ type AuthConfig = KeycloakConfig;
 export async function getAuthConfig(): Promise<AuthConfig> {
   try {
     const serverApiUrl = await getServerApiUrl();
+    console.log('serverApiUrl', serverApiUrl);
     const response = await fetch(`${serverApiUrl}/config`, {
       headers: { 'Cache-Control': 'no-cache' },
     });

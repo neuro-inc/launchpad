@@ -32,7 +32,7 @@ export const getSiteUrl = async (): Promise<string> => {
       console.log('getSiteUrl error:', error);
 
       origin =
-        'https://launchpad-7ac2cc6f12bd477cb3737581adeb0d3f-api.apps.dev.apolo.us';
+        'https://launchpad-7ac2cc6f12bd477cb3737581adeb0d3f.apps.dev.apolo.us';
       // eslint-disable-next-line no-console
       console.log('Set localhost fallback', origin);
     }
