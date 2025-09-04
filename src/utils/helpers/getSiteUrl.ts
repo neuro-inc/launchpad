@@ -21,15 +21,41 @@ export const getSiteUrl = async (): Promise<string> => {
       const host = hdrs.get('host');
       // eslint-disable-next-line no-console
       console.log('host', host);
+
+      /**
+       * If no host header, fall back to environment variable
+       */
+      if (!host) {
+        throw new Error('No host header available');
+      }
+
       const protocol = hdrs.get('x-forwarded-proto') || 'https';
 
       origin = `${protocol}://${host}`;
       // eslint-disable-next-line no-console
       console.log('origin', origin);
-    } catch {
+    } catch (error) {
       // eslint-disable-next-line no-console
-      console.log('Set localhost');
-      origin = 'http://localhost:3000';
+      console.log('getSiteUrl error:', error);
+
+      /**
+       * Try to get from environment variable first
+       */
+      const envUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL;
+
+      if (envUrl) {
+        /**
+         * Add protocol if missing
+         */
+        origin = envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
+        // eslint-disable-next-line no-console
+        console.log('Using env URL:', origin);
+      } else {
+        // eslint-disable-next-line no-console
+        origin = 'http://foo:3000';
+        // eslint-disable-next-line no-console
+        console.log('Set localhost fallback', origin);
+      }
     }
   }
 
