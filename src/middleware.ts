@@ -39,6 +39,8 @@ export const middleware = async (request: NextRequest) => {
     raw: true,
   });
 
+  console.log('token', token);
+
   if (!token && isProtected) {
     const url = new URL(PATH.AUTH, request.url);
 
