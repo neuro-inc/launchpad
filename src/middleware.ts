@@ -4,13 +4,32 @@ import { getToken } from 'next-auth/jwt';
 import { PATH } from '@constants';
 
 export const middleware = async (request: NextRequest) => {
+  const { headers } = request;
   const { pathname } = request.nextUrl;
+
+  const protocol =
+    headers.get('x-forwarded-proto') ??
+    request.nextUrl.protocol.replace(':', '') ??
+    'https';
+  const host =
+    headers.get('x-forwarded-host') ??
+    headers.get('host') ??
+    request.nextUrl.host;
+
+  const origin = `${protocol}://${host}`;
+  const requestHeaders = new Headers(headers);
+
+  requestHeaders.set('x-origin', origin);
 
   /**
    * Skip authentication checks for logout endpoint
    */
   if (pathname === '/api/auth/logout') {
-    return NextResponse.next();
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    });
   }
 
   const isProtected = pathname !== PATH.AUTH;
@@ -32,7 +51,11 @@ export const middleware = async (request: NextRequest) => {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 };
 
 export const config = {

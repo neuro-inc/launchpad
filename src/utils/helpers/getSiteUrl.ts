@@ -1,61 +1,92 @@
 const isLocalhostHost = (host: string): boolean => {
+  /**
+   * Extract hostname from host:port format
+   */
+  const hostname = host.split(':')[0];
+
   return (
-    host === 'localhost' ||
-    host === '127.0.0.1' ||
-    host === '::1' ||
-    host.endsWith('.localhost')
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname.endsWith('.localhost')
   );
 };
 
 export const getSiteUrl = async (): Promise<string> => {
-  let origin: string;
-
   if (typeof window !== 'undefined') {
-    origin = window.location.origin;
-  } else {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { headers } = require('next/headers');
-
-      const hdrs = await headers();
-      const host = hdrs.get('host');
-      // eslint-disable-next-line no-console
-      console.log('host', host);
-
-      const protocol = hdrs.get('x-forwarded-proto') || 'https';
-
-      origin = `${protocol}://${host}`;
-      // eslint-disable-next-line no-console
-      console.log('origin', origin);
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.log('getSiteUrl error:', error);
-
-      origin =
-        'https://launchpad-7ac2cc6f12bd477cb3737581adeb0d3f.apps.dev.apolo.us';
-      // eslint-disable-next-line no-console
-      console.log('Set localhost fallback', origin);
-    }
+    return window.location.origin;
   }
 
-  return origin;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { headers } = require('next/headers');
+
+    const hdrs = await headers();
+    const host = hdrs.get('host');
+    // eslint-disable-next-line no-console
+    console.log('host', host);
+
+    if (!host) {
+      throw new Error('No host header available');
+    }
+
+    if (isLocalhostHost(host)) {
+      const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
+      if (envUrl) {
+        // eslint-disable-next-line no-console
+        console.log('Using localhost env URL:', envUrl);
+        return envUrl;
+      }
+    }
+
+    /**
+     * Try x-origin header (set by middleware)
+     */
+    const xOrigin = hdrs.get('x-origin');
+    if (xOrigin) {
+      // eslint-disable-next-line no-console
+      console.log('Using x-origin:', xOrigin);
+      return xOrigin;
+    }
+
+    /**
+     * Fallback to constructing from host and protocol headers
+     */
+    const protocol = hdrs.get('x-forwarded-proto') || 'https';
+    const origin = `${protocol}://${host}`;
+
+    // eslint-disable-next-line no-console
+    console.log('Constructed origin:', origin);
+    return origin;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('getSiteUrl error (likely outside request scope):', error);
+
+    /**
+     * Fallback when headers() is called outside request scope
+     * This commonly happens during auth flows
+     */
+    const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (envUrl) {
+      // eslint-disable-next-line no-console
+      console.log('Using fallback env URL:', envUrl);
+      return envUrl;
+    }
+
+    /**
+     * Last resort fallback
+     */
+    const fallbackUrl = 'http://localhost:3000';
+    // eslint-disable-next-line no-console
+    console.warn('Using last resort fallback URL:', fallbackUrl);
+    return fallbackUrl;
+  }
 };
 
 export const getServerApiUrl = async (): Promise<string> => {
   const siteUrl = await getSiteUrl();
 
-  let url = new URL(siteUrl);
-
-  if (isLocalhostHost(url.hostname)) {
-    const localhostServerApiUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
-
-    url = new URL(localhostServerApiUrl);
-
-    if (!localhostServerApiUrl) {
-      console.warn('NEXT_PUBLIC_SITE_URL env var is not set for local usage');
-    }
-  }
-
+  const url = new URL(siteUrl);
   const parts = url.hostname.split('.');
 
   parts[0] = `${parts[0]}-api`;
