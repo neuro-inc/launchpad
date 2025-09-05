@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
-import { PATH } from '@constants';
+import { NEXTAUTH_SECRET, PATH } from '@constants';
 
 export const middleware = async (request: NextRequest) => {
   const { headers } = request;
@@ -36,6 +36,7 @@ export const middleware = async (request: NextRequest) => {
 
   const token = await getToken({
     req: request,
+    secret: NEXTAUTH_SECRET,
     raw: true,
   });
 
