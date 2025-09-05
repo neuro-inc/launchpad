@@ -136,14 +136,14 @@ export async function getAuthOptions(): Promise<AuthOptions> {
       strategy: 'jwt',
     },
     callbacks: {
-      async redirect({ url, baseUrl }) {
+      async redirect({ url }) {
         const siteUrl = await getSiteUrl();
 
         /**
          * Log redirect parameters for debugging
          */
         // eslint-disable-next-line no-console
-        console.log('Redirect callback:', { url, baseUrl, siteUrl });
+        console.log('Redirect callback:', { url, siteUrl });
 
         /**
          * If url starts with /, it's a relative path - make it absolute
@@ -156,13 +156,6 @@ export async function getAuthOptions(): Promise<AuthOptions> {
          * If url is from the same origin as our site, allow it
          */
         if (new URL(url).origin === siteUrl) {
-          return url;
-        }
-
-        /**
-         * If url is from the same origin as NextAuth's baseUrl, allow it
-         */
-        if (baseUrl && new URL(url).origin === baseUrl) {
           return url;
         }
 

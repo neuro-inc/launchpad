@@ -66,20 +66,11 @@ export const getSiteUrl = async (): Promise<string> => {
      * Fallback when headers() is called outside request scope
      * This commonly happens during auth flows
      */
-    const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
-    if (envUrl) {
-      // eslint-disable-next-line no-console
-      console.log('Using fallback env URL:', envUrl);
-      return envUrl;
-    }
+    const envUrl = process.env.NEXT_PUBLIC_SITE_URL!;
 
-    /**
-     * Last resort fallback
-     */
-    const fallbackUrl = 'http://localhost:3000';
-    // eslint-disable-next-line no-console
-    console.warn('Using last resort fallback URL:', fallbackUrl);
-    return fallbackUrl;
+    console.log('Using fallback env URL:', envUrl);
+
+    return envUrl;
   }
 };
 
