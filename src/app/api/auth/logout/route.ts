@@ -1,16 +1,25 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
+import { NEXTAUTH_SECRET } from '@constants';
 import { getAuthConfig } from '@features';
-import { getKeycloakIssuer, getSiteUrl } from '@utils/helpers';
+import {
+  getKeycloakIssuer,
+  getSiteUrl,
+  getTokenCookieName,
+} from '@utils/helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const config = await getAuthConfig();
 
-  const token = await getServerSession();
+  const token = await getToken({
+    req,
+    secret: NEXTAUTH_SECRET,
+    cookieName: getTokenCookieName(),
+  });
 
   // eslint-disable-next-line no-console
   console.log('token from getToken:', token);
