@@ -205,6 +205,11 @@ export async function getAuthOptions(): Promise<AuthOptions> {
       async jwt({ token, account, profile }) {
         const now = Date.now();
 
+        // eslint-disable-next-line no-console
+        console.log('account', account);
+        // eslint-disable-next-line no-console
+        console.log('profile', profile);
+
         if (account) {
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;

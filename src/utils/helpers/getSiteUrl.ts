@@ -1,17 +1,3 @@
-const isLocalhostHost = (host: string): boolean => {
-  /**
-   * Extract hostname from host:port format
-   */
-  const hostname = host.split(':')[0];
-
-  return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '::1' ||
-    hostname.endsWith('.localhost')
-  );
-};
-
 export const getSiteUrl = async (): Promise<string> => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
@@ -28,15 +14,6 @@ export const getSiteUrl = async (): Promise<string> => {
 
     if (!host) {
       throw new Error('No host header available');
-    }
-
-    if (isLocalhostHost(host)) {
-      const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
-      if (envUrl) {
-        // eslint-disable-next-line no-console
-        console.log('Using localhost env URL:', envUrl);
-        return envUrl;
-      }
     }
 
     /**
@@ -68,6 +45,7 @@ export const getSiteUrl = async (): Promise<string> => {
      */
     const envUrl = process.env.NEXT_PUBLIC_SITE_URL!;
 
+    // eslint-disable-next-line no-console
     console.log('Using fallback env URL:', envUrl);
 
     return envUrl;
@@ -75,7 +53,11 @@ export const getSiteUrl = async (): Promise<string> => {
 };
 
 export const getServerApiUrl = async (): Promise<string> => {
-  const siteUrl = await getSiteUrl();
+  let siteUrl = await getSiteUrl();
+
+  if (siteUrl.includes('localhost:3000') && process.env.NEXT_PUBLIC_SITE_URL) {
+    siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  }
 
   const url = new URL(siteUrl);
   const parts = url.hostname.split('.');
