@@ -1,21 +1,27 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
+import { NEXTAUTH_SECRET } from '@constants';
 import { getAuthConfig, getAuthOptions } from '@features';
 import { getKeycloakIssuer, getSiteUrl } from '@utils/helpers';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const config = await getAuthConfig();
   const authOptions = await getAuthOptions();
   // eslint-disable-next-line no-console
   console.log('authOptions', authOptions);
-  const session = await getServerSession(authOptions);
-  const siteUrl = await getSiteUrl();
+
+  const token = await getToken({
+    req: request,
+    secret: NEXTAUTH_SECRET,
+  });
 
   // eslint-disable-next-line no-console
-  console.log('session', session);
+  console.log('token from getToken:', token);
 
-  const idToken = session?.idToken;
+  const siteUrl = await getSiteUrl();
+
+  const idToken = token?.idToken;
 
   // eslint-disable-next-line no-console
   console.log('idToken', idToken);
