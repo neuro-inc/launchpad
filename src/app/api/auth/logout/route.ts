@@ -12,6 +12,9 @@ export async function GET() {
 
   const idToken = session?.idToken;
 
+  // eslint-disable-next-line no-console
+  console.log('idToken', idToken);
+
   const logoutUrl = new URL(
     `${getKeycloakIssuer(config)}/protocol/openid-connect/logout`,
   );
