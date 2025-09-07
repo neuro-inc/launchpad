@@ -7,8 +7,13 @@ import { getKeycloakIssuer, getSiteUrl } from '@utils/helpers';
 export async function GET() {
   const config = await getAuthConfig();
   const authOptions = await getAuthOptions();
+  // eslint-disable-next-line no-console
+  console.log('authOptions', authOptions);
   const session = await getServerSession(authOptions);
   const siteUrl = await getSiteUrl();
+
+  // eslint-disable-next-line no-console
+  console.log('session', session);
 
   const idToken = session?.idToken;
 
