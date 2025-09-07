@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
   const token = await getToken({
     req: request,
     secret: NEXTAUTH_SECRET,
-    cookieName: 'next-auth.session-token',
+    cookieName: '__Secure-next-auth.session-token',
   });
 
   // eslint-disable-next-line no-console

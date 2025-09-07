@@ -40,7 +40,7 @@ export const middleware = async (request: NextRequest) => {
     req: request,
     secret: NEXTAUTH_SECRET,
     raw: true,
-    cookieName: 'next-auth.session-token',
+    cookieName: '__Secure-next-auth.session-token',
   });
 
   console.log('token', token);
