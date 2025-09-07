@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
 import { NEXTAUTH_SECRET, PATH } from '@constants';
-import { getTokenCookieName } from '@utils/helpers';
+import { getTokenCookieName } from '@utils/helpers/getTokenCookieName';
 
 export const middleware = async (request: NextRequest) => {
   const { headers } = request;
