@@ -34,6 +34,8 @@ export const middleware = async (request: NextRequest) => {
 
   const isProtected = pathname !== PATH.AUTH;
 
+  console.log('pathname', pathname);
+
   const token = await getToken({
     req: request,
     secret: NEXTAUTH_SECRET,
@@ -42,7 +44,7 @@ export const middleware = async (request: NextRequest) => {
 
   console.log('token', token);
 
-  if (!token && isProtected) {
+  if (!token) {
     const url = new URL(PATH.AUTH, request.url);
 
     return NextResponse.redirect(url);
