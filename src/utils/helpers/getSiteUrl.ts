@@ -1,3 +1,5 @@
+import { IS_LOCAL } from '@constants';
+
 export const getSiteUrl = async (): Promise<string> => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
@@ -55,8 +57,8 @@ export const getSiteUrl = async (): Promise<string> => {
 export const getServerApiUrl = async (): Promise<string> => {
   let siteUrl = await getSiteUrl();
 
-  if (siteUrl.includes('localhost:3000') && process.env.NEXT_PUBLIC_SITE_URL) {
-    siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (IS_LOCAL) {
+    siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '';
   }
 
   const url = new URL(siteUrl);

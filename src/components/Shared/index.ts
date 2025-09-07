@@ -2,7 +2,6 @@ export * from './Badge';
 export * from './Button';
 export * from './ChaseSpinner';
 export * as Field from './Fields';
-export * from './HighlightExcerpt';
 export * from './Icon';
 export * from './Image';
 export * from './Link';

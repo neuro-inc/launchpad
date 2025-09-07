@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
 import { NEXTAUTH_SECRET, PATH } from '@constants';
+import { getTokenCookieName } from '@utils/helpers';
 
 export const middleware = async (request: NextRequest) => {
   const { headers } = request;
@@ -40,12 +41,12 @@ export const middleware = async (request: NextRequest) => {
     req: request,
     secret: NEXTAUTH_SECRET,
     raw: true,
-    cookieName: '__Secure-next-auth.session-token',
+    cookieName: getTokenCookieName(),
   });
 
   console.log('token', token);
 
-  if (!token) {
+  if (!token && isProtected) {
     const url = new URL(PATH.AUTH, request.url);
 
     return NextResponse.redirect(url);
