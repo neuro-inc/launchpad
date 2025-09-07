@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
   const token = await getToken({
     req: request,
     secret: NEXTAUTH_SECRET,
-    raw: true,
     cookieName: 'next-auth.session-token',
   });
 
