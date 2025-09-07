@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { getAuthConfig } from '@features';
 import { getKeycloakIssuer, getSiteUrl } from '@utils/helpers';
 
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
