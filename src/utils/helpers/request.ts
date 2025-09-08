@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { getSession } from 'next-auth/react';
 
-import { IS_PRODUCTION } from '@constants';
+import { IS_LOCAL, IS_PRODUCTION } from '@constants';
 import { getAuthOptions } from '@features';
 
 import { getServerApiUrl } from './getSiteUrl';
@@ -30,12 +30,10 @@ async function makeRequest<T>(
   if (!response.ok) {
     const error = await response.json().catch(() => null);
 
-    if (!IS_PRODUCTION) {
-      // eslint-disable-next-line no-console
-      console.log(`Error in request ${url}:`, { error });
-      // eslint-disable-next-line no-console
-      console.log('Request failed with status: ', response.status);
-    }
+    // eslint-disable-next-line no-console
+    console.log(`Error in request ${url}:`, { error });
+    // eslint-disable-next-line no-console
+    console.log('Request failed with status: ', response.status);
 
     throw new Error(error);
   }

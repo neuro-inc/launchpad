@@ -11,8 +11,6 @@ export const getSiteUrl = async (): Promise<string> => {
 
     const hdrs = await headers();
     const host = hdrs.get('host');
-    // eslint-disable-next-line no-console
-    console.log('host', host);
 
     if (!host) {
       throw new Error('No host header available');
@@ -23,8 +21,6 @@ export const getSiteUrl = async (): Promise<string> => {
      */
     const xOrigin = hdrs.get('x-origin');
     if (xOrigin) {
-      // eslint-disable-next-line no-console
-      console.log('Using x-origin:', xOrigin);
       return xOrigin;
     }
 
@@ -34,11 +30,8 @@ export const getSiteUrl = async (): Promise<string> => {
     const protocol = hdrs.get('x-forwarded-proto') || 'https';
     const origin = `${protocol}://${host}`;
 
-    // eslint-disable-next-line no-console
-    console.log('Constructed origin:', origin);
     return origin;
   } catch (error) {
-    // eslint-disable-next-line no-console
     console.error('getSiteUrl error (likely outside request scope):', error);
 
     /**
