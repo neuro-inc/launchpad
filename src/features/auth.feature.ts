@@ -1,5 +1,4 @@
 import { AuthOptions } from 'next-auth';
-import { getToken } from 'next-auth/jwt';
 import KeycloakProvider from 'next-auth/providers/keycloak';
 
 import { KeycloakConfig } from '@typings';

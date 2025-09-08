@@ -11,9 +11,7 @@ export const LogoutButton = () => {
   const handleLogout = async () => {
     try {
       await request('/auth/logout', { method: 'POST' });
-      await signOut({ redirect: false });
-
-      window.location.href = '/api/auth/logout';
+      await signOut();
     } catch (error) {
       console.error('Error signing out:', error);
     }

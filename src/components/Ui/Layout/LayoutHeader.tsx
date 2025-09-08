@@ -18,8 +18,6 @@ export const LayoutHeader: React.FC<Props> = async ({ className }) => {
   const authOptions = await getAuthOptions();
   const data = (await getServerSession(authOptions)) as Session;
 
-  console.log('getServerSession', data);
-
   const isAuthenticated = isObject(data?.user);
 
   return (

@@ -35,16 +35,12 @@ export const middleware = async (request: NextRequest) => {
 
   const isProtected = pathname !== PATH.AUTH;
 
-  console.log('pathname', pathname);
-
   const token = await getToken({
     req: request,
     secret: NEXTAUTH_SECRET,
     raw: true,
     cookieName: getTokenCookieName(),
   });
-
-  console.log('token', token);
 
   if (!token && isProtected) {
     const url = new URL(PATH.AUTH, request.url);
