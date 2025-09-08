@@ -7,7 +7,7 @@
 <!-- template: login.ftl -->
 
     <#if section = "header">
-        ${msg("loginAccountTitle")}
+        <img src="${url.resourcesPath}/img/launchpad-logo.svg" alt="Launchpad" class="kc-logo" />
     <#elseif section = "form">
         <div id="kc-form">
           <div id="kc-form-wrapper">
