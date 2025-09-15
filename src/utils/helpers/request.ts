@@ -1,7 +1,6 @@
 import { getServerSession } from 'next-auth';
 import { getSession } from 'next-auth/react';
 
-import { IS_LOCAL, IS_PRODUCTION } from '@constants';
 import { getAuthOptions } from '@features';
 
 import { getServerApiUrl } from './getSiteUrl';
