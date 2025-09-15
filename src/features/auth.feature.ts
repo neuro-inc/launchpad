@@ -107,19 +107,6 @@ export const refreshAccessToken = async (token: any) => {
 export async function getAuthOptions(): Promise<AuthOptions> {
   const config = await getAuthConfig();
 
-  /**
-   * Dynamically set NEXTAUTH_URL from x-origin header or getSiteUrl
-   */
-  try {
-    const siteUrl = await getSiteUrl();
-    process.env.NEXTAUTH_URL = siteUrl;
-    // eslint-disable-next-line no-console
-    console.log('Dynamically set NEXTAUTH_URL to:', siteUrl);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to set dynamic NEXTAUTH_URL:', error);
-  }
-
   return {
     providers: [
       KeycloakProvider({

@@ -7,4 +7,3 @@ export const SENTRY_DSN = process.env.SENTRY_DSN ?? '';
 export const SENTRY_AUTH_TOKEN = process.env.SENTRY_AUTH_TOKEN ?? '';
 
 export const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET ?? '';
-export const NEXTAUTH_URL = process.env.NEXTAUTH_URL ?? '';
