@@ -5,7 +5,7 @@ keycloakRealmImportConfigMapName: launchpad-keycloak-realm  # in real app will b
 
 image:
   repository: "ghcr.io/neuro-inc/launchpad"
-  tag: ""  # will be populated by apps
+  tag: "v25.9.6"  # will be populated by apps
 
 replicas: 1
 port: 8080
