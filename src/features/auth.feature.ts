@@ -48,6 +48,9 @@ export async function getAuthConfig(): Promise<AuthConfig> {
       keycloak: KeycloakConfig;
     };
 
+    // eslint-disable-next-line no-console
+    console.log('Config:', responseJson);
+
     if (!responseJson.keycloak) {
       throw new Error('Invalid response structure: keycloak config not found');
     }
