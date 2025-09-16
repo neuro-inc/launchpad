@@ -81,7 +81,27 @@ postgresql:
         create_dbs.sql: |
           CREATE DATABASE keycloak;
           CREATE DATABASE launchpad;
-
+    tolerations:
+      - effect: NoSchedule
+        key: platform.neuromation.io/job
+        operator: Exists
+      - effect: NoExecute
+        key: "node.kubernetes.io/not-ready"
+        operator: "Exists"
+        tolerationSeconds: 300    
+      - effect: NoExecute
+        key: "node.kubernetes.io/unreachable"
+        operator: "Exists"
+        tolerationSeconds: 300
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: platform.neuromation.io/job
+                  operator: In
+                  values:
+                    - "true"
 
 keycloak:
   defaultRealm: "launchpad" # internal variable
