@@ -154,6 +154,8 @@ export async function getAuthOptions(): Promise<AuthOptions> {
          * If url starts with /, it's a relative path - make it absolute
          */
         if (url.startsWith('/')) {
+          // eslint-disable-next-line no-console
+          console.log('Callbacks return startsWith:', `${siteUrl}${url}`);
           return `${siteUrl}${url}`;
         }
 
@@ -161,9 +163,13 @@ export async function getAuthOptions(): Promise<AuthOptions> {
          * If url is from the same origin as our site, allow it
          */
         if (new URL(url).origin === siteUrl) {
+          // eslint-disable-next-line no-console
+          console.log('Callbacks return URL:', url);
           return url;
         }
 
+        // eslint-disable-next-line no-console
+        console.log('Callbacks return default:', `${siteUrl}/apps`);
         /**
          * Default fallback - return to the apps page instead of auth page
          */
