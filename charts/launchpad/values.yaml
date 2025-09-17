@@ -63,6 +63,12 @@ LAUNCHPAD_INITIAL_CONFIG: >
   }
 
 postgresql:
+  global:
+    security:
+      allowInsecureImages: true
+  image:
+    repository: bitnamilegacy/postgresql
+    tag: 17.5.0-debian-12-r18
   enabled: true
   fullnameOverride: launchpad-db  # in real app will be f"launchpad-{apolo_app_id}-db"
   commonAnnotations:
@@ -104,6 +110,12 @@ postgresql:
                     - "true"
 
 keycloak:
+  global:
+    security:
+      allowInsecureImages: true
+  image:
+    repository: bitnamilegacy/keycloak
+    tag: 26.3.0-debian-12-r0
   defaultRealm: "launchpad" # internal variable
   fullnameOverride: launchpad-keycloak  # in real app will be f"launchpad-{apolo_app_id}-keycloak"
   replicas: 1
