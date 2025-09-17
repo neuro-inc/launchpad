@@ -9,7 +9,7 @@ APP_NAME_LLM_INFERENCE = "vllm-llama-3.1-8b"
 class LlmInferenceApp(App[InternalAppContext]):
     name = APP_NAME_LLM_INFERENCE
     template_name = "llm-inference-argocd"
-    template_version = "v25.9.0"
+    template_version = "latest"  # we can lock this later when app versioning is working
     is_internal = True
     is_shared = True
     verbose_name = "LLM Inference"
