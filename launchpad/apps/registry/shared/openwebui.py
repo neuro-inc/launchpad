@@ -56,7 +56,8 @@ class OpenWebUIAppContext(BaseContext):
 class OpenWebUIApp(App[OpenWebUIAppContext]):
     name = APP_NAME_OPEN_WEB_UI
     template_name = "openwebui"
-    template_version = "v25.8.0"
+    template_version = "latest"  # we can lock this later when app versioning is working
+
     is_internal = False
     is_shared = True
     verbose_name = "OpenWebUI"
