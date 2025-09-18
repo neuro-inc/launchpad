@@ -9,7 +9,7 @@ APP_NAME_POSTGRES = "postgres"
 class PostgresApp(App[InternalAppContext]):
     name = APP_NAME_POSTGRES
     template_name = "postgres"
-    template_version = "latest" # we can lock this later when app versioning is working
+    template_version = "latest"  # we can lock this later when app versioning is working
     is_internal = True
     is_shared = True
     verbose_name = "PostgreSQL"

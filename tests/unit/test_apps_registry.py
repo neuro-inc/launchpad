@@ -153,8 +153,8 @@ def test_llm_inference_app_attributes(mock_internal_app_context: MagicMock) -> N
     app = LlmInferenceApp(context=mock_internal_app_context)
 
     assert app.name == APP_NAME_LLM_INFERENCE
-    assert app.template_name == "llm-inference"
-    assert app.template_version == "v25.7.1"
+    assert app.template_name == "llm-inference-argocd"
+    assert app.template_version == "latest"
     assert app.is_internal is True
     assert app.is_shared is True
     assert app.verbose_name == "LLM Inference"
@@ -194,7 +194,7 @@ def test_postgres_app_attributes(mock_internal_app_context: MagicMock) -> None:
 
     assert app.name == APP_NAME_POSTGRES
     assert app.template_name == "postgres"
-    assert app.template_version == "v25.5.0"
+    assert app.template_version == "latest"
     assert app.is_internal is True
     assert app.is_shared is True
     assert app.verbose_name == "PostgreSQL"
@@ -237,7 +237,7 @@ def test_openwebui_app_attributes(mock_openwebui_app_context: MagicMock) -> None
 
     assert app.name == APP_NAME_OPEN_WEB_UI
     assert app.template_name == "openwebui"
-    assert app.template_version == "v25.8.0"
+    assert app.template_version == "latest"
     assert app.is_internal is False
     assert app.is_shared is True
     assert app.verbose_name == "OpenWebUI"
