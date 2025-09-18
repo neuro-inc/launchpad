@@ -112,7 +112,7 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                         "type": "app-instance-ref",
                         "instance_id": str(self._context.postgres_app_id),
                         "path": "$.postgres_users.users[1]",
-                    }
+                    },
                 }
             },
             "displayName": APP_NAME_OPEN_WEB_UI,
