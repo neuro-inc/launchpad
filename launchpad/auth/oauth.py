@@ -120,9 +120,7 @@ class Oauth:
         exception=(ClientConnectionError, Retry),
     )
     async def _fetch_token(self, data: dict[str, str]) -> str:
-        async with self._http.post(  # type: ignore[call-arg]
-            self._token_url, data=data, verify_ssl=False
-        ) as response:
+        async with self._http.post(self._token_url, data=data, ssl=False) as response:
             try:
                 response.raise_for_status()
             except ClientResponseError as e:
