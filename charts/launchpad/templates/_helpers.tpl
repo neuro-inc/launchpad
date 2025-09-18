@@ -56,3 +56,7 @@ platform.apolo.us/component: app
 {{- define "launchpad.domainWithProtocol" -}}
 {{- printf "https://%s.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}
+
+{{- define "launchpad.middlewareName" -}}
+{{- printf "%s-auth-middleware" (include "launchpad.name" .) }}
+{{- end }}
