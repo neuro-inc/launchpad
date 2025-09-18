@@ -105,10 +105,15 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                 "instance_id": str(self._context.llm_inference_app_id),
                 "path": "$.chat_internal_api",
             },
-            "pgvector_user": {
-                "type": "app-instance-ref",
-                "instance_id": str(self._context.postgres_app_id),
-                "path": "$.postgres_users.users[1]",
+            "database_config": {
+                "database": {
+                    "database_type": "postgres",
+                    "credentials": {
+                        "type": "app-instance-ref",
+                        "instance_id": str(self._context.postgres_app_id),
+                        "path": "$.postgres_users.users[1]",
+                    }
+                }
             },
             "displayName": APP_NAME_OPEN_WEB_UI,
             "preset": {"name": "cpu-medium"},
