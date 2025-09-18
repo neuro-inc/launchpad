@@ -79,7 +79,7 @@ class AppService:
                 try:
                     async with self._db() as db:
                         async with db.begin():
-                            output_url = outputs["external_web_app_url"]
+                            output_url = outputs["app_url"]["external_url"]
                             installed_app.url = (
                                 f"{output_url['protocol']}://{output_url['host']}"
                             )
