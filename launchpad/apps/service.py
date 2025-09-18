@@ -104,12 +104,15 @@ class AppService:
     ) -> InstalledApp:
         async with self._db() as db:
             async with db.begin():
+                payload = None
                 try:
+                    payload = await app.to_apps_api_payload()
                     installation_response = await self._apps_api_client.install_app(
-                        payload=await app.to_apps_api_payload()
+                        payload=payload
                     )
                 except AppsApiError:
                     logger.exception("Apps API error occurred")
+                    logger.error(f"Failed payload: {payload}")
                     raise AppServiceError(
                         "Internal service error. "
                         "Please try again later, or contact support"
