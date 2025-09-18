@@ -23,7 +23,10 @@ export const AppWatcher: React.FC<Props> = ({ appName }) => {
           window.location.replace(url);
         }
       } catch (error) {
-        toast.error((error as Error)?.message);
+        const message =
+          // @ts-expect-error todo: fix type
+          error?.detail?.message || error?.message;
+        toast.error(message);
       }
     };
 
