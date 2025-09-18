@@ -5,8 +5,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "3"
   labels:
     application: launchpad
-  name: {{ include "launchpad.name" . }}-auth-middleware
-  namespace: platform
+  name: {{ include "launchpad.middlewareName" . }}
 spec:
   forwardAuth:
     address: {{ include "launchpad.apiDomain" . }}/auth/authorize
