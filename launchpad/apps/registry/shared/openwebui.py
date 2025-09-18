@@ -111,7 +111,7 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                     "credentials": {
                         "type": "app-instance-ref",
                         "instance_id": str(self._context.postgres_app_id),
-                        "path": "$.postgres_users.users[1]",
+                        "path": "$.postgres_users.users[0]",
                     },
                 }
             },
