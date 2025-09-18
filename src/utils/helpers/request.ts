@@ -34,7 +34,7 @@ async function makeRequest<T>(
     // eslint-disable-next-line no-console
     console.log('Request failed with status: ', response.status);
 
-    throw new Error(error);
+    throw new Error(error.detail?.message ?? error.message);
   }
 
   return response.json().catch(() => null) as Promise<T>;
