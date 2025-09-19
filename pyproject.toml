@@ -67,7 +67,7 @@ asyncache = "^0.3.1"
 asyncpg = "^0.30.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.4.1"
+pytest = "^8.4.2"
 ruff = "^0.13.0"
 pre-commit = "^4.3.0"
 mypy = "^1.18.1"
