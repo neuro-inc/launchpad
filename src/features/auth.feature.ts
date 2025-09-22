@@ -14,8 +14,13 @@ export async function getAuthConfig(): Promise<AuthConfig> {
     // eslint-disable-next-line no-console
     console.log('getAuthConfig serverApiUrl:', serverApiUrl);
 
-    const response = await fetch(`${serverApiUrl}/config`, {
-      headers: { 'Cache-Control': 'no-cache' },
+    const response = await fetch(`${serverApiUrl}/config?t=${Date.now()}`, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+      cache: 'no-store',
     });
 
     if (!response.ok) {
@@ -109,6 +114,19 @@ export const refreshAccessToken = async (token: any) => {
 
 export async function getAuthOptions(): Promise<AuthOptions> {
   const config = await getAuthConfig();
+
+  /**
+   * Dynamically set NEXTAUTH_URL from runtime context
+   */
+  try {
+    const siteUrl = await getSiteUrl();
+    process.env.NEXTAUTH_URL = siteUrl;
+    // eslint-disable-next-line no-console
+    console.log('Dynamically set NEXTAUTH_URL to:', siteUrl);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to set dynamic NEXTAUTH_URL:', error);
+  }
 
   return {
     providers: [
