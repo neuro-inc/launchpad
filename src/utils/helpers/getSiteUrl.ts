@@ -1,4 +1,4 @@
-import { IS_LOCAL } from '@constants';
+import { IS_DEVELOPMENT, IS_LOCAL, IS_PRODUCTION } from '@constants';
 
 export const getSiteUrl = async (): Promise<string> => {
   if (typeof window !== 'undefined') {
@@ -49,6 +49,13 @@ export const getSiteUrl = async (): Promise<string> => {
 
 export const getServerApiUrl = async (): Promise<string> => {
   let siteUrl = await getSiteUrl();
+
+  // eslint-disable-next-line no-console
+  console.log('IS_PRODUCTION', IS_PRODUCTION);
+  // eslint-disable-next-line no-console
+  console.log('IS_DEVELOPMENT', IS_DEVELOPMENT);
+  // eslint-disable-next-line no-console
+  console.log('IS_LOCAL', IS_LOCAL);
 
   if (IS_LOCAL) {
     siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? '';
