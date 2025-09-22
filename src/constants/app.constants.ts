@@ -1,4 +1,4 @@
-export const ENVIRONMENT = process.env.ENVIRONMENT ?? 'local';
+export const ENVIRONMENT = process.env.NEXT_PUBLIC_ENVIRONMENT ?? 'local';
 export const IS_PRODUCTION = ENVIRONMENT === 'production';
 export const IS_DEVELOPMENT = ENVIRONMENT === 'development';
 export const IS_LOCAL = !IS_PRODUCTION && !IS_DEVELOPMENT;

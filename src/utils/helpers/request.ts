@@ -13,9 +13,6 @@ async function makeRequest<T>(
   const serverApiUrl = await getServerApiUrl();
   const headers = new Headers(options.headers);
 
-  // eslint-disable-next-line no-console
-  console.log('serverApiUrl', serverApiUrl);
-
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
