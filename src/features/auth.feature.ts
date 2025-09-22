@@ -114,7 +114,7 @@ export const refreshAccessToken = async (token: any) => {
 
 export async function getAuthOptions(): Promise<AuthOptions> {
   const config = await getAuthConfig();
-  const siteUrl = await getSiteUrl();
+  // const siteUrl = await getSiteUrl();
 
   return {
     providers: [
@@ -130,17 +130,17 @@ export async function getAuthOptions(): Promise<AuthOptions> {
          * Only PKCE for public clients
          */
         checks: ['pkce'],
-        httpOptions: {
-          headers: {
-            origin: siteUrl,
-          },
-        },
+        // httpOptions: {
+        //   headers: {
+        //     origin: siteUrl,
+        //   },
+        // },
         authorization: {
           params: {
-            prompt: 'login',
+            // prompt: 'login',
             scope: 'openid profile email offline_access',
             response_type: 'code',
-            redirect_uri: `${siteUrl}/api/auth/callback/keycloak`,
+            // redirect_uri: `${siteUrl}/api/auth/callback/keycloak`,
           },
         },
       }),
