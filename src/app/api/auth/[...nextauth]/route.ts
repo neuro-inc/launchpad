@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server';
 import NextAuth from 'next-auth';
 
 import { getAuthOptions } from '@features';
@@ -6,10 +5,12 @@ import { getAuthOptions } from '@features';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function handler(req: NextRequest) {
+const handler = async (
+  req: Request,
+  context: { params: { nextauth: string[] } },
+) => {
   const authOptions = await getAuthOptions();
-
-  return NextAuth(authOptions)(req);
-}
+  return NextAuth(authOptions)(req, context);
+};
 
 export { handler as GET, handler as POST };
