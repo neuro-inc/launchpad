@@ -1,4 +1,4 @@
-import { IS_DEVELOPMENT, IS_LOCAL, IS_PRODUCTION } from '@constants';
+import { IS_LOCAL } from '@constants';
 
 export const getSiteUrl = async (): Promise<string> => {
   if (typeof window !== 'undefined') {
