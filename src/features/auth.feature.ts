@@ -114,19 +114,7 @@ export const refreshAccessToken = async (token: any) => {
 
 export async function getAuthOptions(): Promise<AuthOptions> {
   const config = await getAuthConfig();
-
-  /**
-   * Dynamically set NEXTAUTH_URL from runtime context
-   */
-  try {
-    const siteUrl = await getSiteUrl();
-    process.env.NEXTAUTH_URL = siteUrl;
-    // eslint-disable-next-line no-console
-    console.log('Dynamically set NEXTAUTH_URL to:', siteUrl);
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to set dynamic NEXTAUTH_URL:', error);
-  }
+  const siteUrl = await getSiteUrl();
 
   return {
     providers: [
@@ -142,10 +130,17 @@ export async function getAuthOptions(): Promise<AuthOptions> {
          * Only PKCE for public clients
          */
         checks: ['pkce'],
+        httpOptions: {
+          headers: {
+            origin: siteUrl,
+          },
+        },
         authorization: {
           params: {
+            prompt: 'login',
             scope: 'openid profile email offline_access',
             response_type: 'code',
+            redirect_uri: `${siteUrl}/api/auth/callback/keycloak`,
           },
         },
       }),
