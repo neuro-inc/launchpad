@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 
 const handler = async (
   req: NextRequest,
+  // @ts-ignore - NextAuth App Router compatibility
   { params }: { params: { nextauth: string[] } },
 ) => {
   const authOptions = await getAuthOptions();
