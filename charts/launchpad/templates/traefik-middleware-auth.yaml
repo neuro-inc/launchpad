@@ -9,6 +9,6 @@ metadata:
   namespace: platform
 spec:
   forwardAuth:
-    address: https://{{ include "launchpad.apiDomain" . }}/auth/authorize
+    address: {{ include "launchpad.apiDomainWithProtocol" . }}/auth/authorize
     trustForwardHeader: true
     authResponseHeadersRegex: ^X-

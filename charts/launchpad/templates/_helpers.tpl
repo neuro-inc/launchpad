@@ -49,6 +49,10 @@ platform.apolo.us/component: app
 {{- printf "%s-api.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}
 
+{{- define "launchpad.apiDomainWithProtocol" -}}
+{{- printf "https://%s-api.%s" (include "launchpad.name" .) .Values.domain }}
+{{- end }}
+
 {{- define "keycloak.domain" -}}
 {{- printf "%s-keycloak.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}

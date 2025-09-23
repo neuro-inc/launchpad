@@ -706,7 +706,8 @@ data:
           "alwaysDisplayInConsole": false,
           "clientAuthenticatorType": "client-secret",
           "redirectUris": [
-            "{{ include "launchpad.domainWithProtocol" . }}/api/auth/callback/keycloak"
+            "{{ include "launchpad.domainWithProtocol" . }}/api/auth/callback/keycloak",
+            "{{ include "launchpad.apiDomainWithProtocol" . }}/auth/callback"
           ],
           "webOrigins": [
             {{ include "launchpad.domainWithProtocol" . | quote }}
