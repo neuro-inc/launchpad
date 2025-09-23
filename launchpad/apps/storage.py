@@ -79,6 +79,24 @@ async def insert_app(
     return typing.cast(InstalledApp, installed_app)
 
 
+async def update_app_url(
+    db: AsyncSession,
+    app_id: UUID,
+    url: str,
+) -> InstalledApp | None:
+    """Update the URL of an installed app"""
+    from sqlalchemy import update
+    
+    query = (
+        update(InstalledApp)
+        .where(InstalledApp.app_id == app_id)
+        .values(url=url)
+        .returning(InstalledApp)
+    )
+    cursor = await db.execute(query)
+    return cursor.scalar_one_or_none()
+
+
 async def delete_app(
     db: AsyncSession,
     app_id: UUID,

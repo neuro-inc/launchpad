@@ -8,7 +8,7 @@ from starlette.requests import Request
 from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App, USER_FACING_APPS
-from launchpad.apps.storage import select_app, insert_app, delete_app
+from launchpad.apps.storage import select_app, insert_app, delete_app, update_app_url
 from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import NotFound, AppsApiError
 
@@ -77,12 +77,15 @@ class AppService:
                 logger.info(f"App {launchpad_app_name} has not yet pushed outputs")
             else:
                 try:
+                    output_url = outputs["app_url"]["external_url"]
+                    url = f"{output_url['protocol']}://{output_url['host']}"
+                    
+                    # Update the URL in the database
                     async with self._db() as db:
                         async with db.begin():
-                            output_url = outputs["app_url"]["external_url"]
-                            installed_app.url = (
-                                f"{output_url['protocol']}://{output_url['host']}"
-                            )
+                            updated_app = await update_app_url(db, installed_app.app_id, url)
+                            if updated_app:
+                                installed_app.url = url
                 except KeyError:
                     logger.error(
                         f"App {launchpad_app_name} does not declare external web app url"
