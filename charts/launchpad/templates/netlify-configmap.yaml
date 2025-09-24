@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{- include "launchpad.netlify-configmap" .  }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+data:
+  script.sh: |-
+    #! /bin/bash
+    set -e
+
+    error_handler() {
+        echo "Failed to modify domain alias"
+        echo "An error occurred on line $LINENO."
+        echo "Command that failed: $BASH_COMMAND"
+        exit 1
+    }
+
+    trap error_handler ERR
+
+    usage="Usage: $0 <action> --site-id <site-id> --domain-alias <domain-alias>
+    Actions: add, delete"
+
+    # Check if NETLIFY_TOKEN environment variable is set
+    if [ -z "$NETLIFY_TOKEN" ]; then
+        echo "Error: NETLIFY_TOKEN environment variable is not set" >&2
+        exit 1
+    fi
+
+    if [ -z "$1" ]; then
+        echo "Error: No action provided" >&2
+        echo "$usage" >&2
+        exit 1
+    fi
+
+    action="$1"
+    shift
+
+    # Parse named arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --site-id)
+                site_id="$2"
+                shift 2
+                ;;
+            --domain-alias)
+                domain_alias="$2"
+                shift 2
+                ;;
+            *)
+                echo "Error: Unknown option $1" >&2
+                echo "$usage" >&2
+                exit 1
+                ;;
+        esac
+    done
+
+    # Check required arguments
+    if [ -z "$site_id" ]; then
+        echo "Error: --site-id is required" >&2
+        echo "$usage" >&2
+        exit 1
+    fi
+
+    if [ -z "$domain_alias" ]; then
+        echo "Error: --domain-alias is required" >&2
+        echo "$usage" >&2
+        exit 1
+    fi
+
+    if [ "$action" != "add" ] && [ "$action" != "delete" ]; then
+        echo "Error: Invalid action '$action'. Must be 'add' or 'delete'" >&2
+        echo $usage >&2
+        exit 1
+    fi
+
+    site_info=$(curl -X 'GET' \
+        -H "Authorization: Bearer $NETLIFY_TOKEN" \
+        "https://api.netlify.com/api/v1/sites/$site_id"
+    )
+    echo "SITE INFO: $site_info"
+    site_domains=$(echo $site_info | jq -r '.domain_aliases')
+    echo "Current domains: $site_domains"
+
+    if [ "$action" = "add" ]; then
+        # Check if domain already exists
+        if echo $site_domains | jq -e --arg domain "$domain_alias" 'index($domain)' > /dev/null; then
+            echo "Domain alias '$domain_alias' already exists"
+            exit 0
+        fi
+
+        new_site_domains_list=$(echo $site_domains | jq ". += [\"$domain_alias\"]")
+        echo "Adding domain alias '$domain_alias'"
+        echo "New domain list: $new_site_domains_list"
+    elif [ "$action" = "delete" ]; then
+        # Check if domain exists
+        if ! echo $site_domains | jq -e --arg domain "$domain_alias" 'index($domain)' > /dev/null; then
+            echo "Domain alias '$domain_alias' does not exist"
+            exit 0
+        fi
+
+        new_site_domains_list=$(echo $site_domains | jq --arg domain "$domain_alias" 'map(select(. != $domain))')
+        echo "Removing domain alias '$domain_alias'"
+        echo "New domain list: $new_site_domains_list"
+    fi
+
+    echo "Updating domain aliases..."
+
+    resulting_site_data=$(curl -X 'PATCH' \
+        -H "Authorization: Bearer $NETLIFY_TOKEN" \
+        -H 'Content-Type: application/json' \
+        -d "{\"domain_aliases\": $new_site_domains_list}" \
+        "https://api.netlify.com/api/v1/sites/$site_id")
+
+    echo "Updated domain aliases."
+    echo "Echo resulting site data: $(echo $resulting_site_data | jq)"
