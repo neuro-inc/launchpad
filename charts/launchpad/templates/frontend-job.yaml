@@ -33,12 +33,12 @@ spec:
         - name: NETLIFY_TOKEN
           valueFrom:
             secretKeyRef:
-              name: launchpad-secrets
+              name: {{ .Values.netlifySecretName }}
               key: NETLIFY_TOKEN
         - name: NETLIFY_SITE_ID
           valueFrom:
             secretKeyRef:
-              name: launchpad-secrets
+              name: {{ .Values.netlifySecretName }}
               key: SITE_ID
         volumeMounts:
         - name: script

@@ -12,7 +12,7 @@ port: 8080
 
 domain: "apps.dev.apolo.us"
 netlifyDomain: "launchpad-web-ui-dev-apolo-us.netlify.app"
-netlifySecretName: null
+netlifySecretName: launchpad-secrets
 
 # apolo specific values
 APOLO_PASSED_CONFIG: null
