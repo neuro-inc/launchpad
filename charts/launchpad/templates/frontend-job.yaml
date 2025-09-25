@@ -50,15 +50,3 @@ spec:
           name: {{ include "launchpad.netlify-configmap" . }}
           defaultMode: 0755
 {{- end -}}
----
-## Example Secret for Netlify Token
-# apiVersion: v1
-# kind: Secret
-# metadata:
-#   name: launchpad-secrets
-#   namespace: platform
-# type: Opaque
-# stringData:
-#   SITE_ID: "123456-789897"
-# data:
-#   NETLIFY_TOKEN: {{ .Values.netlifyToken | b64enc | quote }}
