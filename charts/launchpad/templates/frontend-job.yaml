@@ -20,13 +20,12 @@ spec:
       containers:
       - name: netlify-domain-updater
         image: bash:5.3.3
-        command: ["/bin/sh"]
+        command: ["/usr/local/bin/bash"]
         args:
           - "-c"
           - |
             # Install jq
             apk add --no-cache curl jq
-            chmod +x /scripts/script.sh
             # Run the script
             /scripts/script.sh add --site-id "$NETLIFY_SITE_ID" --domain-alias "{{ include "launchpad.domain" . }}"
         env:
