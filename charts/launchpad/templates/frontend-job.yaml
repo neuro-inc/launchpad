@@ -39,7 +39,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ .Values.netlifySecretName }}
-              key: SITE_ID
+              key: NETLIFY_SITE_ID
         volumeMounts:
         - name: script
           mountPath: /scripts
