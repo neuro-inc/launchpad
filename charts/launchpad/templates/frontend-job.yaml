@@ -1,0 +1,64 @@
+{{- if .Values.netlifySecretName -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "launchpad.name" . }}-netlify-domain-job
+  namespace: platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "launchpad.labels" . | nindent 4 }}
+    service: netlify-domain-job
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "launchpad.selectorLabels" . | nindent 8 }}
+        service: netlify-domain-job
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: netlify-domain-updater
+        image: bash:5.3.3
+        command: ["/bin/sh"]
+        args:
+          - "-c"
+          - |
+            # Install jq
+            apk add --no-cache curl jq
+            chmod +x /scripts/script.sh
+            # Run the script
+            /scripts/script.sh add --site-id "$NETLIFY_SITE_ID" --domain-alias "{{ include "launchpad.domain" . }}"
+        env:
+        - name: NETLIFY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: launchpad-secrets
+              key: NETLIFY_TOKEN
+        - name: NETLIFY_SITE_ID
+          valueFrom:
+            secretKeyRef:
+              name: launchpad-secrets
+              key: SITE_ID
+        volumeMounts:
+        - name: script
+          mountPath: /scripts
+          readOnly: true
+      volumes:
+      - name: script
+        configMap:
+          name: {{ include "launchpad.netlify-configmap" . }}
+          defaultMode: 0755
+{{- end -}}
+---
+## Example Secret for Netlify Token
+# apiVersion: v1
+# kind: Secret
+# metadata:
+#   name: launchpad-secrets
+#   namespace: platform
+# type: Opaque
+# stringData:
+#   SITE_ID: "123456-789897"
+# data:
+#   NETLIFY_TOKEN: {{ .Values.netlifyToken | b64enc | quote }}

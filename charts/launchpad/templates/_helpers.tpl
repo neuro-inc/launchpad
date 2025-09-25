@@ -60,3 +60,7 @@ platform.apolo.us/component: app
 {{- define "launchpad.domainWithProtocol" -}}
 {{- printf "https://%s.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}
+
+{{- define "launchpad.netlify-configmap" -}}
+{{- printf "%s-netlify-configmap" (include "launchpad.name" .) }}
+{{- end }}
