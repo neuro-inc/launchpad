@@ -130,17 +130,18 @@ class AppService:
         if outputs is None:
             raise AppServiceError("Failed to get current outputs")
 
-        installed_apps = outputs.get("installed_apps", [])
+        installed_apps = outputs.get("installed_apps", {})
+        app_list = installed_apps.get("app_list", [])
         if app.app_id not in [
-            UUID(a["app_id"]) for a in installed_apps if "app_id" in a
+            UUID(a["app_id"]) for a in app_list if "app_id" in a
         ]:
-            installed_apps.append(
+            app_list.append(
                 {
                     "app_id": str(app.app_id),
                     "app_name": app.app_name,
                 }
             )
-
+        installed_apps["app_list"] = app_list
         outputs["installed_apps"] = installed_apps
 
         try:
