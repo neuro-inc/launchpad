@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Any, Annotated
 
 import aiohttp
@@ -124,3 +125,24 @@ async def _get_jwks(
 
 
 Auth = Annotated[User, Depends(auth_required)]
+
+
+async def admin_auth_required(
+    request: Request,
+) -> User:
+    # use basic auth for admin endpoints
+    # get admin password from env variable LAUNCHPAD_ADMIN_PASSWORD
+    from fastapi.security import HTTPBasic, HTTPBasicCredentials
+    from starlette.status import HTTP_401_UNAUTHORIZED
+    from starlette.exceptions import HTTPException
+
+    security = HTTPBasic()
+    credentials: HTTPBasicCredentials | None = await security(request)
+    admin_password = os.environ.get("LAUNCHPAD_ADMIN_PASSWORD")
+    if not credentials or not admin_password or credentials.password != admin_password:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return User(id="admin", email="admin", name="admin")

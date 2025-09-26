@@ -8,7 +8,13 @@ from starlette.requests import Request
 from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App, USER_FACING_APPS
-from launchpad.apps.storage import select_app, insert_app, delete_app, update_app_url
+from launchpad.apps.storage import (
+    select_app,
+    insert_app,
+    delete_app,
+    update_app_url,
+    list_apps,
+)
 from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import NotFound, AppsApiError
 
@@ -79,11 +85,13 @@ class AppService:
                 try:
                     output_url = outputs["app_url"]["external_url"]
                     url = f"{output_url['protocol']}://{output_url['host']}"
-                    
+
                     # Update the URL in the database
                     async with self._db() as db:
                         async with db.begin():
-                            updated_app = await update_app_url(db, installed_app.app_id, url)
+                            updated_app = await update_app_url(
+                                db, installed_app.app_id, url
+                            )
                             if updated_app:
                                 installed_app.url = url
                 except KeyError:
@@ -161,6 +169,13 @@ class AppService:
         app_context_class = APPS_CONTEXT[launchpad_app_name]
         app_context = await app_context_class.from_request(request=request)
         return app_class(context=app_context)
+
+    async def list_installed_apps(
+        self,
+        user_id: str | None = None,
+    ) -> list[InstalledApp]:
+        async with self._db() as db:
+            return list(await list_apps(db, user_id=user_id))
 
 
 async def dep_app_service(request: Request) -> AppService:

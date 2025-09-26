@@ -7,8 +7,10 @@ from starlette.responses import Response
 
 from launchpad.app import Launchpad
 from launchpad.apps.api import apps_router
+from launchpad.apps.models import InstalledApp
+from launchpad.apps.service import DepAppService
 from launchpad.auth.api import auth_router
-from launchpad.auth.dependencies import auth_required
+from launchpad.auth.dependencies import auth_required, admin_auth_required
 
 root_router = APIRouter()
 
@@ -39,3 +41,10 @@ async def view_get_config(request: Request) -> dict[str, Any]:
             "realm": app.config.keycloak.realm,
         }
     }
+
+
+@root_router.get("/instances", dependencies=[Depends(admin_auth_required)])
+async def view_get_instances(
+    app_service: DepAppService,
+) -> list[InstalledApp]:
+    return await app_service.list_installed_apps()

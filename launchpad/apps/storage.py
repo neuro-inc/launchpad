@@ -86,7 +86,7 @@ async def update_app_url(
 ) -> InstalledApp | None:
     """Update the URL of an installed app"""
     from sqlalchemy import update
-    
+
     query = (
         update(InstalledApp)
         .where(InstalledApp.app_id == app_id)
@@ -102,3 +102,24 @@ async def delete_app(
     app_id: UUID,
 ) -> None:
     await db.execute(delete(InstalledApp).where(InstalledApp.app_id == app_id))
+
+
+async def list_apps(
+    db: AsyncSession,
+    user_id: str | None = None,
+    is_internal: bool | None = None,
+    is_shared: bool | None = None,
+) -> typing.Sequence[InstalledApp]:
+    where = []
+    if user_id is not None:
+        where.append(InstalledApp.user_id == user_id)
+    if is_internal is not None:
+        where.append(InstalledApp.is_internal.is_(is_internal))
+    if is_shared is not None:
+        where.append(InstalledApp.is_shared.is_(is_shared))
+
+    query = select(InstalledApp)
+    if where:
+        query = query.where(and_(*where))
+    cursor = await db.execute(query)
+    return cursor.scalars().all()
