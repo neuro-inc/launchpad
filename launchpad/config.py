@@ -6,6 +6,7 @@ from base64 import b64decode
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from dotenv import load_dotenv
 from yarl import URL
@@ -66,6 +67,7 @@ class Config:
     apolo: ApoloConfig
     apps: AppsConfig
     server: ServerConfig = ServerConfig()
+    instance_id: UUID | None = None
 
 
 class EnvironConfigFactory:
@@ -84,7 +86,14 @@ class EnvironConfigFactory:
             apolo=self.create_apolo(),
             apps=self.create_apps(),
             postgres=self.create_postgres(),
+            instance_id=self.get_instance_id(),
         )
+
+    def get_instance_id(self) -> UUID | None:
+        instance_id = self._environ.get("LAUNCHPAD_APP_ID")
+        if instance_id is None:
+            return None
+        return UUID(instance_id)
 
     def create_server(self) -> ServerConfig:
         return ServerConfig(

@@ -73,6 +73,8 @@ spec:
               value: {{ .Values.domain }}
             - name: AUTH_MIDDLEWARE_NAME
               value: platform-{{ include "launchpad.name" . }}-auth-middleware
+            - name: LAUNCHPAD_APP_ID
+              value: {{ .Values.apolo_app_id | quote }}
             - name: LAUNCHPAD_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
