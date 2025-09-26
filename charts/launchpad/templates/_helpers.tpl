@@ -64,3 +64,7 @@ platform.apolo.us/component: app
 {{- define "launchpad.netlify-configmap" -}}
 {{- printf "%s-netlify-configmap" (include "launchpad.name" .) }}
 {{- end }}
+
+{{- define "launchpad.admin-secret" -}}
+{{- printf "%s-admin-secret" (include "launchpad.name" .) }}
+{{- end }}

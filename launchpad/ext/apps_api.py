@@ -119,3 +119,14 @@ class AppsApiClient:
         except ValueError as e:
             logger.error(f"Bad response: {raw_response}")
             raise AppsApiError() from e
+
+    async def update_outputs(
+        self,
+        app_id: UUID,
+        outputs: dict[str, Any],
+    ) -> None:
+        await self._request(
+            method="POST",
+            url=f"{self.v1_url}/instances/{app_id}/output",
+            json={"output": outputs},
+        )

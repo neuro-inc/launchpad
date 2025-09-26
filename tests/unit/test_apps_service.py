@@ -9,12 +9,15 @@ from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.registry.base import App
 from launchpad.apps.service import AppService
+from launchpad.config import Config
 from launchpad.ext.apps_api import AppsApiClient
 
 
 @pytest.fixture
 def mock_apps_api_client() -> AsyncMock:
-    return AsyncMock(spec=AppsApiClient)
+    apps_api = AsyncMock(spec=AppsApiClient)
+    apps_api.get_outputs.return_value = {}
+    return apps_api
 
 
 @pytest.fixture
@@ -36,6 +39,8 @@ def mock_launchpad_app(
     app = MagicMock(spec=Launchpad)
     app.apps_api_client = mock_apps_api_client
     app.db = mock_db_session_maker
+    app.config = MagicMock(spec=Config)
+    app.config.instance_id = uuid.uuid4()
     return app
 
 
@@ -56,6 +61,8 @@ async def test_app_service_install_app_success(
     app_id: UUID,
 ) -> None:
     mock_app_instance = MagicMock(spec=App)  # Corrected to spec=App
+    mock_app_instance.config = MagicMock(spec=Config)
+    mock_app_instance.config.instance_id = "INSTANCE_ID"
     mock_app_instance.to_apps_api_payload.return_value = {
         "name": "test-app",
         "chart": "test-chart",

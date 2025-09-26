@@ -2,13 +2,20 @@ import logging
 from typing import Any, Annotated
 from uuid import UUID
 
+import backoff
 from fastapi import Depends
 from starlette.requests import Request
 
 from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App, USER_FACING_APPS
-from launchpad.apps.storage import select_app, insert_app, delete_app, update_app_url
+from launchpad.apps.storage import (
+    select_app,
+    insert_app,
+    delete_app,
+    update_app_url,
+    list_apps,
+)
 from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import NotFound, AppsApiError
 
@@ -40,6 +47,7 @@ class AppService:
     def __init__(self, app: Launchpad):
         self._db = app.db
         self._apps_api_client = app.apps_api_client
+        self._instance_id = app.config.instance_id
 
     async def get_installed_app(
         self,
@@ -79,11 +87,13 @@ class AppService:
                 try:
                     output_url = outputs["app_url"]["external_url"]
                     url = f"{output_url['protocol']}://{output_url['host']}"
-                    
+
                     # Update the URL in the database
                     async with self._db() as db:
                         async with db.begin():
-                            updated_app = await update_app_url(db, installed_app.app_id, url)
+                            updated_app = await update_app_url(
+                                db, installed_app.app_id, url
+                            )
                             if updated_app:
                                 installed_app.url = url
                 except KeyError:
@@ -100,6 +110,49 @@ class AppService:
     ) -> InstalledApp:
         app = await self._app_from_request(request, launchpad_app_name)
         return await self.install(app=app)
+
+    @backoff.on_exception(
+        wait_gen=backoff.expo,
+        exception=(
+            AppServiceError,
+            AppsApiError,
+        ),
+        max_tries=5,
+    )
+    async def _append_app_to_outputs(
+        self,
+        app: InstalledApp,
+    ) -> None:
+        if self._instance_id is None:
+            raise AppServiceError("Instance ID is not configured")
+
+        outputs = await self._apps_api_client.get_outputs(self._instance_id)
+        if outputs is None:
+            raise AppServiceError("Failed to get current outputs")
+
+        installed_apps = outputs.get("installed_apps", [])
+        if app.app_id not in [
+            UUID(a["app_id"]) for a in installed_apps if "app_id" in a
+        ]:
+            installed_apps.append(
+                {
+                    "app_id": str(app.app_id),
+                    "app_name": app.app_name,
+                }
+            )
+
+        outputs["installed_apps"] = installed_apps
+
+        try:
+            await self._apps_api_client.update_outputs(
+                self._instance_id,
+                outputs,
+            )
+        except AppsApiError as e:
+            logger.error(
+                f"Failed to update outputs for instance {self._instance_id}: {e}"
+            )
+            raise AppServiceError("Failed to update instance outputs") from e
 
     async def install(
         self,
@@ -120,7 +173,7 @@ class AppService:
                         "Internal service error. "
                         "Please try again later, or contact support"
                     )
-                return await insert_app(
+                installed_app = await insert_app(
                     db=db,
                     app_id=installation_response["id"],
                     app_name=installation_response["name"],
@@ -130,6 +183,10 @@ class AppService:
                     user_id=None,
                     url=None,
                 )
+
+                await self._append_app_to_outputs(installed_app)
+
+                return installed_app
 
     async def delete(self, app_id: UUID) -> None:
         await self._apps_api_client.delete_app(app_id)
@@ -161,6 +218,13 @@ class AppService:
         app_context_class = APPS_CONTEXT[launchpad_app_name]
         app_context = await app_context_class.from_request(request=request)
         return app_class(context=app_context)
+
+    async def list_installed_apps(
+        self,
+        user_id: str | None = None,
+    ) -> list[InstalledApp]:
+        async with self._db() as db:
+            return list(await list_apps(db, user_id=user_id))
 
 
 async def dep_app_service(request: Request) -> AppService:
