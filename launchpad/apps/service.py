@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any, Annotated
 from uuid import UUID
@@ -48,6 +49,7 @@ class AppService:
         self._db = app.db
         self._apps_api_client = app.apps_api_client
         self._instance_id = app.config.instance_id
+        self._output_buffer: asyncio.Queue[InstalledApp] = asyncio.Queue()
 
     async def get_installed_app(
         self,
@@ -119,28 +121,40 @@ class AppService:
         ),
         max_tries=5,
     )
-    async def _append_app_to_outputs(
+    async def _batch_append_apps_to_outputs(
         self,
-        app: InstalledApp,
+        apps: list[InstalledApp],
     ) -> None:
         if self._instance_id is None:
             raise AppServiceError("Instance ID is not configured")
 
-        outputs = await self._apps_api_client.get_outputs(self._instance_id)
+        outputs = None
+        try:
+            outputs = await self._apps_api_client.get_outputs(self._instance_id)
+        except Exception as e:
+            logger.info(f"Failed to get outputs for instance {self._instance_id}: {e}")
+
         if outputs is None:
-            raise AppServiceError("Failed to get current outputs")
+            raise AppServiceError(
+                "No outputs exist for instance. Cannot append apps until post-outputs hook creates initial outputs."
+            )
 
         installed_apps = outputs.get("installed_apps", {})
         app_list = installed_apps.get("app_list", [])
-        if app.app_id not in [
-            UUID(a["app_id"]) for a in app_list if "app_id" in a
-        ]:
-            app_list.append(
-                {
-                    "app_id": str(app.app_id),
-                    "app_name": app.app_name,
-                }
-            )
+
+        # Get existing app IDs to avoid duplicates
+        existing_app_ids = {UUID(a["app_id"]) for a in app_list if "app_id" in a}
+
+        # Add all new apps in batch
+        for app in apps:
+            if app.app_id not in existing_app_ids:
+                app_list.append(
+                    {
+                        "app_id": str(app.app_id),
+                        "app_name": app.app_name,
+                    }
+                )
+
         installed_apps["app_list"] = app_list
         outputs["installed_apps"] = installed_apps
 
@@ -155,10 +169,45 @@ class AppService:
             )
             raise AppServiceError("Failed to update instance outputs") from e
 
+    async def _add_app_to_buffer(self, app: InstalledApp) -> None:
+        """Add an app to the output buffer for later processing."""
+        await self._output_buffer.put(app)
+        logger.debug(f"Added app {app.app_id} to output buffer")
+
+    async def process_output_buffer(self) -> None:
+        """Process all apps in the output buffer and update outputs in a single batch."""
+        processed_apps = []
+
+        # Collect all apps from the buffer
+        while not self._output_buffer.empty():
+            try:
+                app = self._output_buffer.get_nowait()
+                processed_apps.append(app)
+            except asyncio.QueueEmpty:
+                break
+
+        if not processed_apps:
+            return
+
+        logger.info(
+            f"Processing {len(processed_apps)} apps from output buffer in batch"
+        )
+
+        # Batch process all apps with a single outputs update
+        try:
+            await self._batch_append_apps_to_outputs(processed_apps)
+            logger.info(f"Successfully processed {len(processed_apps)} apps in batch")
+        except Exception as e:
+            logger.error(f"Failed to batch process apps from buffer: {e}")
+            # Re-add all apps to buffer for retry on next cycle
+            for app in processed_apps:
+                await self._output_buffer.put(app)
+
     async def install(
         self,
         app: T_App,
     ) -> InstalledApp:
+        installed_app = None
         async with self._db() as db:
             async with db.begin():
                 payload = None
@@ -185,9 +234,8 @@ class AppService:
                     url=None,
                 )
 
-                await self._append_app_to_outputs(installed_app)
-
-                return installed_app
+        await self._add_app_to_buffer(installed_app)
+        return installed_app
 
     async def delete(self, app_id: UUID) -> None:
         await self._apps_api_client.delete_app(app_id)

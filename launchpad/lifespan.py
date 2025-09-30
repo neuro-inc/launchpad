@@ -14,6 +14,16 @@ from launchpad.ext.apps_api import AppsApiClient
 logger = logging.getLogger(__name__)
 
 
+async def periodic_output_processing_task(app: Launchpad) -> None:
+    """Periodically process the output buffer to update app outputs."""
+    while True:
+        try:
+            await app.app_service.process_output_buffer()
+        except Exception as e:
+            logger.error(f"Error in periodic output processing task: {e}")
+        await asyncio.sleep(30)  # 30 seconds
+
+
 @asynccontextmanager
 async def create_aiohttp_session(app: Launchpad) -> t.AsyncIterator[None]:
     app.http = aiohttp.ClientSession()
@@ -44,4 +54,18 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
             launchpad_domain=app.config.apolo.self_domain,
         )
         launchpad_init_task = asyncio.create_task(init_internal_apps(app))  # noqa: F841
-        yield
+
+        # Start periodic output processing task
+        output_processing_task = asyncio.create_task(
+            periodic_output_processing_task(app)
+        )
+
+        try:
+            yield
+        finally:
+            # Cancel the periodic task on shutdown
+            output_processing_task.cancel()
+            try:
+                await output_processing_task
+            except asyncio.CancelledError:
+                pass
