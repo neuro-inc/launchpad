@@ -1,4 +1,4 @@
-from launchpad.apps.registry.base import App
+from launchpad.apps.registry.base import App, GenericApp
 from launchpad.apps.registry.internal.context import InternalAppContext
 from launchpad.apps.registry.internal.embeddings import (
     EmbeddingsApp,
@@ -15,7 +15,7 @@ from launchpad.apps.registry.shared.openwebui import (
     OpenWebUIAppContext,
 )
 
-T_App = OpenWebUIApp | App[InternalAppContext]
+T_App = OpenWebUIApp | App[InternalAppContext] | GenericApp
 
 APPS: dict[str, type[T_App]] = {
     APP_NAME_LLM_INFERENCE: LlmInferenceApp,

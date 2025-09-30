@@ -1,4 +1,23 @@
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any
+from pydantic import BaseModel, Field, ConfigDict, model_validator
+
+
+class GenericAppInstallRequest(BaseModel):
+    """Request model for installing a generic app with custom configuration"""
+
+    template_name: str = Field(..., description="Name of the template to install")
+    template_version: str = Field(..., description="Version of the template")
+    inputs: dict[str, Any] = Field(..., description="Inputs to pass to the Apps API")
+    name: str | None = Field(None, description="Custom name for the app (defaults to template_name)")
+    verbose_name: str | None = Field(None, description="User-friendly display name")
+    description_short: str = Field(default="", description="Short description")
+    description_long: str = Field(default="", description="Long description")
+    logo: str = Field(default="", description="URL to the app's logo")
+    documentation_urls: list[dict[str, str]] = Field(default_factory=list, description="Documentation URLs")
+    external_urls: list[dict[str, str]] = Field(default_factory=list, description="External URLs")
+    tags: list[str] = Field(default_factory=list, description="Tags for categorization")
+    is_internal: bool = Field(default=False, description="Whether app is internal")
+    is_shared: bool = Field(default=True, description="Whether app can be shared")
 
 
 class LaunchpadAppRead(BaseModel):

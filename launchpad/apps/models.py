@@ -1,7 +1,9 @@
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSON
 
 from launchpad.db.base import Base
 
@@ -35,3 +37,30 @@ class InstalledApp(Base):
     """
     user_id: Mapped[str | None]
     url: Mapped[str | None]
+    template_name: Mapped[str]
+    """Template name used for installation
+    """
+    template_version: Mapped[str]
+    """Template version used for installation
+    """
+    verbose_name: Mapped[str]
+    """User-friendly display name
+    """
+    description_short: Mapped[str]
+    """Short description of the app
+    """
+    description_long: Mapped[str]
+    """Long description of the app
+    """
+    logo: Mapped[str]
+    """URL to the app's logo
+    """
+    documentation_urls: Mapped[list[dict[str, str]]] = mapped_column(JSON)
+    """List of documentation URLs
+    """
+    external_urls: Mapped[list[dict[str, str]]] = mapped_column(JSON)
+    """List of external URLs
+    """
+    tags: Mapped[list[str]] = mapped_column(JSON)
+    """List of tags for categorization
+    """

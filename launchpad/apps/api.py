@@ -7,7 +7,11 @@ from starlette.requests import Request
 from starlette.status import HTTP_200_OK
 
 from launchpad.apps.registry import USER_FACING_APPS
-from launchpad.apps.resources import LaunchpadAppRead, LaunchpadInstalledAppRead
+from launchpad.apps.resources import (
+    GenericAppInstallRequest,
+    LaunchpadAppRead,
+    LaunchpadInstalledAppRead,
+)
 from launchpad.apps.service import (
     AppTemplateNotFound,
     DepAppService,
@@ -23,8 +27,91 @@ apps_router = APIRouter()
 
 
 @apps_router.get("", response_model=Page[LaunchpadAppRead])
-async def view_get_apps_pool() -> Any:
-    return paginate(list(USER_FACING_APPS.values()))
+async def view_get_apps_pool(
+    app_service: DepAppService,
+) -> Any:
+    """
+    Get the pool of available apps.
+
+    Returns both predefined user-facing apps and installed generic apps.
+    """
+    # Get predefined apps
+    predefined_apps = list(USER_FACING_APPS.values())
+
+    # Get installed generic apps (those not in the predefined registry)
+    installed_apps = await app_service.list_installed_apps()
+    generic_apps = [
+        app for app in installed_apps
+        if app.launchpad_app_name not in USER_FACING_APPS
+    ]
+
+    # Convert InstalledApp to LaunchpadAppRead format
+    generic_app_reads = [
+        LaunchpadAppRead.model_validate(
+            {
+                "verbose_name": app.verbose_name,
+                "name": app.launchpad_app_name,
+                "description_short": app.description_short,
+                "description_long": app.description_long,
+                "logo": app.logo,
+                "documentation_urls": app.documentation_urls,
+                "external_urls": app.external_urls,
+                "tags": app.tags,
+            }
+        )
+        for app in generic_apps
+    ]
+
+    # Combine predefined apps and generic apps
+    all_apps = predefined_apps + generic_app_reads
+
+    return paginate(all_apps)
+
+
+@apps_router.post(
+    "/install",
+    status_code=HTTP_200_OK,
+    response_model=LaunchpadInstalledAppRead,
+)
+async def view_post_install_generic_app(
+    request: Request,
+    generic_app_request: GenericAppInstallRequest,
+    app_service: DepAppService,
+    user: Auth,
+) -> Any:
+    """
+    Install a generic app with custom template and configuration.
+
+    This endpoint allows installing any app template by providing:
+    - template_name: The name of the template to install
+    - template_version: The version of the template
+    - inputs: The inputs to pass to the Apps API
+    - Optional metadata: name, verbose_name, description, logo, etc.
+
+    Example request body:
+    ```json
+    {
+        "template_name": "my-template",
+        "template_version": "1.0.0",
+        "inputs": {
+            "displayName": "My Custom App",
+            "preset": {"name": "cpu-small"},
+            "custom_config": {"key": "value"}
+        },
+        "name": "my-custom-app",
+        "verbose_name": "My Custom App",
+        "description_short": "A custom application",
+        "logo": "https://example.com/logo.png"
+    }
+    ```
+    """
+    try:
+        return await app_service.install_from_request(
+            request=request,
+            generic_app_request=generic_app_request,
+        )
+    except AppServiceError as e:
+        raise BadRequest(str(e))
 
 
 @apps_router.post(

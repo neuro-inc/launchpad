@@ -10,6 +10,8 @@ from starlette.requests import Request
 from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App, USER_FACING_APPS
+from launchpad.apps.registry.base import GenericApp
+from launchpad.apps.resources import GenericAppInstallRequest
 from launchpad.apps.storage import (
     select_app,
     insert_app,
@@ -108,10 +110,49 @@ class AppService:
     async def install_from_request(
         self,
         request: Request,
-        launchpad_app_name: str,
+        launchpad_app_name: str | None = None,
+        generic_app_request: "GenericAppInstallRequest | None" = None,
     ) -> InstalledApp:
-        app = await self._app_from_request(request, launchpad_app_name)
-        return await self.install(app=app)
+        """
+        Install an app from a request.
+
+        Args:
+            request: The HTTP request
+            launchpad_app_name: Name of a predefined app to install (existing flow)
+            generic_app_request: Generic app configuration (new flow)
+
+        Returns:
+            The installed app
+
+        Raises:
+            BadRequest: If neither or both parameters are provided
+        """
+        if launchpad_app_name is None and generic_app_request is None:
+            raise BadRequest("Must provide either launchpad_app_name or generic_app_request")
+        if launchpad_app_name is not None and generic_app_request is not None:
+            raise BadRequest("Cannot provide both launchpad_app_name and generic_app_request")
+
+        if generic_app_request:
+            # New flow: install generic app
+            return await self.install_generic(
+                template_name=generic_app_request.template_name,
+                template_version=generic_app_request.template_version,
+                inputs=generic_app_request.inputs,
+                name=generic_app_request.name,
+                is_internal=generic_app_request.is_internal,
+                is_shared=generic_app_request.is_shared,
+                verbose_name=generic_app_request.verbose_name or generic_app_request.name or generic_app_request.template_name,
+                description_short=generic_app_request.description_short,
+                description_long=generic_app_request.description_long,
+                logo=generic_app_request.logo,
+                documentation_urls=generic_app_request.documentation_urls,
+                external_urls=generic_app_request.external_urls,
+                tags=generic_app_request.tags,
+            )
+        else:
+            # Existing flow: install predefined app
+            app = await self._app_from_request(request, launchpad_app_name)  # type: ignore
+            return await self.install(app=app)
 
     @backoff.on_exception(
         wait_gen=backoff.expo,
@@ -232,10 +273,88 @@ class AppService:
                     is_shared=app.is_shared,
                     user_id=None,
                     url=None,
+                    template_name=app.template_name,
+                    template_version=app.template_version,
+                    verbose_name=app.verbose_name,
+                    description_short=app.description_short,
+                    description_long=app.description_long,
+                    logo=app.logo,
+                    documentation_urls=app.documentation_urls,
+                    external_urls=app.external_urls,
+                    tags=app.tags,
                 )
 
         await self._add_app_to_buffer(installed_app)
         return installed_app
+
+    async def install_generic(
+        self,
+        template_name: str,
+        template_version: str,
+        inputs: dict[str, Any],
+        name: str | None = None,
+        is_internal: bool = False,
+        is_shared: bool = True,
+        verbose_name: str = "",
+        description_short: str = "",
+        description_long: str = "",
+        logo: str = "",
+        documentation_urls: list[dict[str, str]] | None = None,
+        external_urls: list[dict[str, str]] | None = None,
+        tags: list[str] | None = None,
+    ) -> InstalledApp:
+        """
+        Install a generic app without requiring a predefined app class.
+
+        Args:
+            template_name: The name of the template to use for installation
+            template_version: The version of the template
+            inputs: The inputs to pass to the Apps API
+            name: Optional name for the app (defaults to template_name)
+            is_internal: Whether the app is internal (not visible to end users)
+            is_shared: Whether the app can be shared by multiple users
+            verbose_name: User-friendly name for the app
+            description_short: Short description of the app
+            description_long: Long description of the app
+            logo: URL to the app's logo
+            documentation_urls: List of documentation URLs
+            external_urls: List of external URLs
+            tags: List of tags for categorization
+
+        Returns:
+            The installed app record
+
+        Example:
+            ```python
+            installed_app = await app_service.install_generic(
+                template_name="my-template",
+                template_version="1.0.0",
+                inputs={
+                    "displayName": "My App",
+                    "preset": {"name": "cpu-small"},
+                    "my_custom_input": "value"
+                },
+                name="my-app",
+                is_shared=True
+            )
+            ```
+        """
+        generic_app = GenericApp(
+            template_name=template_name,
+            template_version=template_version,
+            inputs=inputs,
+            name=name,
+            is_internal=is_internal,
+            is_shared=is_shared,
+            verbose_name=verbose_name,
+            description_short=description_short,
+            description_long=description_long,
+            logo=logo,
+            documentation_urls=documentation_urls,
+            external_urls=external_urls,
+            tags=tags,
+        )
+        return await self.install(generic_app)
 
     async def delete(self, app_id: UUID) -> None:
         await self._apps_api_client.delete_app(app_id)
