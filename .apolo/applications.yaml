@@ -7,7 +7,7 @@
   inputs:
     schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppInputs.json
     types_name: LaunchpadAppInputs
-    processor: LaunchpadAppInputsProcessor
+    processor: LaunchpadInputsProcessor
     image: ghcr.io/neuro-inc/launchpad
   outputs:
     schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppOutputs.json
