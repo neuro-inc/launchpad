@@ -25,18 +25,7 @@ spec:
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         command: ["python3", "/app/scripts/cleanup-apps.py"]
         env:
-        - name: DB_HOST
-          value: {{ .Values.postgresql.fullnameOverride }}
-        - name: DB_USER
-          value: "postgres"
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.dbSecretName }}
-              key: DB_PASSWORD
-        - name: DB_NAME
-          value: "launchpad"
-        - name: DB_PORT
-          value: "5432"
         - name: APOLO_PASSED_CONFIG
           value: {{ .Values.APOLO_PASSED_CONFIG | quote }}
+        - name: LAUNCHPAD_APP_ID
+          value: {{ .Values.apolo_app_id | quote }}

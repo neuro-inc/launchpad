@@ -2,6 +2,9 @@
 """
 Cleanup script for uninstalling all apps managed by Launchpad.
 This script is intended to run as a Kubernetes Job with ArgoCD PostDelete hook.
+
+Note: This script does NOT use the database since it will be deleted before this hook runs.
+Instead, it fetches the list of installed apps from the Launchpad app outputs.
 """
 import asyncio
 import json
@@ -9,15 +12,12 @@ import logging
 import os
 import sys
 from base64 import b64decode
+from uuid import UUID
 
 import aiohttp
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
 from yarl import URL
 
-# Import existing models and functions
-from launchpad.apps.models import InstalledApp
-from launchpad.apps.storage import list_apps
+# Import existing API client
 from launchpad.ext.apps_api import AppsApiClient, AppsApiError, NotFound
 
 # Configure logging
@@ -38,111 +38,158 @@ class CleanupError(Exception):
     pass
 
 
-def order_apps_for_deletion(apps: list[InstalledApp]) -> list[list[InstalledApp]]:
+async def get_installed_apps_from_outputs(
+    api_client: AppsApiClient,
+    launchpad_app_id: UUID,
+) -> list[dict[str, str]]:
+    """
+    Fetch installed apps from Launchpad app outputs.
+    Returns list of dicts with 'app_id' and 'app_name' keys.
+    """
+    logger.info(f"Fetching outputs for Launchpad app {launchpad_app_id}")
+
+    try:
+        outputs = await api_client.get_outputs(launchpad_app_id)
+    except NotFound:
+        logger.warning(f"Launchpad app {launchpad_app_id} not found or has no outputs")
+        return []
+    except AppsApiError as e:
+        logger.error(f"Failed to fetch outputs for {launchpad_app_id}: {e}")
+        raise CleanupError("Failed to fetch Launchpad app outputs") from e
+
+    installed_apps = outputs.get("installed_apps", {})
+    app_list = installed_apps.get("app_list", [])
+
+    logger.info(f"Found {len(app_list)} apps in outputs")
+    for app in app_list:
+        logger.info(f"  - {app.get('app_name')} ({app.get('app_id')})")
+
+    return app_list
+
+
+def get_app_dependencies() -> dict[str, list[str]]:
+    """
+    Define app dependencies.
+    Returns dict where key depends on values (must be deleted after values are deleted).
+    """
+    # OpenWebUI depends on postgres, vllm, and embeddings
+    # So OpenWebUI must be deleted first
+    return {
+        "openwebui": ["postgres", "vllm-llama-3.1-8b", "embeddings"],
+    }
+
+
+def order_apps_for_deletion(apps: list[dict[str, str]]) -> list[list[UUID]]:
     """
     Order apps for deletion based on dependencies.
-    Returns a list of lists, where each inner list contains apps that can be deleted in parallel.
+    Returns a list of lists, where each inner list contains app IDs that can be deleted in parallel.
 
     Dependency order:
-    1. User-facing apps (openwebui) - must be deleted first
-    2. Internal apps (postgres, vllm, embeddings) - can be deleted in parallel after user-facing apps
+    1. Apps that depend on others (openwebui) - must be deleted first
+    2. Apps that are dependencies (postgres, vllm, embeddings) - can be deleted in parallel
     """
-    user_facing = []
-    internal = []
+    dependencies = get_app_dependencies()
 
-    for app in apps:
-        if app.is_internal:
-            internal.append(app)
+    # Build name -> app_id mapping
+    name_to_app = {app["app_name"]: UUID(app["app_id"]) for app in apps}
+
+    # Separate apps with dependencies from those without
+    apps_with_deps = []
+    apps_without_deps = []
+
+    for app_name, app_id in name_to_app.items():
+        if app_name in dependencies:
+            apps_with_deps.append(app_id)
         else:
-            user_facing.append(app)
+            apps_without_deps.append(app_id)
 
-    # Return batches: first user-facing apps, then internal apps
+    # Return batches: first apps with dependencies, then apps without
     batches = []
-    if user_facing:
-        batches.append(user_facing)
-    if internal:
-        batches.append(internal)
+    if apps_with_deps:
+        batches.append(apps_with_deps)
+    if apps_without_deps:
+        batches.append(apps_without_deps)
 
     return batches
 
 
-async def can_uninstall_app(api_client: AppsApiClient, app: InstalledApp) -> bool:
+async def can_uninstall_app(api_client: AppsApiClient, app_id: UUID) -> bool:
     """
     Check if an app can be uninstalled.
     Returns True if the app exists and is not in 'uninstalling' or 'uninstalled' state.
     """
     try:
-        response = await api_client.get_by_id(app.app_id)
+        response = await api_client.get_by_id(app_id)
         state = response.get("state", "").lower()
 
         if state in ("uninstalling", "uninstalled"):
-            logger.info(f"App {app.launchpad_app_name} is already {state}, skipping")
+            logger.info(f"App {app_id} is already {state}, skipping")
             return False
 
-        logger.info(f"App {app.launchpad_app_name} is in state '{state}', can uninstall")
+        logger.info(f"App {app_id} is in state '{state}', can uninstall")
         return True
     except NotFound:
-        logger.info(f"App {app.launchpad_app_name} not found in Apps API, already deleted")
+        logger.info(f"App {app_id} not found in Apps API, already deleted")
         return False
     except AppsApiError as e:
-        logger.warning(f"Error checking app {app.launchpad_app_name} status: {e}")
+        logger.warning(f"Error checking app {app_id} status: {e}")
         # Assume we can try to uninstall if we can't check status
         return True
 
 
-async def uninstall_app_with_retry(api_client: AppsApiClient, app: InstalledApp) -> None:
+async def uninstall_app_with_retry(api_client: AppsApiClient, app_id: UUID) -> None:
     """
     Attempt to uninstall an app with retry logic.
     Raises CleanupError if all retries fail.
     """
     # First check if we can uninstall
-    if not await can_uninstall_app(api_client, app):
+    if not await can_uninstall_app(api_client, app_id):
         return
 
     delay = RETRY_DELAY
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            logger.info(f"Attempting to uninstall {app.launchpad_app_name} (attempt {attempt}/{MAX_RETRIES})")
-            await api_client.delete_app(app.app_id)
-            logger.info(f"Successfully uninstalled {app.launchpad_app_name}")
+            logger.info(f"Attempting to uninstall {app_id} (attempt {attempt}/{MAX_RETRIES})")
+            await api_client.delete_app(app_id)
+            logger.info(f"Successfully uninstalled {app_id}")
             return
         except NotFound:
-            logger.info(f"App {app.launchpad_app_name} not found, already deleted")
+            logger.info(f"App {app_id} not found, already deleted")
             return
         except AppsApiError as e:
             if attempt < MAX_RETRIES:
-                logger.warning(f"Failed to uninstall {app.launchpad_app_name}: {e}. Retrying in {delay}s...")
+                logger.warning(f"Failed to uninstall {app_id}: {e}. Retrying in {delay}s...")
                 await asyncio.sleep(delay)
                 delay *= RETRY_BACKOFF
             else:
-                logger.error(f"Failed to uninstall {app.launchpad_app_name} after {MAX_RETRIES} attempts")
-                raise CleanupError(f"Failed to uninstall {app.launchpad_app_name}") from e
+                logger.error(f"Failed to uninstall {app_id} after {MAX_RETRIES} attempts")
+                raise CleanupError(f"Failed to uninstall {app_id}") from e
 
 
 async def delete_app_batch(
-    apps: list[InstalledApp],
+    app_ids: list[UUID],
     api_client: AppsApiClient,
-) -> tuple[list[InstalledApp], list[tuple[InstalledApp, Exception]]]:
+) -> tuple[list[UUID], list[tuple[UUID, Exception]]]:
     """
     Delete a batch of apps in parallel with retry logic.
     Returns tuple of (successful_deletions, failed_deletions)
     """
     tasks = []
-    for app in apps:
-        tasks.append(uninstall_app_with_retry(api_client, app))
+    for app_id in app_ids:
+        tasks.append(uninstall_app_with_retry(api_client, app_id))
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     successful = []
     failed = []
 
-    for app, result in zip(apps, results):
+    for app_id, result in zip(app_ids, results):
         if isinstance(result, Exception):
-            failed.append((app, result))
-            logger.error(f"Failed to delete {app.launchpad_app_name}: {result}")
+            failed.append((app_id, result))
+            logger.error(f"Failed to delete {app_id}: {result}")
         else:
-            successful.append(app)
-            logger.info(f"Successfully deleted {app.launchpad_app_name}")
+            successful.append(app_id)
+            logger.info(f"Successfully deleted {app_id}")
 
     return successful, failed
 
@@ -156,12 +203,6 @@ async def cleanup_apps() -> int:
 
     # Load configuration from environment
     try:
-        db_host = os.environ["DB_HOST"]
-        db_user = os.environ["DB_USER"]
-        db_password = os.environ["DB_PASSWORD"]
-        db_name = os.environ["DB_NAME"]
-        db_port = os.environ.get("DB_PORT", "5432")
-
         apolo_config_b64 = os.environ["APOLO_PASSED_CONFIG"]
         apolo_config = json.loads(b64decode(apolo_config_b64))
 
@@ -174,68 +215,69 @@ async def cleanup_apps() -> int:
         url = URL(apolo_config["url"])
         apps_api_url = f"{url.scheme}://{url.host}/apis/apps"
 
+        # Get Launchpad app ID
+        launchpad_app_id_str = os.environ.get("LAUNCHPAD_APP_ID")
+        if not launchpad_app_id_str:
+            logger.error("LAUNCHPAD_APP_ID environment variable is not set")
+            return 1
+
+        launchpad_app_id = UUID(launchpad_app_id_str)
+
     except KeyError as e:
         logger.error(f"Missing required environment variable: {e}")
         return 1
-
-    # Create database connection
-    postgres_dsn = f"postgresql+asyncpg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
-    engine = create_async_engine(postgres_dsn, echo=False)
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    except ValueError as e:
+        logger.error(f"Invalid LAUNCHPAD_APP_ID format: {e}")
+        return 1
 
     try:
-        async with async_session() as session:
-            # Fetch all installed apps using existing storage function
-            apps = list(await list_apps(session))
+        # Create Apps API client using existing implementation
+        async with aiohttp.ClientSession() as http:
+            api_client = AppsApiClient(
+                http=http,
+                base_url=apps_api_url,
+                token=token,
+                cluster=cluster,
+                org_name=org_name,
+                project_name=project_name,
+            )
+
+            # Fetch installed apps from Launchpad app outputs
+            apps = await get_installed_apps_from_outputs(api_client, launchpad_app_id)
 
             if not apps:
                 logger.info("No apps to clean up")
                 return 0
 
             logger.info(f"Found {len(apps)} apps to uninstall")
-            for app in apps:
-                logger.info(f"  - {app.launchpad_app_name} ({app.app_id}) - internal={app.is_internal}")
 
             # Order apps for deletion
             deletion_batches = order_apps_for_deletion(apps)
             logger.info(f"Apps will be deleted in {len(deletion_batches)} batches")
 
-            # Create Apps API client using existing implementation
-            async with aiohttp.ClientSession() as http:
-                api_client = AppsApiClient(
-                    http=http,
-                    base_url=apps_api_url,
-                    token=token,
-                    cluster=cluster,
-                    org_name=org_name,
-                    project_name=project_name,
-                )
+            # Delete apps in batches
+            total_failed = []
+            for batch_num, batch in enumerate(deletion_batches, 1):
+                logger.info(f"Processing batch {batch_num}/{len(deletion_batches)} ({len(batch)} apps)")
+                successful, failed = await delete_app_batch(batch, api_client)
+                total_failed.extend(failed)
 
-                # Delete apps in batches
-                total_failed = []
-                for batch_num, batch in enumerate(deletion_batches, 1):
-                    logger.info(f"Processing batch {batch_num}/{len(deletion_batches)} ({len(batch)} apps)")
-                    successful, failed = await delete_app_batch(batch, api_client)
-                    total_failed.extend(failed)
+                if failed:
+                    logger.warning(f"Batch {batch_num} had {len(failed)} failures")
 
-                    if failed:
-                        logger.warning(f"Batch {batch_num} had {len(failed)} failures")
+            # Report final status
+            if total_failed:
+                logger.error(f"Cleanup completed with {len(total_failed)} failures:")
+                for app_id, error in total_failed:
+                    logger.error(f"  - {app_id}: {error}")
+                return 1
 
-                # Report final status
-                if total_failed:
-                    logger.error(f"Cleanup completed with {len(total_failed)} failures:")
-                    for app, error in total_failed:
-                        logger.error(f"  - {app.launchpad_app_name} ({app.app_id}): {error}")
-                    return 1
-
-                logger.info("All apps successfully uninstalled")
-                return 0
+            logger.info("All apps successfully uninstalled")
+            return 0
 
     except Exception as e:
         logger.exception(f"Unexpected error during cleanup: {e}")
         return 1
-    finally:
-        await engine.dispose()
 
 
 def main() -> int:
