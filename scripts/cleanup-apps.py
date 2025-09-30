@@ -6,6 +6,7 @@ This script is intended to run as a Kubernetes Job with ArgoCD PostDelete hook.
 Note: This script does NOT use the database since it will be deleted before this hook runs.
 Instead, it fetches the list of installed apps from the Launchpad app outputs.
 """
+
 import asyncio
 import json
 import logging
@@ -35,6 +36,7 @@ RETRY_BACKOFF = 2  # exponential backoff multiplier
 
 class CleanupError(Exception):
     """Base exception for cleanup errors"""
+
     pass
 
 
@@ -149,7 +151,9 @@ async def uninstall_app_with_retry(api_client: AppsApiClient, app_id: UUID) -> N
     delay = RETRY_DELAY
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            logger.info(f"Attempting to uninstall {app_id} (attempt {attempt}/{MAX_RETRIES})")
+            logger.info(
+                f"Attempting to uninstall {app_id} (attempt {attempt}/{MAX_RETRIES})"
+            )
             await api_client.delete_app(app_id)
             logger.info(f"Successfully uninstalled {app_id}")
             return
@@ -158,11 +162,15 @@ async def uninstall_app_with_retry(api_client: AppsApiClient, app_id: UUID) -> N
             return
         except AppsApiError as e:
             if attempt < MAX_RETRIES:
-                logger.warning(f"Failed to uninstall {app_id}: {e}. Retrying in {delay}s...")
+                logger.warning(
+                    f"Failed to uninstall {app_id}: {e}. Retrying in {delay}s..."
+                )
                 await asyncio.sleep(delay)
                 delay *= RETRY_BACKOFF
             else:
-                logger.error(f"Failed to uninstall {app_id} after {MAX_RETRIES} attempts")
+                logger.error(
+                    f"Failed to uninstall {app_id} after {MAX_RETRIES} attempts"
+                )
                 raise CleanupError(f"Failed to uninstall {app_id}") from e
 
 
@@ -258,7 +266,9 @@ async def cleanup_apps() -> int:
             # Delete apps in batches
             total_failed = []
             for batch_num, batch in enumerate(deletion_batches, 1):
-                logger.info(f"Processing batch {batch_num}/{len(deletion_batches)} ({len(batch)} apps)")
+                logger.info(
+                    f"Processing batch {batch_num}/{len(deletion_batches)} ({len(batch)} apps)"
+                )
                 successful, failed = await delete_app_batch(batch, api_client)
                 total_failed.extend(failed)
 
