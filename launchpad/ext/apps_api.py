@@ -63,6 +63,15 @@ class AppsApiClient:
             url=f"{self.v2_url}/instances/{app_id}",
         )
 
+    async def get_template(
+        self, template_name: str, template_version: str
+    ) -> dict[str, Any]:
+        """Get template details by name and version"""
+        return await self._request(
+            method="GET",
+            url=f"{self.v2_url}/templates/{template_name}/{template_version}",
+        )
+
     async def get_outputs(self, app_id: UUID) -> dict[str, Any]:
         return await self._request(
             method="GET", url=f"{self.v1_url}/instances/{app_id}/output"

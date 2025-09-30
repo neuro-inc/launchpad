@@ -9,6 +9,7 @@ from starlette.status import HTTP_200_OK
 from launchpad.apps.registry import USER_FACING_APPS
 from launchpad.apps.resources import (
     GenericAppInstallRequest,
+    ImportAppRequest,
     LaunchpadAppRead,
     LaunchpadInstalledAppRead,
 )
@@ -41,8 +42,7 @@ async def view_get_apps_pool(
     # Get installed generic apps (those not in the predefined registry)
     installed_apps = await app_service.list_installed_apps()
     generic_apps = [
-        app for app in installed_apps
-        if app.launchpad_app_name not in USER_FACING_APPS
+        app for app in installed_apps if app.launchpad_app_name not in USER_FACING_APPS
     ]
 
     # Convert InstalledApp to LaunchpadAppRead format
@@ -110,6 +110,51 @@ async def view_post_install_generic_app(
             request=request,
             generic_app_request=generic_app_request,
         )
+    except AppServiceError as e:
+        raise BadRequest(str(e))
+
+
+@apps_router.post(
+    "/import",
+    status_code=HTTP_200_OK,
+    response_model=LaunchpadInstalledAppRead,
+)
+async def view_post_import_app(
+    request: Request,
+    import_request: ImportAppRequest,
+    app_service: DepAppService,
+    user: Auth,
+) -> Any:
+    """
+    Import an externally installed app from Apps API.
+
+    This endpoint allows importing apps that were installed outside of Launchpad
+    by providing their app_id. The server will query Apps API to retrieve the app's
+    template information and store it in Launchpad's database.
+
+    You can override metadata when importing:
+    - name: Custom launchpad app name
+    - verbose_name: User-friendly display name
+    - description_short: Short description
+    - description_long: Long description
+    - logo: URL to logo
+    - documentation_urls: List of documentation URLs
+    - external_urls: List of external URLs
+    - tags: List of tags
+
+    Example request body:
+    ```json
+    {
+        "app_id": "123e4567-e89b-12d3-a456-426614174000",
+        "name": "my-imported-app",
+        "verbose_name": "My Imported App",
+        "description_short": "An externally installed app",
+        "logo": "https://example.com/logo.png"
+    }
+    ```
+    """
+    try:
+        return await app_service.import_app(import_request)
     except AppServiceError as e:
         raise BadRequest(str(e))
 

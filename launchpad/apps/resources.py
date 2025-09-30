@@ -1,5 +1,28 @@
 from typing import Any
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from uuid import UUID
+from pydantic import BaseModel, Field, ConfigDict
+
+
+class ImportAppRequest(BaseModel):
+    """Request model for importing an externally installed app"""
+
+    app_id: UUID = Field(..., description="The app_id from Apps API to import")
+    name: str | None = Field(
+        None, description="Custom name for the app (defaults to template_name)"
+    )
+    verbose_name: str | None = Field(None, description="User-friendly display name")
+    description_short: str | None = Field(None, description="Short description")
+    description_long: str | None = Field(None, description="Long description")
+    logo: str | None = Field(None, description="URL to the app's logo")
+    documentation_urls: list[dict[str, str]] | None = Field(
+        None, description="Documentation URLs"
+    )
+    external_urls: list[dict[str, str]] | None = Field(
+        None, description="External URLs"
+    )
+    tags: list[str] | None = Field(None, description="Tags for categorization")
+    is_internal: bool = Field(default=False, description="Whether app is internal")
+    is_shared: bool = Field(default=True, description="Whether app can be shared")
 
 
 class GenericAppInstallRequest(BaseModel):
@@ -8,13 +31,19 @@ class GenericAppInstallRequest(BaseModel):
     template_name: str = Field(..., description="Name of the template to install")
     template_version: str = Field(..., description="Version of the template")
     inputs: dict[str, Any] = Field(..., description="Inputs to pass to the Apps API")
-    name: str | None = Field(None, description="Custom name for the app (defaults to template_name)")
+    name: str | None = Field(
+        None, description="Custom name for the app (defaults to template_name)"
+    )
     verbose_name: str | None = Field(None, description="User-friendly display name")
     description_short: str = Field(default="", description="Short description")
     description_long: str = Field(default="", description="Long description")
     logo: str = Field(default="", description="URL to the app's logo")
-    documentation_urls: list[dict[str, str]] = Field(default_factory=list, description="Documentation URLs")
-    external_urls: list[dict[str, str]] = Field(default_factory=list, description="External URLs")
+    documentation_urls: list[dict[str, str]] = Field(
+        default_factory=list, description="Documentation URLs"
+    )
+    external_urls: list[dict[str, str]] = Field(
+        default_factory=list, description="External URLs"
+    )
     tags: list[str] = Field(default_factory=list, description="Tags for categorization")
     is_internal: bool = Field(default=False, description="Whether app is internal")
     is_shared: bool = Field(default=True, description="Whether app can be shared")

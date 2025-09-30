@@ -11,7 +11,7 @@ from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App, USER_FACING_APPS
 from launchpad.apps.registry.base import GenericApp
-from launchpad.apps.resources import GenericAppInstallRequest
+from launchpad.apps.resources import GenericAppInstallRequest, ImportAppRequest
 from launchpad.apps.storage import (
     select_app,
     insert_app,
@@ -128,9 +128,13 @@ class AppService:
             BadRequest: If neither or both parameters are provided
         """
         if launchpad_app_name is None and generic_app_request is None:
-            raise BadRequest("Must provide either launchpad_app_name or generic_app_request")
+            raise BadRequest(
+                "Must provide either launchpad_app_name or generic_app_request"
+            )
         if launchpad_app_name is not None and generic_app_request is not None:
-            raise BadRequest("Cannot provide both launchpad_app_name and generic_app_request")
+            raise BadRequest(
+                "Cannot provide both launchpad_app_name and generic_app_request"
+            )
 
         if generic_app_request:
             # New flow: install generic app
@@ -141,7 +145,9 @@ class AppService:
                 name=generic_app_request.name,
                 is_internal=generic_app_request.is_internal,
                 is_shared=generic_app_request.is_shared,
-                verbose_name=generic_app_request.verbose_name or generic_app_request.name or generic_app_request.template_name,
+                verbose_name=generic_app_request.verbose_name
+                or generic_app_request.name
+                or generic_app_request.template_name,
                 description_short=generic_app_request.description_short,
                 description_long=generic_app_request.description_long,
                 logo=generic_app_request.logo,
@@ -355,6 +361,136 @@ class AppService:
             tags=tags,
         )
         return await self.install(generic_app)
+
+    async def import_app(
+        self,
+        import_request: ImportAppRequest,
+    ) -> InstalledApp:
+        """
+        Import an externally installed app by querying Apps API and storing it in the database.
+
+        This method:
+        1. Fetches the app instance details from Apps API
+        2. Fetches the template metadata (description, logo, tags, etc.)
+        3. Uses the following priority for metadata:
+           - User-provided overrides (from import_request)
+           - Template metadata (from template definition)
+           - Instance display_name (from app instance)
+           - Defaults (empty strings/lists)
+
+        Args:
+            import_request: Import request containing app_id and optional metadata overrides
+
+        Returns:
+            The installed app record
+
+        Raises:
+            AppsApiError: If the app cannot be found or queried from Apps API
+            AppServiceError: If there's an error storing the app
+
+        Example:
+            ```python
+            # Minimal import - uses template metadata
+            installed_app = await app_service.import_app(
+                ImportAppRequest(app_id=UUID("..."))
+            )
+
+            # With overrides - custom metadata takes precedence
+            installed_app = await app_service.import_app(
+                ImportAppRequest(
+                    app_id=UUID("..."),
+                    name="my-imported-app",
+                    verbose_name="My Imported App",
+                    description_short="Custom description"
+                )
+            )
+            ```
+        """
+        # Query Apps API to get app details
+        try:
+            app_info = await self._apps_api_client.get_by_id(import_request.app_id)
+        except AppsApiError:
+            logger.exception("Failed to get app info from Apps API")
+            raise AppServiceError(
+                f"Unable to retrieve app with id {import_request.app_id} from Apps API"
+            )
+
+        # Extract template information from Apps API response
+        template_name = app_info.get("template_name", "unknown")
+        template_version = app_info.get("template_version", "unknown")
+        app_name = app_info.get("name", str(import_request.app_id))
+        display_name = app_info.get("display_name", "")
+
+        # Fetch template details to get rich metadata
+        template_info = None
+        try:
+            template_info = await self._apps_api_client.get_template(
+                template_name, template_version
+            )
+        except AppsApiError:
+            logger.warning(
+                f"Failed to fetch template {template_name}:{template_version}, "
+                "will use provided metadata only"
+            )
+
+        # Extract metadata from template
+        if template_info:
+            template_title = template_info.get("title", "")
+            template_desc_short = template_info.get("short_description", "")
+            template_desc_long = template_info.get("description", "")
+            template_logo = template_info.get("logo", "")
+            template_tags = template_info.get("tags", [])
+            template_doc_urls = template_info.get("documentation_urls", [])
+            template_ext_urls = template_info.get("external_urls", [])
+        else:
+            template_title = ""
+            template_desc_short = ""
+            template_desc_long = ""
+            template_logo = ""
+            template_tags = []
+            template_doc_urls = []
+            template_ext_urls = []
+
+        # Priority: user override > instance display_name/template metadata > defaults
+        launchpad_app_name = import_request.name or template_name
+        verbose_name = (
+            import_request.verbose_name
+            or display_name
+            or template_title
+            or launchpad_app_name
+        )
+        description_short = import_request.description_short or template_desc_short
+        description_long = import_request.description_long or template_desc_long
+        logo = import_request.logo or template_logo
+        documentation_urls = import_request.documentation_urls or template_doc_urls
+        external_urls = import_request.external_urls or template_ext_urls
+        tags = import_request.tags or template_tags
+
+        # Store in database
+        async with self._db() as db:
+            async with db.begin():
+                installed_app = await insert_app(
+                    db=db,
+                    app_id=import_request.app_id,
+                    app_name=app_name,
+                    launchpad_app_name=launchpad_app_name,
+                    is_internal=import_request.is_internal,
+                    is_shared=import_request.is_shared,
+                    user_id=None,
+                    url=None,
+                    template_name=template_name,
+                    template_version=template_version,
+                    verbose_name=verbose_name,
+                    description_short=description_short,
+                    description_long=description_long,
+                    logo=logo,
+                    documentation_urls=documentation_urls,
+                    external_urls=external_urls,
+                    tags=tags,
+                )
+
+        await self._add_app_to_buffer(installed_app)
+        return installed_app
 
     async def delete(self, app_id: UUID) -> None:
         await self._apps_api_client.delete_app(app_id)
