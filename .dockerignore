@@ -4,3 +4,4 @@
 !launchpad
 !pyproject.toml
 !poetry.lock
+!scripts
