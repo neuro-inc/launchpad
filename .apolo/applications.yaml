@@ -5,13 +5,13 @@
   helm_path: "charts/launchpad"
   app_package_name: apolo_apps_launchpad
   inputs:
-    schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadInputs.json
-    types_name: LaunchpadInputs
-    processor: LaunchpadInputsProcessor
+    schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppInputs.json
+    types_name: LaunchpadAppInputs
+    processor: LaunchpadAppInputsProcessor
     image: ghcr.io/neuro-inc/launchpad
   outputs:
-    schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadOutputs.json
-    types_name: LaunchpadOutputs
+    schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppOutputs.json
+    types_name: LaunchpadAppOutputs
     processor: LaunchpadOutputProcessor
     image: ghcr.io/neuro-inc/launchpad
   short_description: "Preconfigured applications for the Apolo platform"
