@@ -46,6 +46,9 @@ description = ""
 authors = ["apolo.us"]
 readme = "README.md"
 package-mode = false
+packages = [
+  { include = "apolo_apps_launchpad", from = ".apolo/src" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.13"
@@ -65,6 +68,8 @@ backoff = "^2.2.1"
 pyjwt = "^2.10.1"
 asyncache = "^0.3.1"
 asyncpg = "^0.30.0"
+apolo-app-types = "v25.9.23"
+apolo-sdk = "v25.9.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"

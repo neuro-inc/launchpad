@@ -1,0 +1,23 @@
+- app_type: launchpad
+  name: "launchpad"
+  title: "Launchpad"
+  install_type: mlops
+  helm_path: "charts/launchpad"
+  app_package_name: apolo_apps_launchpad
+  inputs:
+    schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadInputs.json
+    types_name: LaunchpadInputs
+    processor: LaunchpadInputsProcessor
+    image: ghcr.io/neuro-inc/launchpad
+  outputs:
+    schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadOutputs.json
+    types_name: LaunchpadOutputs
+    processor: LaunchpadOutputProcessor
+    image: ghcr.io/neuro-inc/launchpad
+  short_description: "Preconfigured applications for the Apolo platform"
+  description: |
+    Launchpad is a suit of applications preconfigured for the Apolo platform,
+    designed to simplify the deployment and management of various AI workloads.
+  pub_date: "2025-08-04T00:00:00+00:00"
+  git_url: "https://github.com/neuro-inc/launchpad"
+  requires_token: true
