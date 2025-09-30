@@ -9,9 +9,10 @@ from starlette.requests import Request
 
 from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
+from launchpad.apps.template_models import AppTemplate
 from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App, USER_FACING_APPS
 from launchpad.apps.registry.base import GenericApp
-from launchpad.apps.resources import GenericAppInstallRequest, ImportAppRequest
+from launchpad.apps.resources import ImportAppRequest, ImportTemplateRequest
 from launchpad.apps.storage import (
     select_app,
     insert_app,
@@ -107,58 +108,87 @@ class AppService:
 
         return installed_app
 
-    async def install_from_request(
+    async def install_from_template(
         self,
         request: Request,
-        launchpad_app_name: str | None = None,
-        generic_app_request: "GenericAppInstallRequest | None" = None,
+        template_name: str,
+        user_inputs: dict[str, Any] | None = None,
     ) -> InstalledApp:
         """
-        Install an app from a request.
+        Install an app from an AppTemplate.
+
+        This method:
+        1. Fetches the template from the AppTemplate table
+        2. Checks if the template has a handler_class
+        3. If yes, uses that handler class; if no, uses GenericApp
+        4. Merges default_inputs from template with user_inputs
+        5. Installs the app
 
         Args:
             request: The HTTP request
-            launchpad_app_name: Name of a predefined app to install (existing flow)
-            generic_app_request: Generic app configuration (new flow)
+            template_name: Name of the template from AppTemplate table
+            user_inputs: Optional user-provided inputs to merge with template defaults
 
         Returns:
             The installed app
 
         Raises:
-            BadRequest: If neither or both parameters are provided
+            AppTemplateNotFound: If template doesn't exist in database
+            AppServiceError: If there's an error during installation
         """
-        if launchpad_app_name is None and generic_app_request is None:
-            raise BadRequest(
-                "Must provide either launchpad_app_name or generic_app_request"
-            )
-        if launchpad_app_name is not None and generic_app_request is not None:
-            raise BadRequest(
-                "Cannot provide both launchpad_app_name and generic_app_request"
+        from launchpad.apps.template_storage import select_template
+        from launchpad.apps.registry import HANDLER_CLASSES, APPS_CONTEXT
+
+        # Get template from database
+        async with self._db() as db:
+            template = await select_template(db, name=template_name)
+
+        if not template:
+            raise AppTemplateNotFound(f"Template {template_name} not found")
+
+        # Merge inputs: user inputs override template defaults
+        inputs = template.default_inputs.copy() if template.default_inputs else {}
+        if user_inputs:
+            inputs.update(user_inputs)
+
+        # Determine which app class to use
+        app: T_App
+        if template.handler_class and template.handler_class in HANDLER_CLASSES:
+            # Use specific handler class
+            from typing import cast, Any as AnyType
+
+            app_class = cast(AnyType, HANDLER_CLASSES[template.handler_class])
+
+            # Check if this handler needs special context
+            if template.name in APPS_CONTEXT:
+                context_class = APPS_CONTEXT[template.name]
+                ctx = await context_class.from_request(request=request)
+                app = app_class(context=ctx)
+            else:
+                # Handler without special context - use InternalAppContext
+                from launchpad.apps.registry.internal.context import InternalAppContext
+
+                internal_ctx = InternalAppContext(config=inputs)
+                app = app_class(context=internal_ctx)
+        else:
+            # Use GenericApp for templates without handlers
+            app = GenericApp(
+                template_name=template.template_name,
+                template_version=template.template_version,
+                inputs=inputs,
+                name=template.name,
+                is_internal=template.is_internal,
+                is_shared=template.is_shared,
+                verbose_name=template.verbose_name,
+                description_short=template.description_short,
+                description_long=template.description_long,
+                logo=template.logo,
+                documentation_urls=template.documentation_urls,
+                external_urls=template.external_urls,
+                tags=template.tags,
             )
 
-        if generic_app_request:
-            # New flow: install generic app
-            return await self.install_generic(
-                template_name=generic_app_request.template_name,
-                template_version=generic_app_request.template_version,
-                inputs=generic_app_request.inputs,
-                name=generic_app_request.name,
-                is_internal=generic_app_request.is_internal,
-                is_shared=generic_app_request.is_shared,
-                verbose_name=generic_app_request.verbose_name
-                or generic_app_request.name
-                or generic_app_request.template_name,
-                description_short=generic_app_request.description_short,
-                description_long=generic_app_request.description_long,
-                logo=generic_app_request.logo,
-                documentation_urls=generic_app_request.documentation_urls,
-                external_urls=generic_app_request.external_urls,
-                tags=generic_app_request.tags,
-            )
-        else:
-            # Existing flow: install predefined app
-            app = await self._app_from_request(request, launchpad_app_name)  # type: ignore
-            return await self.install(app=app)
+        return await self.install(app=app)
 
     @backoff.on_exception(
         wait_gen=backoff.expo,
@@ -279,15 +309,7 @@ class AppService:
                     is_shared=app.is_shared,
                     user_id=None,
                     url=None,
-                    template_name=app.template_name,
-                    template_version=app.template_version,
-                    verbose_name=app.verbose_name,
-                    description_short=app.description_short,
-                    description_long=app.description_long,
-                    logo=app.logo,
-                    documentation_urls=app.documentation_urls,
-                    external_urls=app.external_urls,
-                    tags=app.tags,
+                    template_name=app.name,  # Reference to AppTemplate.name
                 )
 
         await self._add_app_to_buffer(installed_app)
@@ -421,7 +443,87 @@ class AppService:
         app_name = app_info.get("name", str(import_request.app_id))
         display_name = app_info.get("display_name", "")
 
-        # Fetch template details to get rich metadata
+        # Create/update template using helper method
+        template = await self._fetch_and_create_template(
+            template_name=template_name,
+            template_version=template_version,
+            name=import_request.name,
+            verbose_name=import_request.verbose_name,
+            description_short=import_request.description_short,
+            description_long=import_request.description_long,
+            logo=import_request.logo,
+            documentation_urls=import_request.documentation_urls,
+            external_urls=import_request.external_urls,
+            tags=import_request.tags,
+            is_internal=import_request.is_internal,
+            is_shared=True,  # Imported installed apps are always shared
+            fallback_verbose_name=display_name,  # Use display_name as fallback
+        )
+
+        # Link the app installation
+        async with self._db() as db:
+            async with db.begin():
+                installed_app = await insert_app(
+                    db=db,
+                    app_id=import_request.app_id,
+                    app_name=app_name,
+                    launchpad_app_name=template.name,
+                    is_internal=import_request.is_internal,
+                    is_shared=True,  # Imported installed apps are always shared
+                    user_id=None,
+                    url=None,
+                    template_name=template.name,  # Reference to AppTemplate
+                )
+
+        await self._add_app_to_buffer(installed_app)
+        return installed_app
+
+    async def _fetch_and_create_template(
+        self,
+        template_name: str,
+        template_version: str,
+        name: str | None = None,
+        verbose_name: str | None = None,
+        description_short: str | None = None,
+        description_long: str | None = None,
+        logo: str | None = None,
+        documentation_urls: list[dict[str, str]] | None = None,
+        external_urls: list[dict[str, str]] | None = None,
+        tags: list[str] | None = None,
+        is_internal: bool = False,
+        is_shared: bool = True,
+        fallback_verbose_name: str | None = None,
+    ) -> AppTemplate:
+        """
+        Fetch template metadata from Apps API and create/update AppTemplate.
+
+        This helper method:
+        1. Fetches template metadata from Apps API
+        2. Applies priority: user override > fallback > template metadata > defaults
+        3. Creates/updates AppTemplate record
+
+        Args:
+            template_name: Apps API template name
+            template_version: Apps API template version
+            name: Custom name for the template (defaults to template_name)
+            verbose_name: User-friendly display name
+            description_short: Short description
+            description_long: Long description
+            logo: URL to logo
+            documentation_urls: Documentation URLs
+            external_urls: External URLs
+            tags: Tags for categorization
+            is_internal: Whether template is internal
+            is_shared: Whether apps from this template can be shared
+            fallback_verbose_name: Fallback for verbose_name (used by import_app for display_name)
+
+        Returns:
+            The created/updated AppTemplate record
+
+        Raises:
+            AppServiceError: If template cannot be fetched from Apps API
+        """
+        # Fetch template details from Apps API
         template_info = None
         try:
             template_info = await self._apps_api_client.get_template(
@@ -451,46 +553,100 @@ class AppService:
             template_doc_urls = []
             template_ext_urls = []
 
-        # Priority: user override > instance display_name/template metadata > defaults
-        launchpad_app_name = import_request.name or template_name
-        verbose_name = (
-            import_request.verbose_name
-            or display_name
-            or template_title
-            or launchpad_app_name
+        # Apply priority logic: user override > fallback > template metadata > defaults
+        resolved_name = name or template_name
+        resolved_verbose_name = (
+            verbose_name or fallback_verbose_name or template_title or resolved_name
         )
-        description_short = import_request.description_short or template_desc_short
-        description_long = import_request.description_long or template_desc_long
-        logo = import_request.logo or template_logo
-        documentation_urls = import_request.documentation_urls or template_doc_urls
-        external_urls = import_request.external_urls or template_ext_urls
-        tags = import_request.tags or template_tags
+        resolved_description_short = description_short or template_desc_short
+        resolved_description_long = description_long or template_desc_long
+        resolved_logo = logo or template_logo
+        resolved_documentation_urls = documentation_urls or template_doc_urls
+        resolved_external_urls = external_urls or template_ext_urls
+        resolved_tags = tags or template_tags
 
-        # Store in database
+        # Create or update the template
+        from launchpad.apps.template_storage import insert_template
+
         async with self._db() as db:
             async with db.begin():
-                installed_app = await insert_app(
+                template = await insert_template(
                     db=db,
-                    app_id=import_request.app_id,
-                    app_name=app_name,
-                    launchpad_app_name=launchpad_app_name,
-                    is_internal=import_request.is_internal,
-                    is_shared=import_request.is_shared,
-                    user_id=None,
-                    url=None,
+                    name=resolved_name,
                     template_name=template_name,
                     template_version=template_version,
-                    verbose_name=verbose_name,
-                    description_short=description_short,
-                    description_long=description_long,
-                    logo=logo,
-                    documentation_urls=documentation_urls,
-                    external_urls=external_urls,
-                    tags=tags,
+                    verbose_name=resolved_verbose_name,
+                    description_short=resolved_description_short,
+                    description_long=resolved_description_long,
+                    logo=resolved_logo,
+                    documentation_urls=resolved_documentation_urls,
+                    external_urls=resolved_external_urls,
+                    tags=resolved_tags,
+                    is_internal=is_internal,
+                    is_shared=is_shared,
+                    handler_class=None,  # Imported templates use GenericApp
+                    default_inputs=None,
                 )
 
-        await self._add_app_to_buffer(installed_app)
-        return installed_app
+        return template
+
+    async def import_template(
+        self,
+        import_request: ImportTemplateRequest,
+    ) -> AppTemplate:
+        """
+        Import a template from Apps API and add it to the template pool.
+
+        This method:
+        1. Fetches the template metadata from Apps API
+        2. Creates/updates an AppTemplate record
+        3. Does NOT create an InstalledApp (just makes the template available)
+
+        Args:
+            import_request: Import request containing template info and optional metadata overrides
+
+        Returns:
+            The AppTemplate record
+
+        Raises:
+            AppsApiError: If the template cannot be found in Apps API
+            AppServiceError: If there's an error storing the template
+
+        Example:
+            ```python
+            # Import template with default settings
+            template = await app_service.import_template(
+                ImportTemplateRequest(
+                    template_name="my-template",
+                    template_version="1.0.0"
+                )
+            )
+
+            # Import with custom metadata and shared setting
+            template = await app_service.import_template(
+                ImportTemplateRequest(
+                    template_name="my-template",
+                    template_version="1.0.0",
+                    is_shared=False,  # Not a shared app
+                    verbose_name="My Custom Template"
+                )
+            )
+            ```
+        """
+        return await self._fetch_and_create_template(
+            template_name=import_request.template_name,
+            template_version=import_request.template_version,
+            name=import_request.name,
+            verbose_name=import_request.verbose_name,
+            description_short=import_request.description_short,
+            description_long=import_request.description_long,
+            logo=import_request.logo,
+            documentation_urls=import_request.documentation_urls,
+            external_urls=import_request.external_urls,
+            tags=import_request.tags,
+            is_internal=import_request.is_internal,
+            is_shared=import_request.is_shared,
+        )
 
     async def delete(self, app_id: UUID) -> None:
         await self._apps_api_client.delete_app(app_id)

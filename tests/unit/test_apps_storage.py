@@ -58,14 +58,6 @@ async def test_insert_app_success(mock_db_session: MagicMock, app_id: UUID) -> N
         "user_id": "test-user",
         "url": "http://test.com",
         "template_name": "test-template",
-        "template_version": "1.0.0",
-        "verbose_name": "Test App",
-        "description_short": "Short description",
-        "description_long": "Long description",
-        "logo": "http://example.com/logo.png",
-        "documentation_urls": [],
-        "external_urls": [],
-        "tags": [],
     }
     mock_db_session.add.return_value = None
     mock_db_session.flush.return_value = None
@@ -81,14 +73,6 @@ async def test_insert_app_success(mock_db_session: MagicMock, app_id: UUID) -> N
         user_id=app_data["user_id"],
         url=app_data["url"],
         template_name=app_data["template_name"],
-        template_version=app_data["template_version"],
-        verbose_name=app_data["verbose_name"],
-        description_short=app_data["description_short"],
-        description_long=app_data["description_long"],
-        logo=app_data["logo"],
-        documentation_urls=app_data["documentation_urls"],
-        external_urls=app_data["external_urls"],
-        tags=app_data["tags"],
     )
 
     result = await insert_app(mock_db_session, **app_data)

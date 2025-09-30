@@ -3,6 +3,31 @@ from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 
 
+class ImportTemplateRequest(BaseModel):
+    """Request model for importing a template from Apps API"""
+
+    template_name: str = Field(..., description="The template name from Apps API")
+    template_version: str = Field(..., description="The template version from Apps API")
+    name: str | None = Field(
+        None, description="Custom name for the template (defaults to template_name)"
+    )
+    verbose_name: str | None = Field(None, description="User-friendly display name")
+    description_short: str | None = Field(None, description="Short description")
+    description_long: str | None = Field(None, description="Long description")
+    logo: str | None = Field(None, description="URL to the template's logo")
+    documentation_urls: list[dict[str, str]] | None = Field(
+        None, description="Documentation URLs"
+    )
+    external_urls: list[dict[str, str]] | None = Field(
+        None, description="External URLs"
+    )
+    tags: list[str] | None = Field(None, description="Tags for categorization")
+    is_internal: bool = Field(default=False, description="Whether template is internal")
+    is_shared: bool = Field(
+        default=True, description="Whether apps from this template can be shared"
+    )
+
+
 class ImportAppRequest(BaseModel):
     """Request model for importing an externally installed app"""
 
@@ -22,7 +47,6 @@ class ImportAppRequest(BaseModel):
     )
     tags: list[str] | None = Field(None, description="Tags for categorization")
     is_internal: bool = Field(default=False, description="Whether app is internal")
-    is_shared: bool = Field(default=True, description="Whether app can be shared")
 
 
 class GenericAppInstallRequest(BaseModel):
@@ -58,6 +82,25 @@ class LaunchpadAppRead(BaseModel):
     documentation_urls: list[dict[str, str]]
     external_urls: list[dict[str, str]]
     tags: list[str]
+
+
+class LaunchpadTemplateRead(BaseModel):
+    """Response model for template data"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    template_name: str
+    template_version: str
+    verbose_name: str
+    description_short: str
+    description_long: str
+    logo: str
+    documentation_urls: list[dict[str, str]]
+    external_urls: list[dict[str, str]]
+    tags: list[str]
+    is_internal: bool
+    is_shared: bool
 
 
 class LaunchpadInstalledAppRead(BaseModel):

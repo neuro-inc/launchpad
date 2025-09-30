@@ -49,14 +49,6 @@ async def insert_app(
     user_id: str | None,
     url: str | None,
     template_name: str,
-    template_version: str,
-    verbose_name: str,
-    description_short: str,
-    description_long: str,
-    logo: str,
-    documentation_urls: list[dict[str, str]],
-    external_urls: list[dict[str, str]],
-    tags: list[str],
 ) -> InstalledApp:
     query = (
         insert(InstalledApp)
@@ -71,14 +63,6 @@ async def insert_app(
                 user_id=user_id,
                 url=url,
                 template_name=template_name,
-                template_version=template_version,
-                verbose_name=verbose_name,
-                description_short=description_short,
-                description_long=description_long,
-                logo=logo,
-                documentation_urls=documentation_urls,
-                external_urls=external_urls,
-                tags=tags,
             )
         )
         # possible update a URL of an app
@@ -88,15 +72,6 @@ async def insert_app(
                 app_id=app_id,
                 app_name=app_name,
                 url=url,
-                template_name=template_name,
-                template_version=template_version,
-                verbose_name=verbose_name,
-                description_short=description_short,
-                description_long=description_long,
-                logo=logo,
-                documentation_urls=documentation_urls,
-                external_urls=external_urls,
-                tags=tags,
             ),
         )
         .returning(InstalledApp)

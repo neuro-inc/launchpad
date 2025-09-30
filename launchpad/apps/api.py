@@ -6,12 +6,14 @@ from fastapi_pagination import paginate
 from starlette.requests import Request
 from starlette.status import HTTP_200_OK
 
-from launchpad.apps.registry import USER_FACING_APPS
+from launchpad.app import Launchpad
 from launchpad.apps.resources import (
     GenericAppInstallRequest,
     ImportAppRequest,
+    ImportTemplateRequest,
     LaunchpadAppRead,
     LaunchpadInstalledAppRead,
+    LaunchpadTemplateRead,
 )
 from launchpad.apps.service import (
     AppTemplateNotFound,
@@ -29,43 +31,39 @@ apps_router = APIRouter()
 
 @apps_router.get("", response_model=Page[LaunchpadAppRead])
 async def view_get_apps_pool(
-    app_service: DepAppService,
+    request: Request,
 ) -> Any:
     """
-    Get the pool of available apps.
+    Get the pool of available app templates.
 
-    Returns both predefined user-facing apps and installed generic apps.
+    Returns all non-internal templates from the AppTemplate table.
     """
-    # Get predefined apps
-    predefined_apps = list(USER_FACING_APPS.values())
+    from launchpad.apps.template_storage import list_templates
 
-    # Get installed generic apps (those not in the predefined registry)
-    installed_apps = await app_service.list_installed_apps()
-    generic_apps = [
-        app for app in installed_apps if app.launchpad_app_name not in USER_FACING_APPS
-    ]
+    app: Launchpad = request.app
 
-    # Convert InstalledApp to LaunchpadAppRead format
-    generic_app_reads = [
+    async with app.db() as db:
+        # Get all non-internal templates
+        templates = await list_templates(db, is_internal=False)
+
+    # Convert AppTemplate to LaunchpadAppRead
+    app_reads = [
         LaunchpadAppRead.model_validate(
             {
-                "verbose_name": app.verbose_name,
-                "name": app.launchpad_app_name,
-                "description_short": app.description_short,
-                "description_long": app.description_long,
-                "logo": app.logo,
-                "documentation_urls": app.documentation_urls,
-                "external_urls": app.external_urls,
-                "tags": app.tags,
+                "verbose_name": template.verbose_name,
+                "name": template.name,
+                "description_short": template.description_short,
+                "description_long": template.description_long,
+                "logo": template.logo,
+                "documentation_urls": template.documentation_urls,
+                "external_urls": template.external_urls,
+                "tags": template.tags,
             }
         )
-        for app in generic_apps
+        for template in templates
     ]
 
-    # Combine predefined apps and generic apps
-    all_apps = predefined_apps + generic_app_reads
-
-    return paginate(all_apps)
+    return paginate(app_reads)
 
 
 @apps_router.post(
@@ -82,11 +80,9 @@ async def view_post_install_generic_app(
     """
     Install a generic app with custom template and configuration.
 
-    This endpoint allows installing any app template by providing:
-    - template_name: The name of the template to install
-    - template_version: The version of the template
-    - inputs: The inputs to pass to the Apps API
-    - Optional metadata: name, verbose_name, description, logo, etc.
+    This endpoint:
+    1. Creates/updates an AppTemplate record with the provided metadata
+    2. Installs the app using that template
 
     Example request body:
     ```json
@@ -105,10 +101,40 @@ async def view_post_install_generic_app(
     }
     ```
     """
+    from launchpad.apps.template_storage import insert_template
+
+    app: Launchpad = request.app
+
+    # Create or update the template
+    async with app.db() as db:
+        async with db.begin():
+            await insert_template(
+                db=db,
+                name=generic_app_request.name or generic_app_request.template_name,
+                template_name=generic_app_request.template_name,
+                template_version=generic_app_request.template_version,
+                verbose_name=generic_app_request.verbose_name
+                or generic_app_request.name
+                or generic_app_request.template_name,
+                description_short=generic_app_request.description_short,
+                description_long=generic_app_request.description_long,
+                logo=generic_app_request.logo,
+                documentation_urls=generic_app_request.documentation_urls,
+                external_urls=generic_app_request.external_urls,
+                tags=generic_app_request.tags,
+                is_internal=generic_app_request.is_internal,
+                is_shared=generic_app_request.is_shared,
+                handler_class=None,  # No handler for generic apps
+                default_inputs=generic_app_request.inputs,
+            )
+
+    # Install from the template
     try:
-        return await app_service.install_from_request(
+        template_name = generic_app_request.name or generic_app_request.template_name
+        return await app_service.install_from_template(
             request=request,
-            generic_app_request=generic_app_request,
+            template_name=template_name,
+            user_inputs=None,  # Already in default_inputs
         )
     except AppServiceError as e:
         raise BadRequest(str(e))
@@ -128,19 +154,13 @@ async def view_post_import_app(
     """
     Import an externally installed app from Apps API.
 
-    This endpoint allows importing apps that were installed outside of Launchpad
-    by providing their app_id. The server will query Apps API to retrieve the app's
-    template information and store it in Launchpad's database.
+    This endpoint:
+    1. Fetches app instance details from Apps API
+    2. Fetches template metadata from Apps API
+    3. Creates/updates AppTemplate with the metadata
+    4. Links the existing app installation to the template
 
-    You can override metadata when importing:
-    - name: Custom launchpad app name
-    - verbose_name: User-friendly display name
-    - description_short: Short description
-    - description_long: Long description
-    - logo: URL to logo
-    - documentation_urls: List of documentation URLs
-    - external_urls: List of external URLs
-    - tags: List of tags
+    You can override metadata when importing.
 
     Example request body:
     ```json
@@ -160,6 +180,45 @@ async def view_post_import_app(
 
 
 @apps_router.post(
+    "/templates/import",
+    status_code=HTTP_200_OK,
+    response_model=LaunchpadTemplateRead,
+)
+async def view_post_import_template(
+    request: Request,
+    import_request: ImportTemplateRequest,
+    app_service: DepAppService,
+    user: Auth,
+) -> Any:
+    """
+    Import a template from Apps API to make it available in the app pool.
+
+    This endpoint:
+    1. Fetches template metadata from Apps API
+    2. Creates/updates AppTemplate record
+    3. Does NOT install the app (just adds template to pool)
+
+    You can configure whether apps from this template are shared and override metadata.
+
+    Example request body:
+    ```json
+    {
+        "template_name": "my-template",
+        "template_version": "1.0.0",
+        "is_shared": false,
+        "name": "my-custom-name",
+        "verbose_name": "My Custom Template",
+        "description_short": "A custom template"
+    }
+    ```
+    """
+    try:
+        return await app_service.import_template(import_request)
+    except AppServiceError as e:
+        raise BadRequest(str(e))
+
+
+@apps_router.post(
     "/{app_name}",
     status_code=HTTP_200_OK,
     response_model=LaunchpadInstalledAppRead,
@@ -170,6 +229,12 @@ async def view_post_run_app(
     app_service: DepAppService,
     user: Auth,
 ) -> Any:
+    """
+    Install or get an app by template name.
+
+    If the app is not installed, it will be installed using the template from AppTemplate table.
+    If the app is already installed, returns the existing installation.
+    """
     try:
         installed_app = await app_service.get_installed_app(
             launchpad_app_name=app_name,
@@ -178,11 +243,11 @@ async def view_post_run_app(
     except AppsApiNotFound:
         raise NotFound(f"Unknown app {app_name}")
     except AppNotInstalledError:
-        # app is not running yet, lets do an installation
+        # app is not running yet, lets do an installation from template
         try:
-            return await app_service.install_from_request(request, app_name)
+            return await app_service.install_from_template(request, app_name)
         except AppTemplateNotFound:
-            raise NotFound(f"App {app_name} does not exist in the pool")
+            raise NotFound(f"App template {app_name} does not exist in the pool")
         except AppServiceError as e:
             raise BadRequest(str(e))
 

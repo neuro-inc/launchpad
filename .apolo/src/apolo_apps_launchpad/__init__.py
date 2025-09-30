@@ -8,4 +8,6 @@ __all__ = [
     "APOLO_APP_TYPE",
     "LaunchpadOutputProcessor",
     "LaunchpadInputsProcessor",
+    "LaunchpadAppInputs",
+    "LaunchpadAppOutputs",
 ]
