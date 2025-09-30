@@ -45,5 +45,6 @@ COPY alembic.ini /app/alembic.ini
 COPY alembic /app/alembic
 
 COPY launchpad /app/launchpad
+COPY scripts /app/scripts
 
 ENTRYPOINT ["python", "-m", "launchpad"]

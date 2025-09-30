@@ -1,0 +1,53 @@
+{{- if .Values.netlifySecretName -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "launchpad.name" . }}-netlify-cleanup-job
+  namespace: platform
+  annotations:
+    argocd.argoproj.io/hook: PostDelete
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  labels:
+    {{- include "launchpad.labels" . | nindent 4 }}
+    service: netlify-cleanup-job
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "launchpad.selectorLabels" . | nindent 8 }}
+        service: netlify-cleanup-job
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: netlify-domain-remover
+        image: bash:5.3.3
+        command: ["/usr/local/bin/bash"]
+        args:
+          - "-c"
+          - |
+            # Install jq
+            apk add --no-cache curl jq
+            # Run the script to delete the domain
+            /scripts/script.sh delete --site-id "$NETLIFY_SITE_ID" --domain-alias "{{ include "launchpad.domain" . }}"
+        env:
+        - name: NETLIFY_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.netlifySecretName }}
+              key: NETLIFY_TOKEN
+        - name: NETLIFY_SITE_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.netlifySecretName }}
+              key: NETLIFY_SITE_ID
+        volumeMounts:
+        - name: script
+          mountPath: /scripts
+          readOnly: true
+      volumes:
+      - name: script
+        configMap:
+          name: {{ include "launchpad.netlify-configmap" . }}
+          defaultMode: 0755
+{{- end -}}

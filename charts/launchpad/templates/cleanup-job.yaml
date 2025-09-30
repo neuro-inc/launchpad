@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "launchpad.name" . }}-cleanup-job
+  namespace: platform
+  annotations:
+    argocd.argoproj.io/hook: PostDelete
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+  labels:
+    {{- include "launchpad.labels" . | nindent 4 }}
+    service: cleanup-job
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "launchpad.selectorLabels" . | nindent 8 }}
+        service: cleanup-job
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: "ghcr"
+      containers:
+      - name: cleanup
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        command: ["python3", "/app/scripts/cleanup-apps.py"]
+        env:
+        - name: APOLO_PASSED_CONFIG
+          value: {{ .Values.APOLO_PASSED_CONFIG | quote }}
+        - name: LAUNCHPAD_APP_ID
+          value: {{ .Values.apolo_app_id | quote }}
