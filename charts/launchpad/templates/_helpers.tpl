@@ -61,10 +61,6 @@ platform.apolo.us/component: app
 {{- printf "https://%s.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}
 
-{{- define "launchpad.netlify-configmap" -}}
-{{- printf "%s-netlify-configmap" (include "launchpad.name" .) }}
-{{- end }}
-
 {{- define "launchpad.admin-secret" -}}
 {{- printf "%s-admin-secret" (include "launchpad.name" .) }}
 {{- end }}

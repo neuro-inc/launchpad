@@ -19,17 +19,18 @@ spec:
         service: netlify-cleanup-job
     spec:
       restartPolicy: OnFailure
+      imagePullSecrets:
+        - name: "ghcr"
       containers:
       - name: netlify-domain-remover
-        image: bash:5.3.3
-        command: ["/usr/local/bin/bash"]
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        command: ["python3", "/app/scripts/netlify-cleanup.py"]
         args:
-          - "-c"
-          - |
-            # Install jq
-            apk add --no-cache curl jq
-            # Run the script to delete the domain
-            /scripts/script.sh delete --site-id "$NETLIFY_SITE_ID" --domain-alias "{{ include "launchpad.domain" . }}"
+          - "delete"
+          - "--site-id"
+          - "$(NETLIFY_SITE_ID)"
+          - "--domain-alias"
+          - "{{ include "launchpad.domain" . }}"
         env:
         - name: NETLIFY_TOKEN
           valueFrom:
@@ -41,13 +42,4 @@ spec:
             secretKeyRef:
               name: {{ .Values.netlifySecretName }}
               key: NETLIFY_SITE_ID
-        volumeMounts:
-        - name: script
-          mountPath: /scripts
-          readOnly: true
-      volumes:
-      - name: script
-        configMap:
-          name: {{ include "launchpad.netlify-configmap" . }}
-          defaultMode: 0755
 {{- end -}}
