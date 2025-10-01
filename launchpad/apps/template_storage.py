@@ -1,3 +1,4 @@
+import logging
 import typing
 from typing import Any
 from uuid import UUID, uuid4
@@ -7,6 +8,35 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from launchpad.apps.template_models import AppTemplate
+
+logger = logging.getLogger(__name__)
+
+
+async def seed_user_facing_templates(db: AsyncSession) -> None:
+    """Seed user-facing templates (like OpenWebUI) into the AppTemplate table."""
+    from launchpad.apps.registry.shared.openwebui import OpenWebUIApp
+
+    logger.info("Seeding user-facing templates")
+
+    # Seed OpenWebUI template
+    openwebui = OpenWebUIApp
+    await insert_template(
+        db=db,
+        name=openwebui.name,
+        template_name=openwebui.template_name,
+        template_version=openwebui.template_version,
+        verbose_name=openwebui.verbose_name,
+        description_short=openwebui.description_short,
+        description_long=openwebui.description_long,
+        logo=openwebui.logo,
+        documentation_urls=openwebui.documentation_urls,
+        external_urls=openwebui.external_urls,
+        tags=openwebui.tags,
+        is_internal=openwebui.is_internal,
+        is_shared=openwebui.is_shared,
+        handler_class="OpenWebUIApp",
+    )
+    logger.info(f"Seeded template: {openwebui.name}")
 
 
 async def select_template(
@@ -103,6 +133,8 @@ async def list_templates(
     db: AsyncSession,
     is_internal: bool | None = None,
 ) -> typing.Sequence[AppTemplate]:
+    logger.info(f"list_templates called with is_internal={is_internal}")
+
     where = []
     if is_internal is not None:
         where.append(AppTemplate.is_internal.is_(is_internal))
@@ -110,5 +142,15 @@ async def list_templates(
     query = select(AppTemplate)
     if where:
         query = query.where(and_(*where))
+
+    logger.info(f"Executing query: {query}")
     cursor = await db.execute(query)
-    return cursor.scalars().all()
+    results = cursor.scalars().all()
+    logger.info(f"Found {len(results)} templates")
+    for template in results:
+        logger.info(
+            f"  - {template.name}: {template.verbose_name} "
+            f"(is_internal={template.is_internal}, is_shared={template.is_shared})"
+        )
+
+    return results

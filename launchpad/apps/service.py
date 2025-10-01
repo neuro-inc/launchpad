@@ -683,8 +683,17 @@ class AppService:
         self,
         user_id: str | None = None,
     ) -> list[InstalledApp]:
+        logger.info(f"Listing installed apps for user_id={user_id}")
         async with self._db() as db:
-            return list(await list_apps(db, user_id=user_id))
+            apps = list(await list_apps(db, user_id=user_id))
+            logger.info(f"Found {len(apps)} installed apps")
+            for app in apps:
+                logger.info(
+                    f"  - {app.launchpad_app_name} (id={app.id}, "
+                    f"user_id={app.user_id}, apolo_app_id={app.apolo_app_id}, "
+                    f"is_internal={app.is_internal}, is_shared={app.is_shared})"
+                )
+            return apps
 
 
 async def dep_app_service(request: Request) -> AppService:

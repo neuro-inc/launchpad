@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter
@@ -26,6 +27,8 @@ from launchpad.auth.dependencies import Auth
 from launchpad.errors import NotFound, BadRequest
 from launchpad.ext.apps_api import NotFound as AppsApiNotFound
 
+logger = logging.getLogger(__name__)
+
 apps_router = APIRouter()
 
 
@@ -38,6 +41,7 @@ async def view_get_apps_pool(
 
     Returns all non-internal templates from the AppTemplate table.
     """
+    logger.info("GET /api/v1/apps - Fetching app pool (non-internal templates)")
     from launchpad.apps.template_storage import list_templates
 
     app: Launchpad = request.app
@@ -45,6 +49,7 @@ async def view_get_apps_pool(
     async with app.db() as db:
         # Get all non-internal templates
         templates = await list_templates(db, is_internal=False)
+        logger.info(f"Retrieved {len(templates)} non-internal templates from storage")
 
     # Convert AppTemplate to LaunchpadAppRead
     app_reads = [
@@ -63,7 +68,10 @@ async def view_get_apps_pool(
         for template in templates
     ]
 
-    return paginate(app_reads)
+    logger.info(f"Converted to {len(app_reads)} LaunchpadAppRead objects")
+    result = paginate(app_reads)
+    logger.info(f"Returning paginated result")
+    return result
 
 
 @apps_router.post(

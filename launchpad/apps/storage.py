@@ -1,3 +1,4 @@
+import logging
 import typing
 from uuid import UUID, uuid4
 
@@ -9,6 +10,8 @@ from launchpad.apps.models import (
     InstalledApp,
     UNIQUE__INSTALLED_APPS__LAUNCHPAD_APP_NAME__USER_ID,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def select_app(
@@ -112,6 +115,11 @@ async def list_apps(
     is_internal: bool | None = None,
     is_shared: bool | None = None,
 ) -> typing.Sequence[InstalledApp]:
+    logger.info(
+        f"list_apps called with filters: user_id={user_id}, "
+        f"is_internal={is_internal}, is_shared={is_shared}"
+    )
+
     where = []
     if user_id is not None:
         where.append(InstalledApp.user_id == user_id)
@@ -123,5 +131,10 @@ async def list_apps(
     query = select(InstalledApp)
     if where:
         query = query.where(and_(*where))
+
+    logger.info(f"Executing query: {query}")
     cursor = await db.execute(query)
-    return cursor.scalars().all()
+    results = cursor.scalars().all()
+    logger.info(f"Query returned {len(results)} results")
+
+    return results
