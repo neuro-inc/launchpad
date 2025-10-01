@@ -1,15 +1,14 @@
 from apolo_app_types.outputs.base import BaseAppOutputsProcessor
-import httpx
 from apolo_app_types.clients.kube import get_service_host_port
 from apolo_app_types.outputs.common import INSTANCE_LABEL
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
-from apolo_app_types.protocols.apps import AppInstance
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
 from apolo_app_types.protocols.launchpad import (
-    InstalledApps,
     KeycloakConfig,
     LaunchpadAppOutputs,
 )
+import typing as t
+
 
 async def get_launchpad_outputs(
     helm_values: dict[str, t.Any],

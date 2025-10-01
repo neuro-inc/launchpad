@@ -42,7 +42,7 @@ test-integration:
 build-hook-image:
 	docker build \
 		-t $(HOOK_IMAGE_NAME):latest \
-		-f hooks.Dockerfile \
+		-f ./hooks/hooks.Dockerfile \
 		.;
 
 .PHONY: push-hook-image
