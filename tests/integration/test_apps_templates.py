@@ -1,0 +1,234 @@
+from uuid import uuid4
+
+import pytest
+from fastapi.testclient import TestClient
+
+
+class TestTemplateImport:
+    """Integration tests for template import functionality"""
+
+    def test_import_template_minimal(self, app_client: TestClient) -> None:
+        """Test importing a template with minimal parameters"""
+        response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "my-template",
+                "template_version": "1.0.0",
+            },
+        )
+
+        assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.json()}"
+        data = response.json()
+
+        # Verify template was created with API metadata
+        assert data["name"] == "my-template"
+        assert data["template_name"] == "my-template"
+        assert data["template_version"] == "1.0.0"
+        assert data["verbose_name"] == "my-template v1.0.0"  # From API template title
+        assert data["description_short"] == "Short description from Apps API"
+        assert data["logo"] == "https://example.com/logo.png"
+        assert data["is_shared"] is True  # Default value
+        assert data["is_internal"] is False  # Default value
+
+    def test_import_template_with_overrides(self, app_client: TestClient) -> None:
+        """Test importing a template with custom metadata overrides"""
+        response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "custom-template",
+                "template_version": "2.0.0",
+                "name": "my-custom-name",
+                "verbose_name": "My Custom Template",
+                "description_short": "Custom short description",
+                "description_long": "Custom long description",
+                "logo": "https://mycustom.com/logo.png",
+                "is_shared": False,  # Override to non-shared
+                "is_internal": True,
+                "tags": ["custom", "test"],
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify overrides take precedence
+        assert data["name"] == "my-custom-name"
+        assert data["verbose_name"] == "My Custom Template"
+        assert data["description_short"] == "Custom short description"
+        assert data["description_long"] == "Custom long description"
+        assert data["logo"] == "https://mycustom.com/logo.png"
+        assert data["is_shared"] is False  # Custom value
+        assert data["is_internal"] is True
+        assert "custom" in data["tags"]
+
+    def test_import_template_upsert(self, app_client: TestClient) -> None:
+        """Test that importing same template twice updates it"""
+        # First import
+        response1 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "upsert-test",
+                "template_version": "1.0.0",
+                "verbose_name": "First Import",
+            },
+        )
+        assert response1.status_code == 200
+        data1 = response1.json()
+        assert data1["verbose_name"] == "First Import"
+
+        # Second import with same name
+        response2 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "upsert-test",
+                "template_version": "2.0.0",  # Different version
+                "verbose_name": "Second Import",
+            },
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2["verbose_name"] == "Second Import"
+        assert data2["template_version"] == "2.0.0"  # Updated
+
+
+class TestAppImport:
+    """Integration tests for app import functionality"""
+
+    def test_import_app_minimal(self, app_client: TestClient) -> None:
+        """Test importing an externally installed app"""
+        app_id = uuid4()
+
+        response = app_client.post(
+            "/api/v1/apps/import",
+            json={
+                "app_id": str(app_id),
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify app was linked
+        assert data["launchpad_app_name"] == "test-template"  # From template_name
+        assert data["is_shared"] is True  # Always true for imported apps
+        assert data["user_id"] is None
+
+    def test_import_app_with_overrides(self, app_client: TestClient) -> None:
+        """Test importing app with custom metadata"""
+        app_id = uuid4()
+
+        response = app_client.post(
+            "/api/v1/apps/import",
+            json={
+                "app_id": str(app_id),
+                "name": "my-imported-app",
+                "verbose_name": "My Imported App",
+                "description_short": "Custom imported app",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify custom name was used
+        assert data["launchpad_app_name"] == "my-imported-app"
+        assert data["is_shared"] is True  # Always true for imported apps
+
+
+class TestGenericAppInstall:
+    """Integration tests for generic app installation"""
+
+    def test_install_generic_app(self, app_client: TestClient) -> None:
+        """Test installing a generic app with custom configuration"""
+        response = app_client.post(
+            "/api/v1/apps/install",
+            json={
+                "template_name": "generic-template",
+                "template_version": "1.0.0",
+                "inputs": {
+                    "displayName": "My Generic App",
+                    "preset": {"name": "cpu-small"},
+                },
+                "name": "my-generic-app",
+                "verbose_name": "My Generic Application",
+                "description_short": "A custom generic app",
+                "logo": "https://example.com/custom-logo.png",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify app was installed
+        assert data["launchpad_app_name"] == "my-generic-app"
+
+
+class TestAppPool:
+    """Integration tests for app pool listing"""
+
+    def test_get_apps_pool_empty(self, app_client: TestClient) -> None:
+        """Test getting app pool when no templates exist"""
+        response = app_client.get("/api/v1/apps")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should return paginated empty list
+        assert "items" in data
+        assert len(data["items"]) == 0
+
+    def test_get_apps_pool_with_templates(self, app_client: TestClient) -> None:
+        """Test getting app pool after importing templates"""
+        # Import a template first
+        import_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "pool-test",
+                "template_version": "1.0.0",
+                "verbose_name": "Pool Test Template",
+            },
+        )
+        assert import_response.status_code == 200
+
+        # Get app pool
+        response = app_client.get("/api/v1/apps")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should return the template
+        assert "items" in data
+        assert len(data["items"]) == 1
+        assert data["items"][0]["launchpad_app_name"] == "pool-test"
+
+    def test_get_apps_pool_excludes_internal(self, app_client: TestClient) -> None:
+        """Test that internal templates are excluded from app pool"""
+        # Import an internal template
+        app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "internal-template",
+                "template_version": "1.0.0",
+                "is_internal": True,
+            },
+        )
+
+        # Import a non-internal template
+        app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "public-template",
+                "template_version": "1.0.0",
+                "is_internal": False,
+            },
+        )
+
+        # Get app pool
+        response = app_client.get("/api/v1/apps")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should only return non-internal template
+        assert len(data["items"]) == 1
+        assert data["items"][0]["launchpad_app_name"] == "public-template"

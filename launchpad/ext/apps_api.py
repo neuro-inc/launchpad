@@ -97,12 +97,12 @@ class AppsApiClient:
         headers = kwargs.pop("headers", {})
         headers.update(self.default_headers)
         try:
-            response = await self._http.request(  # type: ignore[call-arg]
+            response = await self._http.request(
                 method,
                 url,
                 *args,
                 headers=headers,
-                verify_ssl=False,  # todo: check why requests are failing with SSL error
+                ssl=False,  # todo: check why requests are failing with SSL error
                 **kwargs,
             )
         except TimeoutError as e:

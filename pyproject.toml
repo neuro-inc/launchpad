@@ -9,9 +9,14 @@ known-first-party = ["launchpad", "tests"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-log_level = "DEBUG"
+log_cli_level = "INFO"
+log_cli_format = "%(levelname)s %(name)s:%(filename)s:%(lineno)s %(message)s"
 testpaths = ["tests"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:testcontainers",
+    "ignore::ResourceWarning",
+]
 
 [tool.coverage.run]
 branch = true
@@ -79,6 +84,8 @@ mypy = "^1.18.1"
 pytest-cov = "^6.2.1"
 pytest-asyncio = "1.1.0"
 types-cachetools = "^6.2.0.20250827"
+testcontainers = {extras = ["postgres"], version = "^4.10.0"}
+psycopg2-binary = "^2.9.10"
 
 [build-system]
 requires = ["poetry-core"]

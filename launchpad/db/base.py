@@ -35,7 +35,7 @@ class Base(MappedAsDataclass, DeclarativeBase, kw_only=True):
     __abstract__ = True
 
     type_annotation_map = {
-        UUID: SQL_UUID,
+        UUID: SQL_UUID(),
         datetime.datetime: TIMESTAMP(timezone=True),
         enum.Enum: SQL_ENUM(enum.Enum, native_enum=True, inherit_schema=True),
     }

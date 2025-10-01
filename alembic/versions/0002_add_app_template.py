@@ -30,13 +30,19 @@ def upgrade() -> None:
         sa.Column("description_short", sa.String(), nullable=False),
         sa.Column("description_long", sa.String(), nullable=False),
         sa.Column("logo", sa.String(), nullable=False),
-        sa.Column("documentation_urls", postgresql.JSON(astext_type=sa.Text()), nullable=False),
-        sa.Column("external_urls", postgresql.JSON(astext_type=sa.Text()), nullable=False),
+        sa.Column(
+            "documentation_urls", postgresql.JSON(astext_type=sa.Text()), nullable=False
+        ),
+        sa.Column(
+            "external_urls", postgresql.JSON(astext_type=sa.Text()), nullable=False
+        ),
         sa.Column("tags", postgresql.JSON(astext_type=sa.Text()), nullable=False),
         sa.Column("is_internal", sa.Boolean(), nullable=False),
         sa.Column("is_shared", sa.Boolean(), nullable=False),
         sa.Column("handler_class", sa.String(), nullable=True),
-        sa.Column("default_inputs", postgresql.JSON(astext_type=sa.Text()), nullable=True),
+        sa.Column(
+            "default_inputs", postgresql.JSON(astext_type=sa.Text()), nullable=True
+        ),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column(
             "created_at",

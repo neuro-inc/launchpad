@@ -1,5 +1,4 @@
 from typing import Any
-from uuid import UUID
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSON
