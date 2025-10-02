@@ -60,5 +60,5 @@ class AppTemplate(Base):
     handler_class: Mapped[str | None]
     """Optional handler class name (e.g., 'OpenWebUIApp'). If None, uses GenericApp"""
 
-    default_inputs: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    default_inputs: Mapped[dict[str, Any]] = mapped_column(JSON)
     """Default inputs to merge with user-provided inputs"""

@@ -171,7 +171,7 @@ class AppService:
             raise AppTemplateNotFound(f"Template {template_name} not found")
 
         # Merge inputs: user inputs override template defaults
-        inputs = template.default_inputs.copy() if template.default_inputs else {}
+        inputs = template.default_inputs.copy()
         if user_inputs:
             inputs.update(user_inputs)
 
@@ -517,6 +517,7 @@ class AppService:
         is_internal: bool = False,
         is_shared: bool = True,
         fallback_verbose_name: str | None = None,
+        default_inputs: dict[str, Any] | None = None,
     ) -> AppTemplate:
         """
         Fetch template metadata from Apps API and create/update AppTemplate.
@@ -609,7 +610,7 @@ class AppService:
                     is_internal=is_internal,
                     is_shared=is_shared,
                     handler_class=None,  # Imported templates use GenericApp
-                    default_inputs=None,
+                    default_inputs=default_inputs,
                 )
 
         return template
@@ -670,6 +671,7 @@ class AppService:
             tags=import_request.tags,
             is_internal=import_request.is_internal,
             is_shared=import_request.is_shared,
+            default_inputs=import_request.default_inputs,
         )
 
     async def delete(self, app_id: UUID) -> None:

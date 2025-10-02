@@ -107,7 +107,15 @@ async def insert_template(
     handler_class: str | None = None,
     default_inputs: dict[str, Any] | None = None,
 ) -> AppTemplate:
-    """Insert or update a template"""
+    """
+    Insert or update a template.
+
+    Note: default_inputs is currently optional for backwards compatibility,
+    but will be converted to an empty dict if None.
+    """
+    # Ensure default_inputs is never None
+    if default_inputs is None:
+        default_inputs = {}
     query = (
         insert(AppTemplate)
         .values(
