@@ -3,7 +3,7 @@ from apolo_app_types.clients.kube import get_service_host_port
 from apolo_app_types.outputs.common import INSTANCE_LABEL
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
-from apolo_app_types.protocols.launchpad import (
+from .types import (
     KeycloakConfig,
     LaunchpadAppOutputs,
 )

@@ -16,7 +16,7 @@ from apolo_app_types.protocols.common.hugging_face import (
     HuggingFaceModel,
 )
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
-from apolo_app_types.protocols.launchpad import (
+from .types import (
     CustomLLMModel,
     HuggingFaceEmbeddingsModel,
     HuggingFaceLLMModel,
