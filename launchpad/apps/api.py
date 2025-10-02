@@ -143,6 +143,7 @@ async def view_post_install_generic_app(
             request=request,
             template_name=template_name,
             user_inputs=None,  # Already in default_inputs
+            user_id=user.id,
         )
     except AppServiceError as e:
         raise BadRequest(str(e))
@@ -256,7 +257,9 @@ async def view_post_run_app(
         raise NotFound(f"Unknown app {app_name}")
     except AppNotInstalledError:
         # App not found in DB or not healthy - check if installation is in progress
-        logger.info(f"App {app_name} not installed, checking for in-progress installation")
+        logger.info(
+            f"App {app_name} not installed, checking for in-progress installation"
+        )
 
         # Check if app exists in DB (regardless of health status) to prevent duplicate installations
         existing_app = await app_service.get_existing_app(
@@ -274,7 +277,9 @@ async def view_post_run_app(
         # Truly not installed, proceed with installation
         logger.info(f"App {app_name} not found, attempting to install from template")
         try:
-            return await app_service.install_from_template(request, app_name)
+            return await app_service.install_from_template(
+                request, app_name, user_id=user.id
+            )
         except AppTemplateNotFound:
             logger.error(f"App template {app_name} not found in database")
             raise NotFound(f"App template {app_name} does not exist in the pool")
@@ -298,5 +303,7 @@ async def view_post_run_app(
 
         raise BadRequest(f"App {app_name} is unhealthy")
     else:
-        logger.info(f"App {app_name} already installed, returning existing installation")
+        logger.info(
+            f"App {app_name} already installed, returning existing installation"
+        )
         return installed_app

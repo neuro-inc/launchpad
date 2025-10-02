@@ -39,12 +39,14 @@ class App(ABC, Generic[T_Context]):
     documentation_urls: list[dict[str, str]]
     external_urls: list[dict[str, str]]
     tags: list[str]
+    user_id: str | None
 
     def __init__(
         self,
         context: T_Context,
     ):
         self._context = context
+        self.user_id = None  # Default to None, can be set later
 
     def __str__(self) -> str:
         return self.name

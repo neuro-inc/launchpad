@@ -10,7 +10,7 @@ from starlette.requests import Request
 from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.template_models import AppTemplate
-from launchpad.apps.registry import APPS, APPS_CONTEXT, T_App, USER_FACING_APPS
+from launchpad.apps.registry import APPS_CONTEXT, T_App, USER_FACING_APPS
 from launchpad.apps.registry.base import GenericApp
 from launchpad.apps.resources import ImportAppRequest, ImportTemplateRequest
 from launchpad.apps.storage import (
@@ -141,7 +141,9 @@ class AppService:
             installed_app = await select_app(db, **select_params)
 
         if installed_app is None:
-            logger.info(f"App {launchpad_app_name} not installed, raising AppNotInstalledError")
+            logger.info(
+                f"App {launchpad_app_name} not installed, raising AppNotInstalledError"
+            )
             raise AppNotInstalledError()
 
         logger.info(
@@ -183,6 +185,7 @@ class AppService:
         request: Request,
         template_name: str,
         user_inputs: dict[str, Any] | None = None,
+        user_id: str | None = None,
     ) -> InstalledApp:
         """
         Install an app from an AppTemplate.
@@ -198,6 +201,7 @@ class AppService:
             request: The HTTP request
             template_name: Name of the template from AppTemplate table
             user_inputs: Optional user-provided inputs to merge with template defaults
+            user_id: User ID for non-shared apps (required if is_shared=False)
 
         Returns:
             The installed app
@@ -215,6 +219,12 @@ class AppService:
 
         if not template:
             raise AppTemplateNotFound(f"Template {template_name} not found")
+
+        # Validate user_id requirement for non-shared apps
+        if not template.is_shared and not template.is_internal and user_id is None:
+            raise AppServiceError(
+                f"Cannot install non-shared app '{template_name}' without user_id"
+            )
 
         # Merge inputs: user inputs override template defaults
         inputs = template.default_inputs.copy()
@@ -258,7 +268,7 @@ class AppService:
                 tags=template.tags,
             )
 
-        return await self.install(app=app)
+        return await self.install(app=app, user_id=user_id)
 
     @backoff.on_exception(
         wait_gen=backoff.expo,
@@ -353,6 +363,7 @@ class AppService:
     async def install(
         self,
         app: T_App,
+        user_id: str | None = None,
     ) -> InstalledApp:
         installed_app = None
         async with self._db() as db:
@@ -377,7 +388,7 @@ class AppService:
                     launchpad_app_name=app.name,
                     is_internal=app.is_internal,
                     is_shared=app.is_shared,
-                    user_id=None,
+                    user_id=user_id,
                     url=None,
                     template_name=app.name,  # Reference to AppTemplate.name
                 )
@@ -400,6 +411,7 @@ class AppService:
         documentation_urls: list[dict[str, str]] | None = None,
         external_urls: list[dict[str, str]] | None = None,
         tags: list[str] | None = None,
+        user_id: str | None = None,
     ) -> InstalledApp:
         """
         Install a generic app without requiring a predefined app class.
@@ -452,7 +464,7 @@ class AppService:
             external_urls=external_urls,
             tags=tags,
         )
-        return await self.install(generic_app)
+        return await self.install(generic_app, user_id=user_id)
 
     async def import_app(
         self,
