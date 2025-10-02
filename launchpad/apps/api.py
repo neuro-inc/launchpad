@@ -70,7 +70,7 @@ async def view_get_apps_pool(
 
     logger.info(f"Converted to {len(app_reads)} LaunchpadAppRead objects")
     result = paginate(app_reads)
-    logger.info(f"Returning paginated result")
+    logger.info("Returning paginated result")
     return result
 
 

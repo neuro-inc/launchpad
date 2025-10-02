@@ -85,7 +85,7 @@ jobs:
               repo: context.repo.repo,
               body: `🐳 Docker image for this PR has been built and pushed:\n\n\`ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}\``
             })
-  
+
   release-hook-image:
     name: Release hook image
     runs-on: ubuntu-latest
@@ -127,4 +127,3 @@ jobs:
         run: |
           export IMAGE_TAG=${GITHUB_REF#refs/tags/}
           make push-hook-image
- 

@@ -250,14 +250,14 @@ trio = ["trio (>=0.31.0)"]
 
 [[package]]
 name = "apolo-app-types"
-version = "25.9.23"
+version = "25.10.1"
 description = "Apolo Platform App Types."
 optional = false
 python-versions = "<4.0,>=3.9.0"
 groups = ["main"]
 files = [
-    {file = "apolo_app_types-25.9.23-py3-none-any.whl", hash = "sha256:4711e46ce36c8b0412e8fda54ba3c2adeb03ea0ee7fd365f1c9b49d418ef7b50"},
-    {file = "apolo_app_types-25.9.23.tar.gz", hash = "sha256:1284ce901fe3cd05786fcc41063679ccdd1c95600be69f3e3bfe3d47afc51fc1"},
+    {file = "apolo_app_types-25.10.1-py3-none-any.whl", hash = "sha256:282bd38ce46444050bd088f267ddada000285a1d5179a80779330dce3c9757da"},
+    {file = "apolo_app_types-25.10.1.tar.gz", hash = "sha256:2d3fd26e71ebf9dad04b084122dfa66778b575d038913182cee044cea35fb258"},
 ]
 
 [package.dependencies]
@@ -265,9 +265,9 @@ apolo-sdk = ">=25.9.0,<26.0.0"
 click = ">=8.0.3,<9.0.0"
 httpx = ">=0.28.0,<0.29.0"
 jsonref = ">=1.1.0,<2.0.0"
-kubernetes = ">=33.1.0,<34.0.0"
+kubernetes = ">=34.1.0,<35.0.0"
 pydantic = ">=2.11.9,<3.0.0"
-pyyaml = ">=6.0.2,<7.0.0"
+pyyaml = ">=6.0.3,<7.0.0"
 types-PyYAML = ">=6.0.12.20250915,<7.0.0.0"
 yarl = ">=1.20.1,<2.0.0"
 
@@ -1160,27 +1160,26 @@ files = [
 
 [[package]]
 name = "kubernetes"
-version = "33.1.0"
+version = "34.1.0"
 description = "Kubernetes python client"
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
 files = [
-    {file = "kubernetes-33.1.0-py2.py3-none-any.whl", hash = "sha256:544de42b24b64287f7e0aa9513c93cb503f7f40eea39b20f66810011a86eabc5"},
-    {file = "kubernetes-33.1.0.tar.gz", hash = "sha256:f64d829843a54c251061a8e7a14523b521f2dc5c896cf6d65ccf348648a88993"},
+    {file = "kubernetes-34.1.0-py2.py3-none-any.whl", hash = "sha256:bffba2272534e224e6a7a74d582deb0b545b7c9879d2cd9e4aae9481d1f2cc2a"},
+    {file = "kubernetes-34.1.0.tar.gz", hash = "sha256:8fe8edb0b5d290a2f3ac06596b23f87c658977d46b5f8df9d0f4ea83d0003912"},
 ]
 
 [package.dependencies]
 certifi = ">=14.05.14"
 durationpy = ">=0.7"
 google-auth = ">=1.0.1"
-oauthlib = ">=3.2.2"
 python-dateutil = ">=2.5.3"
 pyyaml = ">=5.4.1"
 requests = "*"
 requests-oauthlib = "*"
 six = ">=1.9.0"
-urllib3 = ">=1.24.2"
+urllib3 = ">=1.24.2,<2.4.0"
 websocket-client = ">=0.32.0,<0.40.0 || >0.40.0,<0.41.dev0 || >=0.43.dev0"
 
 [package.extras]
@@ -2152,14 +2151,14 @@ files = [
 
 [[package]]
 name = "urllib3"
-version = "2.5.0"
+version = "2.3.0"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "urllib3-2.5.0-py3-none-any.whl", hash = "sha256:e6b01673c0fa6a13e374b50871808eb3bf7046c4b125b216f6bf1cc604cff0dc"},
-    {file = "urllib3-2.5.0.tar.gz", hash = "sha256:3fc47733c7e419d4bc3f6b3dc2b4f890bb743906a30d56ba4a5bfa4bbff92760"},
+    {file = "urllib3-2.3.0-py3-none-any.whl", hash = "sha256:1cee9ad369867bfdbbb48b7dd50374c0967a0bb7710050facf0dd6911440e3df"},
+    {file = "urllib3-2.3.0.tar.gz", hash = "sha256:f8c5449b3cf0861679ce7e0503c7b44b5ec981bec0d1d3795a07f1ba96f0204d"},
 ]
 
 [package.extras]
@@ -2419,4 +2418,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "a7d3c84faa9f376fd57a95a5872bd9d4f9a39d0c546ba7adb8c206853ee52d55"
+content-hash = "47488d133ac341eaa839f1b5adbbc81a10782cf3bd4ae8adcb4a7724097fd269"
