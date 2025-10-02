@@ -1,7 +1,7 @@
 - app_type: launchpad
   name: "launchpad"
   title: "Launchpad"
-  install_type: mlops
+  install_type: workflow
   helm_path: "charts/launchpad"
   app_package_name: apolo_apps_launchpad
   inputs:
