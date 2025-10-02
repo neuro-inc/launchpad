@@ -1,6 +1,5 @@
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 
@@ -17,7 +16,9 @@ class TestTemplateImport:
             },
         )
 
-        assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.json()}"
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 but got {response.status_code}: {response.json()}"
         data = response.json()
 
         # Verify template was created with API metadata
@@ -167,15 +168,17 @@ class TestAppPool:
     """Integration tests for app pool listing"""
 
     def test_get_apps_pool_empty(self, app_client: TestClient) -> None:
-        """Test getting app pool when no templates exist"""
+        """Test getting app pool with only seeded templates (OpenWebUI)"""
         response = app_client.get("/api/v1/apps")
 
         assert response.status_code == 200
         data = response.json()
 
-        # Should return paginated empty list
+        # Should return OpenWebUI which is seeded on startup
         assert "items" in data
-        assert len(data["items"]) == 0
+        assert len(data["items"]) == 1
+        assert data["items"][0]["launchpad_app_name"] == "openwebui"
+        assert data["items"][0]["title"] == "OpenWebUI"
 
     def test_get_apps_pool_with_templates(self, app_client: TestClient) -> None:
         """Test getting app pool after importing templates"""
@@ -196,10 +199,14 @@ class TestAppPool:
         assert response.status_code == 200
         data = response.json()
 
-        # Should return the template
+        # Should return OpenWebUI (seeded) + imported template
         assert "items" in data
-        assert len(data["items"]) == 1
-        assert data["items"][0]["launchpad_app_name"] == "pool-test"
+        assert len(data["items"]) == 2
+
+        # Get template names
+        template_names = {item["launchpad_app_name"] for item in data["items"]}
+        assert "openwebui" in template_names
+        assert "pool-test" in template_names
 
     def test_get_apps_pool_excludes_internal(self, app_client: TestClient) -> None:
         """Test that internal templates are excluded from app pool"""
@@ -229,6 +236,13 @@ class TestAppPool:
         assert response.status_code == 200
         data = response.json()
 
-        # Should only return non-internal template
-        assert len(data["items"]) == 1
-        assert data["items"][0]["launchpad_app_name"] == "public-template"
+        # Should return OpenWebUI (seeded) + public-template, but NOT internal templates
+        # Note: We also seed 3 internal apps (vllm, postgres, embeddings) which should be excluded
+        assert len(data["items"]) == 2
+
+        # Verify only non-internal templates are returned
+        template_names = {item["launchpad_app_name"] for item in data["items"]}
+        assert "openwebui" in template_names
+        assert "public-template" in template_names
+        # Internal template should NOT be in the pool
+        assert "internal-template" not in template_names

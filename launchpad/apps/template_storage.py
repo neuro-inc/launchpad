@@ -12,13 +12,43 @@ from launchpad.apps.template_models import AppTemplate
 logger = logging.getLogger(__name__)
 
 
-async def seed_user_facing_templates(db: AsyncSession) -> None:
-    """Seed user-facing templates (like OpenWebUI) into the AppTemplate table."""
+async def seed_templates(db: AsyncSession) -> None:
+    """
+    Seed all app templates into the AppTemplate table.
+    This includes both internal apps (vllm, postgres, embeddings) and user-facing apps (OpenWebUI).
+    """
     from launchpad.apps.registry.shared.openwebui import OpenWebUIApp
+    from launchpad.apps.registry.internal.llm_inference import LlmInferenceApp
+    from launchpad.apps.registry.internal.postgres import PostgresApp
+    from launchpad.apps.registry.internal.embeddings import EmbeddingsApp
 
-    logger.info("Seeding user-facing templates")
+    logger.info("Seeding app templates")
 
-    # Seed OpenWebUI template
+    # Seed internal app templates
+    for app_class, handler_name in [
+        (LlmInferenceApp, "LlmInferenceApp"),
+        (PostgresApp, "PostgresApp"),
+        (EmbeddingsApp, "EmbeddingsApp"),
+    ]:
+        await insert_template(
+            db=db,
+            name=app_class.name,
+            template_name=app_class.template_name,
+            template_version=app_class.template_version,
+            verbose_name=app_class.verbose_name,
+            description_short=app_class.description_short,
+            description_long=app_class.description_long,
+            logo=app_class.logo,
+            documentation_urls=app_class.documentation_urls,
+            external_urls=app_class.external_urls,
+            tags=app_class.tags,
+            is_internal=app_class.is_internal,
+            is_shared=app_class.is_shared,
+            handler_class=handler_name,
+        )
+        logger.info(f"Seeded internal template: {app_class.name}")
+
+    # Seed user-facing templates (OpenWebUI)
     openwebui = OpenWebUIApp
     await insert_template(
         db=db,
@@ -36,7 +66,9 @@ async def seed_user_facing_templates(db: AsyncSession) -> None:
         is_shared=openwebui.is_shared,
         handler_class="OpenWebUIApp",
     )
-    logger.info(f"Seeded template: {openwebui.name}")
+    logger.info(f"Seeded user-facing template: {openwebui.name}")
+
+    logger.info("Template seeding complete")
 
 
 async def select_template(

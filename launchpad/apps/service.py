@@ -61,23 +61,47 @@ class AppService:
         *,
         with_url: bool = True,
     ) -> InstalledApp:
-        try:
-            app_class = APPS[launchpad_app_name]
-        except KeyError:
+        from launchpad.apps.template_storage import select_template
+
+        logger.info(
+            f"get_installed_app called: app_name={launchpad_app_name}, "
+            f"user_id={user_id}, with_url={with_url}"
+        )
+
+        # Check if template exists in database (replaces APPS registry check)
+        async with self._db() as db_template:
+            template = await select_template(db_template, name=launchpad_app_name)
+
+        if template is None:
+            logger.warning(f"Template not found in database: {launchpad_app_name}")
             raise NotFound(f"Unknown app {launchpad_app_name}")
 
+        logger.info(
+            f"Template found: {template.name} "
+            f"(is_shared={template.is_shared}, is_internal={template.is_internal})"
+        )
+
+        # Use template metadata to determine selection criteria
         select_params: dict[str, Any] = {"name": launchpad_app_name}
-        if not app_class.is_shared and not app_class.is_internal:
+        if not template.is_shared and not template.is_internal:
             # personal app, let's add user ID to a selection and validate it exists.
             if user_id is None:
                 raise BadRequest("Access to a personal app without user ID provided")
             select_params["user_id"] = user_id
 
+        logger.info(f"Checking if app is installed with params: {select_params}")
+
         async with self._db() as db:
             installed_app = await select_app(db, **select_params)
 
         if installed_app is None:
+            logger.info(f"App {launchpad_app_name} not installed, raising AppNotInstalledError")
             raise AppNotInstalledError()
+
+        logger.info(
+            f"App {launchpad_app_name} is installed: "
+            f"app_id={installed_app.app_id}, url={installed_app.url}"
+        )
 
         if not await self.is_healthy(installed_app):
             raise AppUnhealthyError(installed_app.app_id)

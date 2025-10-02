@@ -243,23 +243,31 @@ async def view_post_run_app(
     If the app is not installed, it will be installed using the template from AppTemplate table.
     If the app is already installed, returns the existing installation.
     """
+    logger.info(f"POST /api/v1/apps/{app_name} - user_id={user.id}")
+
     try:
         installed_app = await app_service.get_installed_app(
             launchpad_app_name=app_name,
             user_id=user.id,
         )
     except AppsApiNotFound:
+        logger.error(f"App {app_name} not found in Apps API")
         raise NotFound(f"Unknown app {app_name}")
     except AppNotInstalledError:
         # app is not running yet, lets do an installation from template
+        logger.info(f"App {app_name} not installed, attempting to install from template")
         try:
             return await app_service.install_from_template(request, app_name)
         except AppTemplateNotFound:
+            logger.error(f"App template {app_name} not found in database")
             raise NotFound(f"App template {app_name} does not exist in the pool")
         except AppServiceError as e:
+            logger.error(f"Error installing app {app_name}: {e}")
             raise BadRequest(str(e))
 
     except AppUnhealthyError:
+        logger.warning(f"App {app_name} is unhealthy")
         raise BadRequest(f"App {app_name} is unhealthy")
     else:
+        logger.info(f"App {app_name} already installed, returning existing installation")
         return installed_app

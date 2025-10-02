@@ -1,17 +1,12 @@
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import Iterator
 from typing import Any
 from unittest.mock import MagicMock, AsyncMock, patch
 from uuid import UUID
 import logging
+import os
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import (
-    create_async_engine,
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-)
 from testcontainers.postgres import PostgresContainer
 from yarl import URL
 
