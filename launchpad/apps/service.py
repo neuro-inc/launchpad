@@ -54,6 +54,52 @@ class AppService:
         self._instance_id = app.config.instance_id
         self._output_buffer: asyncio.Queue[InstalledApp] = asyncio.Queue()
 
+    async def get_existing_app(
+        self,
+        launchpad_app_name: str,
+        user_id: str | None = None,
+    ) -> InstalledApp | None:
+        """
+        Check if an app exists in the database, regardless of its health status.
+        This is useful for preventing duplicate installations during polling.
+
+        Returns None if the app doesn't exist, otherwise returns the InstalledApp.
+        Does NOT check health status or fetch URLs.
+        """
+        from launchpad.apps.template_storage import select_template
+
+        logger.info(
+            f"get_existing_app called: app_name={launchpad_app_name}, user_id={user_id}"
+        )
+
+        # Check if template exists in database
+        async with self._db() as db_template:
+            template = await select_template(db_template, name=launchpad_app_name)
+
+        if template is None:
+            logger.warning(f"Template not found in database: {launchpad_app_name}")
+            return None
+
+        # Use template metadata to determine selection criteria
+        select_params: dict[str, Any] = {"name": launchpad_app_name}
+        if not template.is_shared and not template.is_internal:
+            # personal app, let's add user ID to a selection
+            if user_id is not None:
+                select_params["user_id"] = user_id
+
+        async with self._db() as db:
+            installed_app = await select_app(db, **select_params)
+
+        if installed_app:
+            logger.info(
+                f"Found existing app {launchpad_app_name}: "
+                f"app_id={installed_app.app_id}"
+            )
+        else:
+            logger.info(f"No existing app found for {launchpad_app_name}")
+
+        return installed_app
+
     async def get_installed_app(
         self,
         launchpad_app_name: str,

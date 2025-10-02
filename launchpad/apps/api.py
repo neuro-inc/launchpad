@@ -242,6 +242,7 @@ async def view_post_run_app(
 
     If the app is not installed, it will be installed using the template from AppTemplate table.
     If the app is already installed, returns the existing installation.
+    This endpoint is safe for polling - it will not create duplicate installations.
     """
     logger.info(f"POST /api/v1/apps/{app_name} - user_id={user.id}")
 
@@ -254,8 +255,24 @@ async def view_post_run_app(
         logger.error(f"App {app_name} not found in Apps API")
         raise NotFound(f"Unknown app {app_name}")
     except AppNotInstalledError:
-        # app is not running yet, lets do an installation from template
-        logger.info(f"App {app_name} not installed, attempting to install from template")
+        # App not found in DB or not healthy - check if installation is in progress
+        logger.info(f"App {app_name} not installed, checking for in-progress installation")
+
+        # Check if app exists in DB (regardless of health status) to prevent duplicate installations
+        existing_app = await app_service.get_existing_app(
+            launchpad_app_name=app_name,
+            user_id=user.id,
+        )
+
+        if existing_app:
+            logger.info(
+                f"App {app_name} found in DB (app_id={existing_app.app_id}), "
+                f"returning existing installation to prevent duplicate"
+            )
+            return existing_app
+
+        # Truly not installed, proceed with installation
+        logger.info(f"App {app_name} not found, attempting to install from template")
         try:
             return await app_service.install_from_template(request, app_name)
         except AppTemplateNotFound:
@@ -265,8 +282,20 @@ async def view_post_run_app(
             logger.error(f"Error installing app {app_name}: {e}")
             raise BadRequest(str(e))
 
-    except AppUnhealthyError:
-        logger.warning(f"App {app_name} is unhealthy")
+    except AppUnhealthyError as e:
+        # App exists but is unhealthy - check if it's just being installed
+        logger.warning(f"App {app_name} is unhealthy (app_id={e.app_id})")
+
+        # Get the app from DB to return its current state
+        existing_app = await app_service.get_existing_app(
+            launchpad_app_name=app_name,
+            user_id=user.id,
+        )
+
+        if existing_app:
+            logger.info(f"Returning unhealthy app {app_name} for status polling")
+            return existing_app
+
         raise BadRequest(f"App {app_name} is unhealthy")
     else:
         logger.info(f"App {app_name} already installed, returning existing installation")
