@@ -690,7 +690,7 @@ class AppService:
             for app in apps:
                 logger.info(
                     f"  - {app.launchpad_app_name} (id={app.id}, "
-                    f"user_id={app.user_id}, apolo_app_id={app.apolo_app_id}, "
+                    f"user_id={app.user_id} "
                     f"is_internal={app.is_internal}, is_shared={app.is_shared})"
                 )
             return apps

@@ -46,5 +46,3 @@ ruff = "^0.13.0"
 pre-commit = "^4.3.0"
 mypy = "^1.18.1"
 pytest-cov = "^6.2.1"
-
-

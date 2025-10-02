@@ -77,19 +77,6 @@ async def get_launchpad_outputs(
 
     keycloak_password = helm_values["keycloak"]["auth"]["adminPassword"]
 
-    # getting Launchpad API url
-    api_labels = {**labels, "service": "launchpad"}
-    internal_host, internal_port = await get_service_host_port(match_labels=api_labels)
-    api_http_url = None
-    if internal_host:
-        api_http_url = HttpApi(
-            host=internal_host,
-            port=int(internal_port),
-            base_path="/",
-            protocol="http",
-        )
-    launchpad_admin_password = helm_values.get("LAUNCHPAD_ADMIN_PASSWORD", None)
-
     outputs = LaunchpadAppOutputs(
         app_url=ServiceAPI[WebApp](
             internal_url=internal_web_app_url,
