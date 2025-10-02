@@ -101,5 +101,5 @@ class LaunchpadOutputProcessor(BaseAppOutputsProcessor[LaunchpadAppOutputs]):
         app_instance_id: str,
     ) -> LaunchpadAppOutputs:
         return LaunchpadAppOutputs.model_validate(
-            **(await get_launchpad_outputs(helm_values, app_instance_id))
+            await get_launchpad_outputs(helm_values, app_instance_id)
         )
