@@ -42,27 +42,30 @@
     },
     "AppsConfig": {
       "properties": {
-        "llm_config": {
-          "$ref": "#/$defs/LLMConfig"
-        },
-        "postgres_config": {
-          "$ref": "#/$defs/PostgresConfig"
-        },
-        "embeddings_config": {
-          "$ref": "#/$defs/TextEmbeddingsConfig"
+        "quick_start_config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NoQuickStartConfig"
+            },
+            {
+              "$ref": "#/$defs/OpenWebUIConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Quick Start Config"
         }
       },
       "required": [
-        "llm_config",
-        "postgres_config",
-        "embeddings_config"
+        "quick_start_config"
       ],
       "title": "AppsConfig",
       "type": "object",
-      "x-description": "Configuration for the applications to be launched in the Launchpad.",
+      "x-description": "Choose some available configuration presets to jump start this Launchpad instance with some preinstalled applications",
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
-      "x-title": "Apps Configuration",
+      "x-title": "Quickstart Presets",
       "x-type": "AppsConfig"
     },
     "CustomLLMModel": {
@@ -268,6 +271,50 @@
       "x-meta-type": "inline",
       "x-title": "Launchpad Configuration",
       "x-type": "LaunchpadConfig"
+    },
+    "NoQuickStartConfig": {
+      "properties": {
+        "type": {
+          "const": "no_quickstart",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "NoQuickStartConfig",
+      "type": "object",
+      "x-description": "Install only Launchpad. You can add new Apps to Launchpad later",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "No Startup Apps",
+      "x-type": "NoQuickStartConfig"
+    },
+    "OpenWebUIConfig": {
+      "properties": {
+        "llm_config": {
+          "$ref": "#/$defs/LLMConfig"
+        },
+        "postgres_config": {
+          "$ref": "#/$defs/PostgresConfig"
+        },
+        "embeddings_config": {
+          "$ref": "#/$defs/TextEmbeddingsConfig"
+        }
+      },
+      "required": [
+        "llm_config",
+        "postgres_config",
+        "embeddings_config"
+      ],
+      "title": "OpenWebUIConfig",
+      "type": "object",
+      "x-description": "Install OpenWebUI and its dependencies on Launchpad startup",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "OpenWebUI Presets",
+      "x-type": "OpenWebUIConfig"
     },
     "PostgresConfig": {
       "properties": {

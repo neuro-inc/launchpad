@@ -35,3 +35,6 @@ class InstalledApp(Base):
     """
     user_id: Mapped[str | None]
     url: Mapped[str | None]
+    template_name: Mapped[str]
+    """References AppTemplate.name - the template used for this installation
+    """
