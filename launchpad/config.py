@@ -65,7 +65,7 @@ class Config:
     postgres: PostgresConfig
     keycloak: KeycloakConfig
     apolo: ApoloConfig
-    apps: AppsConfig
+    apps: AppsConfig | None
     server: ServerConfig = ServerConfig()
     instance_id: UUID | None = None
 
@@ -135,8 +135,20 @@ class EnvironConfigFactory:
             auth_middleware_name=self._environ["AUTH_MIDDLEWARE_NAME"],
         )
 
-    def create_apps(self) -> AppsConfig:
-        initial_config = json.loads(self._environ["LAUNCHPAD_INITIAL_CONFIG"])
+    def create_apps(self) -> AppsConfig | None:
+        initial_config_str = self._environ.get("LAUNCHPAD_INITIAL_CONFIG", "")
+        if not initial_config_str or initial_config_str == "{}":
+            # No quickstart config provided, return None to skip internal apps installation
+            return None
+
+        initial_config = json.loads(initial_config_str)
+
+        # Validate that required keys are present
+        required_keys = ["vllm", "postgres", "text-embeddings"]
+        if not all(key in initial_config for key in required_keys):
+            # Config is incomplete, return None
+            return None
+
         return AppsConfig(
             vllm=initial_config["vllm"],
             postgres=initial_config["postgres"],

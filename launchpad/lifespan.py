@@ -56,16 +56,26 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
             launchpad_domain=app.config.apolo.self_domain,
         )
 
-        # Seed app templates on startup (can be disabled with LAUNCHPAD_SKIP_SEED_TEMPLATES=1)
-        if not os.getenv("LAUNCHPAD_SKIP_SEED_TEMPLATES"):
-            logger.info("Seeding app templates on startup")
-            async with app.db() as db:
-                async with db.begin():
-                    await seed_templates(db)
+        # Seed app templates and initialize internal apps only if apps config is present
+        if app.config.apps is None:
+            logger.info(
+                "No initial apps configuration found (LAUNCHPAD_INITIAL_CONFIG is empty or not provided). "
+                "Skipping template seeding and internal apps installation."
+            )
         else:
-            logger.info("Skipping template seeding (LAUNCHPAD_SKIP_SEED_TEMPLATES is set)")
+            # Seed app templates on startup (can be disabled with LAUNCHPAD_SKIP_SEED_TEMPLATES=1)
+            if not os.getenv("LAUNCHPAD_SKIP_SEED_TEMPLATES"):
+                logger.info("Seeding app templates on startup")
+                async with app.db() as db:
+                    async with db.begin():
+                        await seed_templates(db)
+            else:
+                logger.info(
+                    "Skipping template seeding (LAUNCHPAD_SKIP_SEED_TEMPLATES is set)"
+                )
 
-        launchpad_init_task = asyncio.create_task(init_internal_apps(app))  # noqa: F841
+            # Initialize internal apps (vllm, postgres, embeddings)
+            launchpad_init_task = asyncio.create_task(init_internal_apps(app))  # noqa: F841
 
         # Start periodic output processing task
         output_processing_task = asyncio.create_task(

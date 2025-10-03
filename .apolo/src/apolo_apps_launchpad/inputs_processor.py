@@ -24,6 +24,7 @@ from .types import (
     PreConfiguredEmbeddingsModels,
     PreConfiguredHuggingFaceLLMModel,
     PreConfiguredLLMModels,
+    OpenWebUIConfig,
 )
 from apolo_app_types.protocols.postgres import (
     PGBackupConfig,
@@ -170,15 +171,38 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         #     app_type_name=str(AppType.Launchpad.value),
         #     app_name=app_name,
         # )
-        llm_input = await self.get_vllm_inputs(
-            input_,
-        )
-        postgres_inputs = await self.get_postgres_inputs(
-            input_,
-        )
-        text_embeddings_inputs = await self.get_text_embeddings_inputs(
-            input_,
-        )
+        LAUNCHPAD_INITIAL_CONFIG = {}
+        if isinstance(input_.apps_config.quick_start_config, OpenWebUIConfig):
+            llm_input = await self.get_vllm_inputs(
+                input_,
+            )
+            postgres_inputs = await self.get_postgres_inputs(
+                input_,
+            )
+            text_embeddings_inputs = await self.get_text_embeddings_inputs(
+                input_,
+            )
+            LAUNCHPAD_INITIAL_CONFIG = json.dumps(
+                {
+                    "vllm": get_nested_values(
+                        llm_input.model_dump(),
+                        [
+                            "hugging_face_model",
+                            "preset",
+                            "server_extra_args",
+                            "cache_config",
+                        ],
+                    ),
+                    "postgres": get_nested_values(
+                        postgres_inputs.model_dump(),
+                        ["preset", "pg_bouncer.preset"],
+                    ),
+                    "text-embeddings": get_nested_values(
+                        text_embeddings_inputs.model_dump(),
+                        ["model", "preset", "server_extra_args"],
+                    ),
+                }
+            )
 
         values = await gen_extra_values(
             apolo_client=self.client,
@@ -241,25 +265,5 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             "keycloak": keycloak_values,  # keeping this for backwards compatibility
             "mlops-keycloak": keycloak_values,
             "LAUNCHPAD_ADMIN_PASSWORD": _generate_password(),
-            "LAUNCHPAD_INITIAL_CONFIG": json.dumps(
-                {
-                    "vllm": get_nested_values(
-                        llm_input.model_dump(),
-                        [
-                            "hugging_face_model",
-                            "preset",
-                            "server_extra_args",
-                            "cache_config",
-                        ],
-                    ),
-                    "postgres": get_nested_values(
-                        postgres_inputs.model_dump(),
-                        ["preset", "pg_bouncer.preset"],
-                    ),
-                    "text-embeddings": get_nested_values(
-                        text_embeddings_inputs.model_dump(),
-                        ["model", "preset", "server_extra_args"],
-                    ),
-                }
-            ),
+            "LAUNCHPAD_INITIAL_CONFIG": LAUNCHPAD_INITIAL_CONFIG,
         }

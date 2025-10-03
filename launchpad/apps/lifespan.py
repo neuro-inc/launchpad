@@ -13,6 +13,13 @@ logger = logging.getLogger(__name__)
 
 # todo: make this a periodic task to sync the statuses of the internal apps with the apps api ?
 async def init_internal_apps(app: Launchpad) -> None:
+    # Check if apps config is available
+    if app.config.apps is None:
+        logger.info(
+            "No apps configuration available, skipping internal apps initialization"
+        )
+        return
+
     llm_inference_context = InternalAppContext(config=app.config.apps.vllm)
     embeddings_context = InternalAppContext(config=app.config.apps.embeddings)
     postgres_context = InternalAppContext(config=app.config.apps.postgres)

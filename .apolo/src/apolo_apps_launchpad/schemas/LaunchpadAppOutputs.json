@@ -139,7 +139,7 @@
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
       "x-title": "",
-      "x-type": "Image"
+      "x-type": "KeycloakConfig"
     },
     "ServiceAPI_HttpApi_": {
       "properties": {

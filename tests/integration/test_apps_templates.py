@@ -16,9 +16,9 @@ class TestTemplateImport:
             },
         )
 
-        assert response.status_code == 200, (
-            f"Expected 200 but got {response.status_code}: {response.json()}"
-        )
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 but got {response.status_code}: {response.json()}"
         data = response.json()
 
         # Verify template was created with API metadata
@@ -108,9 +108,9 @@ class TestTemplateImport:
             },
         )
 
-        assert response.status_code == 200, (
-            f"Expected 200 but got {response.status_code}: {response.json()}"
-        )
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 but got {response.status_code}: {response.json()}"
         data = response.json()
 
         # Verify template was created

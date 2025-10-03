@@ -1,5 +1,6 @@
 import enum
 
+from typing import Literal
 from pydantic import ConfigDict, Field
 
 from apolo_app_types import (
@@ -229,18 +230,41 @@ class TextEmbeddingsConfig(AbstractAppFieldType):
     )
 
 
-class AppsConfig(AbstractAppFieldType):
+class NoQuickStartConfig(AbstractAppFieldType):
     model_config = ConfigDict(
         protected_namespaces=(),
         json_schema_extra=SchemaExtraMetadata(
-            title="Apps Configuration",
-            description="Configuration for the applications to be launched"
-            " in the Launchpad.",
+            title="No Startup Apps",
+            description="Install only Launchpad. You can add new apps to Launchpad later",
+        ).as_json_schema_extra(),
+    )
+    type: Literal["no_quickstart"]
+
+
+class OpenWebUIConfig(AbstractAppFieldType):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="OpenWebUI Presets",
+            description="Install OpenWebUI and its dependencies on Launchpad startup",
         ).as_json_schema_extra(),
     )
     llm_config: LLMConfig
     postgres_config: PostgresConfig
     embeddings_config: TextEmbeddingsConfig
+
+
+class AppsConfig(AbstractAppFieldType):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Quickstart Presets",
+            description="Choose some available configuration"
+            " presets to jump start this Launchpad instance"
+            " with some preinstalled applications",
+        ).as_json_schema_extra(),
+    )
+    quick_start_config: NoQuickStartConfig | OpenWebUIConfig
 
 
 class LaunchpadConfig(AbstractAppFieldType):
