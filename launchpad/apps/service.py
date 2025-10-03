@@ -302,8 +302,8 @@ class AppService:
                 "No outputs exist for instance. Cannot append apps until post-outputs hook creates initial outputs."
             )
 
-        installed_apps = outputs.get("installed_apps", {})
-        app_list = installed_apps.get("app_list", [])
+        installed_apps = outputs.get("installed_apps") or {}
+        app_list = installed_apps.get("app_list") or []
 
         # Get existing app IDs to avoid duplicates
         existing_app_ids = {UUID(a["app_id"]) for a in app_list if "app_id" in a}

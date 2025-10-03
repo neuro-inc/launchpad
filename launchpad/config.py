@@ -136,12 +136,19 @@ class EnvironConfigFactory:
         )
 
     def create_apps(self) -> AppsConfig | None:
-        initial_config_str = self._environ.get("LAUNCHPAD_INITIAL_CONFIG", "")
-        if not initial_config_str or initial_config_str == "{}":
+        initial_config_str = self._environ.get("LAUNCHPAD_INITIAL_CONFIG", "").strip()
+
+        # Check if config is empty, just whitespace, or Go's empty map representation
+        if not initial_config_str or initial_config_str in ("{}", "map[]"):
             # No quickstart config provided, return None to skip internal apps installation
             return None
 
-        initial_config = json.loads(initial_config_str)
+        # Try to parse JSON, return None if invalid
+        try:
+            initial_config = json.loads(initial_config_str)
+        except (json.JSONDecodeError, ValueError):
+            # Invalid JSON (including Go's "map[]"), treat as no config
+            return None
 
         # Validate that required keys are present
         required_keys = ["vllm", "postgres", "text-embeddings"]
