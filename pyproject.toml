@@ -44,6 +44,10 @@ ignore_missing_imports = true
 module = "asyncache.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "testcontainers.*"
+ignore_missing_imports = true
+
 [tool.poetry]
 name = "launchpad"
 version = "0.1.0"

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any, Annotated
+from typing import Any, Annotated, cast
 from uuid import UUID
 
 import backoff
@@ -10,7 +10,12 @@ from starlette.requests import Request
 from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.template_models import AppTemplate
-from launchpad.apps.registry import APPS_CONTEXT, T_App, USER_FACING_APPS
+from launchpad.apps.registry import (
+    APPS_CONTEXT,
+    T_App,
+    USER_FACING_APPS,
+    HANDLER_CLASSES,
+)
 from launchpad.apps.registry.base import GenericApp
 from launchpad.apps.resources import ImportAppRequest, ImportTemplateRequest
 from launchpad.apps.storage import (
@@ -240,8 +245,8 @@ class AppService:
             app_class = cast(AnyType, HANDLER_CLASSES[template.handler_class])
 
             # Check if this handler needs special context
-            if template.name in APPS_CONTEXT:
-                context_class = APPS_CONTEXT[template.name]
+            if app_class.__name__ in APPS_CONTEXT:
+                context_class = cast(AnyType, APPS_CONTEXT[app_class.__name__])
                 ctx = await context_class.from_request(request=request)
                 app = app_class(context=ctx)
             else:
@@ -268,7 +273,8 @@ class AppService:
                 tags=template.tags,
             )
 
-        return await self.install(app=app, user_id=user_id)
+        app.user_id = user_id
+        return await self.install(app=app)
 
     @backoff.on_exception(
         wait_gen=backoff.expo,
@@ -363,7 +369,6 @@ class AppService:
     async def install(
         self,
         app: T_App,
-        user_id: str | None = None,
     ) -> InstalledApp:
         installed_app = None
         async with self._db() as db:
@@ -388,7 +393,7 @@ class AppService:
                     launchpad_app_name=app.name,
                     is_internal=app.is_internal,
                     is_shared=app.is_shared,
-                    user_id=user_id,
+                    user_id=app.user_id,
                     url=None,
                     template_name=app.name,  # Reference to AppTemplate.name
                 )
@@ -464,7 +469,8 @@ class AppService:
             external_urls=external_urls,
             tags=tags,
         )
-        return await self.install(generic_app, user_id=user_id)
+        generic_app.user_id = user_id
+        return await self.install(generic_app)
 
     async def import_app(
         self,
@@ -576,6 +582,7 @@ class AppService:
         is_shared: bool = True,
         fallback_verbose_name: str | None = None,
         default_inputs: dict[str, Any] | None = None,
+        handler_class: str | None = None,
     ) -> AppTemplate:
         """
         Fetch template metadata from Apps API and create/update AppTemplate.
@@ -599,6 +606,8 @@ class AppService:
             is_internal: Whether template is internal
             is_shared: Whether apps from this template can be shared
             fallback_verbose_name: Fallback for verbose_name (used by import_app for display_name)
+            default_inputs: Default inputs to merge when installing
+            handler_class: Custom handler class for the template
 
         Returns:
             The created/updated AppTemplate record
@@ -667,7 +676,7 @@ class AppService:
                     tags=resolved_tags,
                     is_internal=is_internal,
                     is_shared=is_shared,
-                    handler_class=None,  # Imported templates use GenericApp
+                    handler_class=handler_class,
                     default_inputs=default_inputs,
                 )
 
@@ -730,6 +739,7 @@ class AppService:
             is_internal=import_request.is_internal,
             is_shared=import_request.is_shared,
             default_inputs=import_request.default_inputs,
+            handler_class=import_request.handler_class,
         )
 
     async def delete(self, app_id: UUID) -> None:
@@ -759,7 +769,8 @@ class AppService:
         if not app_class:
             raise AppTemplateNotFound()
 
-        app_context_class = APPS_CONTEXT[launchpad_app_name]
+        handler_class = HANDLER_CLASSES[launchpad_app_name]
+        app_context_class = cast(Any, APPS_CONTEXT[handler_class.__name__])
         app_context = await app_context_class.from_request(request=request)
         return app_class(context=app_context)
 

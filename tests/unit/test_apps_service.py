@@ -79,6 +79,7 @@ async def test_app_service_install_app_success(
     mock_app_instance.documentation_urls = []
     mock_app_instance.external_urls = []
     mock_app_instance.tags = []
+    mock_app_instance.user_id = None
 
     mock_apps_api_client.install_app.return_value = {
         "id": "123",

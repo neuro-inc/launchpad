@@ -16,9 +16,9 @@ class TestTemplateImport:
             },
         )
 
-        assert (
-            response.status_code == 200
-        ), f"Expected 200 but got {response.status_code}: {response.json()}"
+        assert response.status_code == 200, (
+            f"Expected 200 but got {response.status_code}: {response.json()}"
+        )
         data = response.json()
 
         # Verify template was created with API metadata
@@ -90,6 +90,50 @@ class TestTemplateImport:
         data2 = response2.json()
         assert data2["verbose_name"] == "Second Import"
         assert data2["template_version"] == "2.0.0"  # Updated
+
+    def test_import_template_with_handler_class(self, app_client: TestClient) -> None:
+        """Test importing a template with a custom handler_class"""
+        response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "service-deployment",
+                "template_version": "1.0.0",
+                "name": "custom-service",
+                "verbose_name": "Custom Service Deployment",
+                "handler_class": "ServiceDeploymentApp",
+                "default_inputs": {
+                    "displayName": "My Service",
+                    "preset": {"name": "cpu-small"},
+                },
+            },
+        )
+
+        assert response.status_code == 200, (
+            f"Expected 200 but got {response.status_code}: {response.json()}"
+        )
+        data = response.json()
+
+        # Verify template was created
+        assert data["name"] == "custom-service"
+        assert data["template_name"] == "service-deployment"
+        assert data["verbose_name"] == "Custom Service Deployment"
+
+        # Verify the template is in the app pool (since it's not internal)
+        pool_response = app_client.get("/api/v1/apps")
+        assert pool_response.status_code == 200
+        pool_data = pool_response.json()
+
+        # Find our template in the pool
+        custom_service = next(
+            (
+                item
+                for item in pool_data["items"]
+                if item["launchpad_app_name"] == "custom-service"
+            ),
+            None,
+        )
+        assert custom_service is not None
+        assert custom_service["title"] == "Custom Service Deployment"
 
 
 class TestAppImport:

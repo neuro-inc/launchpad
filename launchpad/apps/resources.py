@@ -27,7 +27,11 @@ class ImportTemplateRequest(BaseModel):
         default=True, description="Whether apps from this template can be shared"
     )
     default_inputs: dict[str, Any] = Field(
-        default_factory=dict, description="Default inputs to merge with user-provided inputs when installing"
+        default_factory=dict,
+        description="Default inputs to merge with user-provided inputs when installing",
+    )
+    handler_class: str | None = Field(
+        None, description="Custom handler class for the template"
     )
 
 

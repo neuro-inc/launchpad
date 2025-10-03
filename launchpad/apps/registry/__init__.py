@@ -14,6 +14,10 @@ from launchpad.apps.registry.shared.openwebui import (
     OpenWebUIApp,
     OpenWebUIAppContext,
 )
+from launchpad.apps.registry.handlers.service_deployment import (
+    ServiceDeploymentApp,
+    ServiceDeploymentContext,
+)
 
 T_App = OpenWebUIApp | App[InternalAppContext] | GenericApp
 
@@ -29,15 +33,17 @@ TEMPLATE_HANDLERS: dict[str, type[T_App]] = {
 # Maps handler class names to App classes
 # Used for dynamic lookup from AppTemplate.handler_class
 HANDLER_CLASSES: dict[str, type[T_App]] = {
-    "LlmInferenceApp": LlmInferenceApp,
-    "EmbeddingsApp": EmbeddingsApp,
-    "PostgresApp": PostgresApp,
-    "OpenWebUIApp": OpenWebUIApp,
+    LlmInferenceApp.__name__: LlmInferenceApp,
+    EmbeddingsApp.__name__: EmbeddingsApp,
+    PostgresApp.__name__: PostgresApp,
+    OpenWebUIApp.__name__: OpenWebUIApp,
+    ServiceDeploymentApp.__name__: ServiceDeploymentApp,
 }
 
 # Maps template names to context classes (for templates that need special context)
 APPS_CONTEXT = {
-    APP_NAME_OPEN_WEB_UI: OpenWebUIAppContext,
+    OpenWebUIApp.__name__: OpenWebUIAppContext,
+    ServiceDeploymentApp.__name__: ServiceDeploymentContext,
 }
 
 # Legacy compatibility

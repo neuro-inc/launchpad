@@ -3,7 +3,6 @@ from typing import Any
 from unittest.mock import MagicMock, AsyncMock, patch
 from uuid import UUID
 import logging
-import os
 
 import pytest
 from fastapi.testclient import TestClient
