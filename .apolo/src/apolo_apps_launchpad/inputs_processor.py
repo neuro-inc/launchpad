@@ -171,7 +171,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         #     app_type_name=str(AppType.Launchpad.value),
         #     app_name=app_name,
         # )
-        LAUNCHPAD_INITIAL_CONFIG = {}
+        LAUNCHPAD_INITIAL_CONFIG = ""
         if isinstance(input_.apps_config.quick_start_config, OpenWebUIConfig):
             llm_input = await self.get_vllm_inputs(
                 input_,
