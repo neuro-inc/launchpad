@@ -208,6 +208,96 @@ class TestGenericAppInstall:
         assert data["launchpad_app_name"] == "my-generic-app"
 
 
+class TestHandlerAppInstall:
+    """Integration tests for installing apps with custom handler classes"""
+
+    def test_install_openwebui_app(self, app_client: TestClient) -> None:
+        """Test installing OpenWebUI app with OpenWebUIApp handler"""
+        # First, install the required dependencies
+        # Install vLLM
+        vllm_response = app_client.post("/api/v1/apps/vllm-llama-3.1-8b")
+        assert vllm_response.status_code == 200
+
+        # Install embeddings
+        embeddings_response = app_client.post("/api/v1/apps/embeddings")
+        assert embeddings_response.status_code == 200
+
+        # Install postgres
+        postgres_response = app_client.post("/api/v1/apps/postgres")
+        assert postgres_response.status_code == 200
+
+        # Now install OpenWebUI
+        response = app_client.post("/api/v1/apps/openwebui")
+
+        assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.json()}"
+        data = response.json()
+
+        # Verify app was installed with correct name
+        assert data["launchpad_app_name"] == "openwebui"
+        assert data["is_shared"] is True
+
+    def test_install_service_deployment_app(self, app_client: TestClient) -> None:
+        """Test installing an app with ServiceDeploymentApp handler"""
+        # First import a template with ServiceDeploymentApp handler
+        import_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "service-deployment",
+                "template_version": "1.0.0",
+                "name": "test-service",
+                "verbose_name": "Test Service Deployment",
+                "handler_class": "ServiceDeploymentApp",
+                "default_inputs": {
+                    "displayName": "Test Service",
+                    "preset": {"name": "cpu-small"},
+                },
+            },
+        )
+        assert import_response.status_code == 200
+
+        # Now install the app
+        response = app_client.post("/api/v1/apps/test-service")
+
+        assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.json()}"
+        data = response.json()
+
+        # Verify app was installed
+        assert data["launchpad_app_name"] == "test-service"
+        assert data["is_shared"] is True
+
+    def test_install_service_deployment_with_user_inputs(
+        self, app_client: TestClient
+    ) -> None:
+        """Test installing ServiceDeploymentApp with user-provided inputs"""
+        # Import template
+        app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "service-deployment",
+                "template_version": "1.0.0",
+                "name": "custom-service",
+                "handler_class": "ServiceDeploymentApp",
+                "default_inputs": {
+                    "displayName": "Default Service",
+                    "preset": {"name": "cpu-small"},
+                },
+            },
+        )
+
+        # Install with custom inputs
+        response = app_client.post(
+            "/api/v1/apps/custom-service",
+            json={
+                "displayName": "Custom Display Name",
+                "preset": {"name": "cpu-large"},
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["launchpad_app_name"] == "custom-service"
+
+
 class TestAppPool:
     """Integration tests for app pool listing"""
 

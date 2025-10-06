@@ -248,7 +248,29 @@ class AppService:
             if app_class.__name__ in APPS_CONTEXT:
                 context_class = cast(AnyType, APPS_CONTEXT[app_class.__name__])
                 ctx = await context_class.from_request(request=request)
-                app = app_class(context=ctx)
+
+                # Check if this is a GenericApp subclass or an App subclass
+                if issubclass(app_class, GenericApp):
+                    # GenericApp-based handlers need all parameters
+                    app = app_class(
+                        context=ctx,
+                        template_name=template.template_name,
+                        template_version=template.template_version,
+                        inputs=inputs,
+                        name=template.name,
+                        is_internal=template.is_internal,
+                        is_shared=template.is_shared,
+                        verbose_name=template.verbose_name,
+                        description_short=template.description_short,
+                        description_long=template.description_long,
+                        logo=template.logo,
+                        documentation_urls=template.documentation_urls,
+                        external_urls=template.external_urls,
+                        tags=template.tags,
+                    )
+                else:
+                    # App-based handlers (like OpenWebUIApp) only need context
+                    app = app_class(context=ctx)
             else:
                 # Handler without special context - use InternalAppContext
                 from launchpad.apps.registry.internal.context import InternalAppContext

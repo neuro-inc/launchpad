@@ -88,6 +88,7 @@ class GenericApp(App[BaseContext]):
         documentation_urls: list[dict[str, str]] | None = None,
         external_urls: list[dict[str, str]] | None = None,
         tags: list[str] | None = None,
+        context: BaseContext | None = None,
     ):
         """
         Initialize a generic app.
@@ -106,9 +107,11 @@ class GenericApp(App[BaseContext]):
             documentation_urls: List of documentation URLs
             external_urls: List of external URLs
             tags: List of tags for categorization
+            context: Optional context to use (defaults to BaseContext())
         """
-        # Create a minimal context since we don't need complex context for generic apps
-        context = BaseContext()
+        # Use provided context or create a minimal BaseContext
+        if context is None:
+            context = BaseContext()
         super().__init__(context)
 
         self.name = name or template_name
