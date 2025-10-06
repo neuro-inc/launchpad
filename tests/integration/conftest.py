@@ -72,7 +72,12 @@ def config(postgres_container: PostgresContainer) -> Config:
 @pytest.fixture
 def mock_user() -> User:
     """Mock authenticated user for testing"""
-    return User(id="test@example.com", email="test@example.com", name="Test User")
+    return User(
+        id="test@example.com",
+        email="test@example.com",
+        name="Test User",
+        groups=["admin"],
+    )
 
 
 @pytest.fixture
@@ -162,10 +167,14 @@ def app_client(
                 # Create the app (uses real PostgreSQL from config)
                 app = create_app(config)
 
-                # Override auth dependency
-                from launchpad.auth.dependencies import auth_required
+                # Override auth dependencies
+                from launchpad.auth.dependencies import (
+                    auth_required,
+                    admin_role_required,
+                )
 
                 app.dependency_overrides[auth_required] = mock_auth_dependency
+                app.dependency_overrides[admin_role_required] = mock_auth_dependency
 
                 with TestClient(app) as client:
                     yield client

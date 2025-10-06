@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from launchpad.apps.registry.base import BaseContext, GenericApp
 from apolo_app_types.helm.utils.deep_merging import merge_list_of_dicts
 from copy import deepcopy
@@ -6,6 +7,7 @@ from starlette.requests import Request
 from typing import Self, Any, cast
 
 
+@dataclass
 class ServiceDeploymentContext(BaseContext):
     auth_middleware_name: str
 
@@ -17,7 +19,7 @@ class ServiceDeploymentContext(BaseContext):
         params = {
             "auth_middleware_name": request.app.config.apolo.auth_middleware_name,
         }
-        return ServiceDeploymentContext(**params)
+        return cls(**params)
 
 
 class ServiceDeploymentApp(GenericApp):
