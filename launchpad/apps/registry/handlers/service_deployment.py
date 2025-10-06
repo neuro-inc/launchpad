@@ -23,6 +23,12 @@ class ServiceDeploymentContext(BaseContext):
 
 
 class ServiceDeploymentApp(GenericApp):
+    def __init__(
+        self, context: ServiceDeploymentContext, *args: Any, **kwargs: Any
+    ) -> None:
+        self._context = context
+        super().__init__(*args, **kwargs)
+
     async def _generate_inputs(self) -> dict[str, Any]:
         context = cast(ServiceDeploymentContext, self._context)
         inputs = deepcopy(self._inputs)
