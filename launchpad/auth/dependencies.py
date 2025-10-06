@@ -31,7 +31,13 @@ async def auth_required(
         logger.error("Unable to extract `email` from the token")
         raise Unauthorized("Unable to authorize a user without an email")
     name = decoded_token.get("name") or ""
-    groups = decoded_token.get("groups") or []
+
+    # Extract roles from resource_access.frontend.roles
+    groups = []
+    resource_access = decoded_token.get("resource_access", {})
+    frontend_access = resource_access.get("frontend", {})
+    groups = frontend_access.get("roles", [])
+
     return User(id=email, email=email, name=name, groups=groups)
 
 
