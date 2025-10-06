@@ -5,6 +5,7 @@ from copy import deepcopy
 from starlette.requests import Request
 from typing import Self, Any, cast
 
+
 class ServiceDeploymentContext(BaseContext):
     auth_middleware_name: str
 
@@ -16,14 +17,14 @@ class ServiceDeploymentContext(BaseContext):
         params = {
             "auth_middleware_name": request.app.config.apolo.auth_middleware_name,
         }
-        return cls(**params)
+        return ServiceDeploymentContext(**params)
 
 
 class ServiceDeploymentApp(GenericApp):
     async def _generate_inputs(self) -> dict[str, Any]:
         context = cast(ServiceDeploymentContext, self._context)
         inputs = deepcopy(self._inputs)
-        middleware_config ={
+        middleware_config = {
             "networking_config": {
                 "advanced_networking": {
                     "ingress_middleware": {"name": context.auth_middleware_name}
@@ -32,4 +33,3 @@ class ServiceDeploymentApp(GenericApp):
         }
         inputs = merge_list_of_dicts([inputs, middleware_config])
         return inputs
-
