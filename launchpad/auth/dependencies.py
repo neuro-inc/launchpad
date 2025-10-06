@@ -31,7 +31,8 @@ async def auth_required(
         logger.error("Unable to extract `email` from the token")
         raise Unauthorized("Unable to authorize a user without an email")
     name = decoded_token.get("name") or ""
-    return User(id=email, email=email, name=name)
+    groups = decoded_token.get("groups") or []
+    return User(id=email, email=email, name=name, groups=groups)
 
 
 async def _token_from_request(request: Request) -> dict[str, Any]:
@@ -122,7 +123,21 @@ async def _get_jwks(
     return await response.json()
 
 
+async def admin_role_required(
+    request: Request,
+) -> User:
+    """
+    JWT authentication with admin role check
+    """
+    user = await auth_required(request)
+    if "admin" not in user.groups:
+        logger.warning(f"User {user.email} attempted to access admin endpoint without admin role")
+        raise Unauthorized("Admin role required")
+    return user
+
+
 Auth = Annotated[User, Depends(auth_required)]
+AdminAuth = Annotated[User, Depends(admin_role_required)]
 
 
 async def admin_auth_required(

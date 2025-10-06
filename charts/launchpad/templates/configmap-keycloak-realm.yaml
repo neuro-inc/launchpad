@@ -427,7 +427,17 @@ data:
               "attributes": {}
             }
           ],
-          "frontend": []
+          "frontend": [
+            {
+              "id": "f1a2b3c4-d5e6-7f8g-9h0i-1j2k3l4m5n6o",
+              "name": "admin",
+              "description": "Administrator role for frontend",
+              "composite": false,
+              "clientRole": true,
+              "containerId": "a0151d56-41f6-4722-af35-0159c9bfffeb",
+              "attributes": {}
+            }
+          ]
         }
       },
       "groups": [],
@@ -717,7 +727,7 @@ data:
           "consentRequired": false,
           "standardFlowEnabled": true,
           "implicitFlowEnabled": false,
-          "directAccessGrantsEnabled": false,
+          "directAccessGrantsEnabled": true,
           "serviceAccountsEnabled": false,
           "publicClient": true,
           "frontchannelLogout": true,

@@ -23,7 +23,7 @@ from launchpad.apps.service import (
     AppUnhealthyError,
     AppServiceError,
 )
-from launchpad.auth.dependencies import Auth
+from launchpad.auth.dependencies import Auth, AdminAuth
 from launchpad.errors import NotFound, BadRequest
 from launchpad.ext.apps_api import NotFound as AppsApiNotFound
 
@@ -158,7 +158,7 @@ async def view_post_import_app(
     request: Request,
     import_request: ImportAppRequest,
     app_service: DepAppService,
-    user: Auth,
+    user: AdminAuth,
 ) -> Any:
     """
     Import an externally installed app from Apps API.
@@ -197,7 +197,7 @@ async def view_post_import_template(
     request: Request,
     import_request: ImportTemplateRequest,
     app_service: DepAppService,
-    user: Auth,
+    user: AdminAuth,
 ) -> Any:
     """
     Import a template from Apps API to make it available in the app pool.

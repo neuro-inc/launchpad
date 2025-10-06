@@ -222,3 +222,69 @@ def test_environ_config_factory_create_apps_incomplete_config() -> None:
     factory = EnvironConfigFactory(environ=environ)
     config = factory.create_apps()
     assert config is None
+
+
+def test_environ_config_factory_create_apps_invalid_json() -> None:
+    """Test that invalid JSON in LAUNCHPAD_INITIAL_CONFIG returns None for apps"""
+    # Use EnvironConfigFactory with explicit environ dict to bypass .env loading
+    environ = {
+        "HOST": "127.0.0.1",
+        "PORT": "8000",
+        "DB_HOST": "localhost",
+        "DB_USER": "testuser",
+        "DB_PASSWORD": "testpassword",
+        "DB_NAME": "testdb",
+        "KEYCLOAK_URL": "keycloak.example.com",
+        "KEYCLOAK_REALM": "testrealm",
+        "APOLO_PASSED_CONFIG": b64encode(
+            json.dumps(
+                {
+                    "url": "https://apolo.example.com",
+                    "cluster": "test-cluster",
+                    "org_name": "test-org",
+                    "project_name": "test-project",
+                    "token": "test-token",
+                }
+            ).encode()
+        ).decode(),
+        "SELF_DOMAIN": "https://self.example.com",
+        "BASE_DOMAIN": "https://base.example.com",
+        "AUTH_MIDDLEWARE_NAME": "test-middleware",
+        "LAUNCHPAD_INITIAL_CONFIG": "not valid json {{{",  # Invalid JSON
+    }
+    factory = EnvironConfigFactory(environ=environ)
+    config = factory.create_apps()
+    assert config is None
+
+
+def test_environ_config_factory_create_apps_whitespace_only() -> None:
+    """Test that whitespace-only LAUNCHPAD_INITIAL_CONFIG returns None for apps"""
+    # Use EnvironConfigFactory with explicit environ dict to bypass .env loading
+    environ = {
+        "HOST": "127.0.0.1",
+        "PORT": "8000",
+        "DB_HOST": "localhost",
+        "DB_USER": "testuser",
+        "DB_PASSWORD": "testpassword",
+        "DB_NAME": "testdb",
+        "KEYCLOAK_URL": "keycloak.example.com",
+        "KEYCLOAK_REALM": "testrealm",
+        "APOLO_PASSED_CONFIG": b64encode(
+            json.dumps(
+                {
+                    "url": "https://apolo.example.com",
+                    "cluster": "test-cluster",
+                    "org_name": "test-org",
+                    "project_name": "test-project",
+                    "token": "test-token",
+                }
+            ).encode()
+        ).decode(),
+        "SELF_DOMAIN": "https://self.example.com",
+        "BASE_DOMAIN": "https://base.example.com",
+        "AUTH_MIDDLEWARE_NAME": "test-middleware",
+        "LAUNCHPAD_INITIAL_CONFIG": "   \n  \t  ",  # Whitespace only
+    }
+    factory = EnvironConfigFactory(environ=environ)
+    config = factory.create_apps()
+    assert config is None
