@@ -243,7 +243,7 @@ class AppService:
             from typing import cast, Any as AnyType
 
             app_class = cast(AnyType, HANDLER_CLASSES[template.handler_class])
-
+            logger.info(f"App class selected: {app_class}")
             # Check if this handler needs special context
             if app_class.__name__ in APPS_CONTEXT:
                 context_class = cast(AnyType, APPS_CONTEXT[app_class.__name__])
