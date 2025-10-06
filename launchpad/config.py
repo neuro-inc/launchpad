@@ -136,7 +136,9 @@ class EnvironConfigFactory:
         )
 
     def create_apps(self) -> AppsConfig | None:
-        initial_config_str = self._environ.get("LAUNCHPAD_INITIAL_CONFIG", "").strip()
+        initial_config_str = (
+            self._environ.get("LAUNCHPAD_INITIAL_CONFIG") or ""
+        ).strip()
 
         # Check if config is empty, just whitespace, or Go's empty map representation
         if not initial_config_str or initial_config_str in ("{}", "map[]"):

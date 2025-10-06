@@ -131,7 +131,9 @@ async def admin_role_required(
     """
     user = await auth_required(request)
     if "admin" not in user.groups:
-        logger.warning(f"User {user.email} attempted to access admin endpoint without admin role")
+        logger.warning(
+            f"User {user.email} attempted to access admin endpoint without admin role"
+        )
         raise Unauthorized("Admin role required")
     return user
 
