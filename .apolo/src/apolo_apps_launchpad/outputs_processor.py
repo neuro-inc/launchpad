@@ -88,7 +88,10 @@ async def get_launchpad_outputs(
 
     # Construct middleware name using helm chart logic: launchpad-{apolo_app_id}-auth-middleware
     launchpad_name = get_launchpad_name(app_instance_id)
-    middleware_name = f"{launchpad_name}-auth-middleware"
+    middleware_name = f"platform-{launchpad_name}-auth-middleware"
+    print(f"App instance ID: {app_instance_id}")
+    print(f"Launchpad name: {launchpad_name}")
+    print(f"Full middleware name: {middleware_name}")
 
     outputs = LaunchpadAppOutputs(
         app_url=ServiceAPI[WebApp](
@@ -103,7 +106,7 @@ async def get_launchpad_outputs(
             auth_admin_password=keycloak_password,
         ),
         installed_apps=None,
-        auth_middleware=AuthIngressMiddleware(name=f"platform-{middleware_name}"),
+        auth_middleware=AuthIngressMiddleware(name=middleware_name),
     )
     return outputs.model_dump()
 
