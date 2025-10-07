@@ -37,8 +37,8 @@ pyyaml = "^6.0.2"
 yarl = "^1.18.3"
 pre-commit = "^4.2.0"
 multidict = "^6.6.4"
-apolo-app-types = "v25.10.2"
-apolo-sdk = "v25.9.0"
+apolo-app-types = "v25.10.8"
+apolo-sdk = "v25.9.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"

@@ -282,37 +282,37 @@ trio = ["trio (>=0.31.0)"]
 
 [[package]]
 name = "apolo-app-types"
-version = "25.9.23"
+version = "25.10.8"
 description = "Apolo Platform App Types."
 optional = false
 python-versions = "<4.0,>=3.9.0"
 groups = ["main"]
 files = [
-    {file = "apolo_app_types-25.9.23-py3-none-any.whl", hash = "sha256:4711e46ce36c8b0412e8fda54ba3c2adeb03ea0ee7fd365f1c9b49d418ef7b50"},
-    {file = "apolo_app_types-25.9.23.tar.gz", hash = "sha256:1284ce901fe3cd05786fcc41063679ccdd1c95600be69f3e3bfe3d47afc51fc1"},
+    {file = "apolo_app_types-25.10.8-py3-none-any.whl", hash = "sha256:f3a39c1cbfe527dd0a9f2aa555d47c5931ad480f66e01124c7370a56e55c2c0d"},
+    {file = "apolo_app_types-25.10.8.tar.gz", hash = "sha256:498cf72bd31fab5744607bb73552a6633e027824ef8b86d51c0b477d170afd3f"},
 ]
 
 [package.dependencies]
-apolo-sdk = ">=25.9.0,<26.0.0"
+apolo-sdk = ">=25.9.1,<26.0.0"
 click = ">=8.0.3,<9.0.0"
 httpx = ">=0.28.0,<0.29.0"
 jsonref = ">=1.1.0,<2.0.0"
-kubernetes = ">=33.1.0,<34.0.0"
+kubernetes = ">=34.1.0,<35.0.0"
 pydantic = ">=2.11.9,<3.0.0"
-pyyaml = ">=6.0.2,<7.0.0"
+pyyaml = ">=6.0.3,<7.0.0"
 types-PyYAML = ">=6.0.12.20250915,<7.0.0.0"
 yarl = ">=1.20.1,<2.0.0"
 
 [[package]]
 name = "apolo-sdk"
-version = "25.9.0"
+version = "25.9.1"
 description = "Apolo SDK"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "apolo_sdk-25.9.0-py3-none-any.whl", hash = "sha256:295fe1c9ac89b238d1ddab3329ea58b3b5bfb0e44bc4c6835627aa29e3c8e017"},
-    {file = "apolo_sdk-25.9.0.tar.gz", hash = "sha256:f614e87d33146f10b3d4b0103a1d7ef3e84eb64126c89dcaf906c7882845fc00"},
+    {file = "apolo_sdk-25.9.1-py3-none-any.whl", hash = "sha256:a4049c707b7eed06b33f0714823b8b7588ed0c9708e8a2aa864b9abfe142ceff"},
+    {file = "apolo_sdk-25.9.1.tar.gz", hash = "sha256:5069eb3202927b357cc2bfe3f97538da11463c5e151c6f0ddc758a03534dbb3f"},
 ]
 
 [package.dependencies]
@@ -322,8 +322,8 @@ aiohttp = ">=3.11.3"
 azure-storage-blob = ">=12.8.1,<12.9.0 || >12.9.0"
 certifi = "*"
 google-auth = ">=2.0.2"
-neuro-admin-client = ">=24.12.2"
-neuro-config-client = "25.8.7"
+neuro-admin-client = "25.9.2"
+neuro-config-client = "25.9.4"
 packaging = ">=20.4"
 python-dateutil = ">=2.7.0"
 python-jose = ">=3.3.0"
@@ -1475,27 +1475,26 @@ typing-extensions = ">=4.5.0"
 
 [[package]]
 name = "kubernetes"
-version = "33.1.0"
+version = "34.1.0"
 description = "Kubernetes python client"
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
 files = [
-    {file = "kubernetes-33.1.0-py2.py3-none-any.whl", hash = "sha256:544de42b24b64287f7e0aa9513c93cb503f7f40eea39b20f66810011a86eabc5"},
-    {file = "kubernetes-33.1.0.tar.gz", hash = "sha256:f64d829843a54c251061a8e7a14523b521f2dc5c896cf6d65ccf348648a88993"},
+    {file = "kubernetes-34.1.0-py2.py3-none-any.whl", hash = "sha256:bffba2272534e224e6a7a74d582deb0b545b7c9879d2cd9e4aae9481d1f2cc2a"},
+    {file = "kubernetes-34.1.0.tar.gz", hash = "sha256:8fe8edb0b5d290a2f3ac06596b23f87c658977d46b5f8df9d0f4ea83d0003912"},
 ]
 
 [package.dependencies]
 certifi = ">=14.05.14"
 durationpy = ">=0.7"
 google-auth = ">=1.0.1"
-oauthlib = ">=3.2.2"
 python-dateutil = ">=2.5.3"
 pyyaml = ">=5.4.1"
 requests = "*"
 requests-oauthlib = "*"
 six = ">=1.9.0"
-urllib3 = ">=1.24.2"
+urllib3 = ">=1.24.2,<2.4.0"
 websocket-client = ">=0.32.0,<0.40.0 || >0.40.0,<0.41.dev0 || >=0.43.dev0"
 
 [package.extras]
@@ -1833,14 +1832,14 @@ yarl = ">=1.10"
 
 [[package]]
 name = "neuro-config-client"
-version = "25.8.7"
+version = "25.9.4"
 description = "Internal client for Neu.ro config service"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "neuro_config_client-25.8.7-py3-none-any.whl", hash = "sha256:784336b6e97305bbb3773eb50c8d2c839979152b9b35eadb2991a16a7d115e9e"},
-    {file = "neuro_config_client-25.8.7.tar.gz", hash = "sha256:28362491f161b9f111d53ce03cee8402b7db63c2821667a11b12cb385ef3a0dd"},
+    {file = "neuro_config_client-25.9.4-py3-none-any.whl", hash = "sha256:b2a3ab0bafc494111f38f6f09f6760c96f72487ff61b4e8b1f9ac65685af5ece"},
+    {file = "neuro_config_client-25.9.4.tar.gz", hash = "sha256:ee6b76de0be163ea0cfbbe34edd99a26007f14b797aa2dd19af5412778022418"},
 ]
 
 [package.dependencies]
@@ -1849,22 +1848,21 @@ tzdata = "*"
 
 [[package]]
 name = "neuro-logging"
-version = "25.6.1"
+version = "25.10.0"
 description = "Logging client for Neu.ro platform services"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "neuro_logging-25.6.1-py3-none-any.whl", hash = "sha256:13a981110eb6fc21371c0691cf71280394652655c154e6fdc32d39177b89e19b"},
-    {file = "neuro_logging-25.6.1.tar.gz", hash = "sha256:934af7c79054530f774898da2d3692faae207a6233fd44dda80b40afbe00661b"},
+    {file = "neuro_logging-25.10.0-py3-none-any.whl", hash = "sha256:01c456a5ad2fb75b2e43bb2f619020acab0b342ea9a05344d5a367d1e0f57e07"},
+    {file = "neuro_logging-25.10.0.tar.gz", hash = "sha256:fb66b219d3916835a99dbbb6016388d1ead35eaff92ce7e6c4e9040fe7b4ba14"},
 ]
 
 [package.dependencies]
 aiohttp = ">=3.8,<4.0"
 orjson = ">=3.10.12"
 python-json-logger = ">=3.2.1"
-sentry-sdk = ">=2.19.2,<2.32"
-urllib3 = ">=2.5.0"
+sentry-sdk = ">=2.19.2,<2.40"
 
 [[package]]
 name = "nodeenv"
@@ -3243,14 +3241,14 @@ files = [
 
 [[package]]
 name = "urllib3"
-version = "2.5.0"
+version = "2.3.0"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
 python-versions = ">=3.9"
 groups = ["main", "dev"]
 files = [
-    {file = "urllib3-2.5.0-py3-none-any.whl", hash = "sha256:e6b01673c0fa6a13e374b50871808eb3bf7046c4b125b216f6bf1cc604cff0dc"},
-    {file = "urllib3-2.5.0.tar.gz", hash = "sha256:3fc47733c7e419d4bc3f6b3dc2b4f890bb743906a30d56ba4a5bfa4bbff92760"},
+    {file = "urllib3-2.3.0-py3-none-any.whl", hash = "sha256:1cee9ad369867bfdbbb48b7dd50374c0967a0bb7710050facf0dd6911440e3df"},
+    {file = "urllib3-2.3.0.tar.gz", hash = "sha256:f8c5449b3cf0861679ce7e0503c7b44b5ec981bec0d1d3795a07f1ba96f0204d"},
 ]
 
 [package.extras]
@@ -3529,4 +3527,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "0347dba15d2c87ca11c5fcc578480595583d7776076905ac43801aaf01f50e04"
+content-hash = "ac4306d181f03b113f11e5759202ebc7b06a8a06c80f5ba8ed3c8ddd02823bd6"

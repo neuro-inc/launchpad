@@ -1,8 +1,9 @@
 from apolo_app_types.outputs.base import BaseAppOutputsProcessor
-from apolo_app_types.clients.kube import get_service_host_port
+from apolo_app_types.clients.kube import get_service_host_port, get_middlewares
 from apolo_app_types.outputs.common import INSTANCE_LABEL
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
+from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
 from .types import (
     KeycloakConfig,
     LaunchpadAppOutputs,
@@ -77,6 +78,15 @@ async def get_launchpad_outputs(
 
     keycloak_password = helm_values["keycloak"]["auth"]["adminPassword"]
 
+    middlewares = await get_middlewares(labels, namespace="platform")
+    middleware_name = None
+    if middlewares:
+        print(f"Found {len(middlewares)} middlewares")
+        middleware_name = middlewares[0]["metadata"]["name"]
+        print(f"Using middleware: {middleware_name}")
+    else:
+        print("No middlewares found")
+
     outputs = LaunchpadAppOutputs(
         app_url=ServiceAPI[WebApp](
             internal_url=internal_web_app_url,
@@ -88,6 +98,9 @@ async def get_launchpad_outputs(
                 external_url=keycloak_external_web_app_url,
             ),
             auth_admin_password=keycloak_password,
+            auth_middleware=AuthIngressMiddleware(
+                name=f"platform-{middleware_name}"
+            )
         ),
         installed_apps=None,
     )

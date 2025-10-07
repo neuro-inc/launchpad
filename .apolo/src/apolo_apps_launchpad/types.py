@@ -18,6 +18,7 @@ from apolo_app_types.protocols.common.preset import Preset
 from apolo_app_types.protocols.common.schema_extra import SchemaExtraMetadata
 from apolo_app_types.protocols.common.secrets_ import OptionalSecret
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
+from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
 
 
 class PreConfiguredLLMModels(enum.StrEnum):
@@ -296,6 +297,13 @@ class KeycloakConfig(AbstractAppFieldType):
         json_schema_extra=SchemaExtraMetadata(
             title="Keycloak Admin Password",
             description="Password for the Keycloak admin user.",
+        ).as_json_schema_extra(),
+    )
+    auth_middleware: AuthIngressMiddleware = Field(
+        ...,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Keycloak Auth Middleware",
+            description="Authentication middleware configuration for Keycloak.",
         ).as_json_schema_extra(),
     )
 

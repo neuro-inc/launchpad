@@ -4,6 +4,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "3"
   labels:
+    {{- include "launchpad.labels" . | nindent 4 }}
     application: launchpad
   name: {{ include "launchpad.name" . }}-auth-middleware
   namespace: platform
