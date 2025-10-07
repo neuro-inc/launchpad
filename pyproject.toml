@@ -77,7 +77,7 @@ backoff = "^2.2.1"
 pyjwt = "^2.10.1"
 asyncache = "^0.3.1"
 asyncpg = "^0.30.0"
-apolo-app-types = "v25.10.8"
+apolo-app-types = "v25.10.9"
 apolo-sdk = "v25.9.1"
 
 [tool.poetry.group.dev.dependencies]

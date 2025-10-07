@@ -330,6 +330,5 @@ class LaunchpadAppOutputs(AppOutputs):
             title="Keycloak Auth Middleware",
             description="Authentication middleware used to enable custom authentication "
             "for other applications.",
-            meta_type=SchemaMetaType.INTEGRATION,
         ).as_json_schema_extra(),
     )

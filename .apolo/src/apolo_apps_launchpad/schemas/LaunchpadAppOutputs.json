@@ -50,7 +50,7 @@
       "type": "object",
       "x-description": "Configure authentication middleware for ingress traffic.",
       "x-is-advanced-field": false,
-      "x-meta-type": "inline",
+      "x-meta-type": "integration",
       "x-title": "Authentication Ingress Middleware",
       "x-type": "AuthIngressMiddleware"
     },
