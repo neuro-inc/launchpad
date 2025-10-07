@@ -53,5 +53,5 @@ push-hook-image:
 
 .PHONY: gen-types-schemas
 gen-types-schemas:
-	app-types dump-types-schema .apolo/src/apolo_apps_launchpad launchpad LaunchpadAppInputs .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppInputs.json
-	app-types dump-types-schema .apolo/src/apolo_apps_launchpad launchpad LaunchpadAppOutputs .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppOutputs.json
+	app-types dump-types-schema .apolo/src/apolo_apps_launchpad LaunchpadAppInputs .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppInputs.json
+	app-types dump-types-schema .apolo/src/apolo_apps_launchpad LaunchpadAppOutputs .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppOutputs.json

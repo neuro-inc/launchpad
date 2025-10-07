@@ -31,6 +31,29 @@
       "x-title": "App Instance",
       "x-type": "AppInstance"
     },
+    "AuthIngressMiddleware": {
+      "properties": {
+        "name": {
+          "pattern": "^platform",
+          "title": "Name",
+          "type": "string",
+          "x-description": "Name of the authentication middleware (with namespace) to apply to ingress traffic.",
+          "x-is-advanced-field": false,
+          "x-meta-type": "inline",
+          "x-title": "Middleware Name"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "AuthIngressMiddleware",
+      "type": "object",
+      "x-description": "Configure authentication middleware for ingress traffic.",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "Authentication Ingress Middleware",
+      "x-type": "AuthIngressMiddleware"
+    },
     "HttpApi": {
       "properties": {
         "host": {
@@ -327,8 +350,25 @@
         }
       ],
       "default": null
+    },
+    "auth_middleware": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AuthIngressMiddleware"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "x-description": "Authentication middleware used to enable custom authentication for other applications.",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "Keycloak Auth Middleware"
     }
   },
+  "required": [
+    "auth_middleware"
+  ],
   "title": "LaunchpadAppOutputs",
   "type": "object"
 }

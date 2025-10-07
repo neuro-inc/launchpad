@@ -49,9 +49,6 @@
             },
             {
               "$ref": "#/$defs/OpenWebUIConfig"
-            },
-            {
-              "type": "null"
             }
           ],
           "title": "Quick Start Config"
@@ -285,7 +282,7 @@
       ],
       "title": "NoQuickStartConfig",
       "type": "object",
-      "x-description": "Install only Launchpad. You can add new Apps to Launchpad later",
+      "x-description": "Install only Launchpad. You can add new apps to Launchpad later",
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
       "x-title": "No Startup Apps",
