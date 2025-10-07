@@ -11,6 +11,14 @@ from .types import (
 import typing as t
 
 
+def get_launchpad_name(apolo_app_id: str) -> str:
+    """
+    Construct launchpad name using helm chart logic.
+    Mirrors the template: {{ printf "launchpad-%s" .Values.apolo_app_id | trunc 63 | trimSuffix "-" }}
+    """
+    return f"launchpad-{apolo_app_id}"[:63].rstrip("-")
+
+
 async def get_launchpad_outputs(
     helm_values: dict[str, t.Any],
     app_instance_id: str,
@@ -78,14 +86,9 @@ async def get_launchpad_outputs(
 
     keycloak_password = helm_values["keycloak"]["auth"]["adminPassword"]
 
-    middlewares = await get_middlewares(labels, namespace="platform")
-    middleware_name = None
-    if middlewares:
-        print(f"Found {len(middlewares)} middlewares")
-        middleware_name = middlewares[0]["metadata"]["name"]
-        print(f"Using middleware: {middleware_name}")
-    else:
-        print("No middlewares found")
+    # Construct middleware name using helm chart logic: launchpad-{apolo_app_id}-auth-middleware
+    launchpad_name = get_launchpad_name(app_instance_id)
+    middleware_name = f"{launchpad_name}-auth-middleware"
 
     outputs = LaunchpadAppOutputs(
         app_url=ServiceAPI[WebApp](
