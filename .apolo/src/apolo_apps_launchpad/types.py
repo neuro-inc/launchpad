@@ -299,13 +299,6 @@ class KeycloakConfig(AbstractAppFieldType):
             description="Password for the Keycloak admin user.",
         ).as_json_schema_extra(),
     )
-    auth_middleware: AuthIngressMiddleware = Field(
-        ...,
-        json_schema_extra=SchemaExtraMetadata(
-            title="Keycloak Auth Middleware",
-            description="Authentication middleware configuration for Keycloak.",
-        ).as_json_schema_extra(),
-    )
 
 
 class InstalledApps(AbstractAppFieldType):
@@ -328,3 +321,11 @@ class InstalledApps(AbstractAppFieldType):
 class LaunchpadAppOutputs(AppOutputs):
     keycloak_config: KeycloakConfig | None = None
     installed_apps: InstalledApps | None = None
+    auth_middleware: AuthIngressMiddleware = Field(
+        ...,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Keycloak Auth Middleware",
+            description="Authentication middleware used to enable custom authentication "
+            "for other applications.",
+        ).as_json_schema_extra(),
+    )

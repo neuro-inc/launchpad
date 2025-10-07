@@ -101,11 +101,11 @@ async def get_launchpad_outputs(
                 external_url=keycloak_external_web_app_url,
             ),
             auth_admin_password=keycloak_password,
-            auth_middleware=AuthIngressMiddleware(
-                name=f"platform-{middleware_name}"
-            )
         ),
         installed_apps=None,
+        auth_middleware=AuthIngressMiddleware(
+            name=f"platform-{middleware_name}"
+        )
     )
     return outputs.model_dump()
 
