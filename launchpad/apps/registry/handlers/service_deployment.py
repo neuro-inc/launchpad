@@ -23,9 +23,7 @@ class ServiceDeploymentContext(BaseContext):
 
 
 class ServiceDeploymentApp(GenericApp):
-    def __init__(
-        self, context: ServiceDeploymentContext, **kwargs: Any
-    ) -> None:
+    def __init__(self, context: ServiceDeploymentContext, **kwargs: Any) -> None:
         super().__init__(context=context, **kwargs)
 
     async def _generate_inputs(self) -> dict[str, Any]:

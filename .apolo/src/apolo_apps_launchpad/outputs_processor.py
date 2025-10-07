@@ -1,5 +1,5 @@
 from apolo_app_types.outputs.base import BaseAppOutputsProcessor
-from apolo_app_types.clients.kube import get_service_host_port, get_middlewares
+from apolo_app_types.clients.kube import get_service_host_port
 from apolo_app_types.outputs.common import INSTANCE_LABEL
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
@@ -103,9 +103,7 @@ async def get_launchpad_outputs(
             auth_admin_password=keycloak_password,
         ),
         installed_apps=None,
-        auth_middleware=AuthIngressMiddleware(
-            name=f"platform-{middleware_name}"
-        )
+        auth_middleware=AuthIngressMiddleware(name=f"platform-{middleware_name}"),
     )
     return outputs.model_dump()
 

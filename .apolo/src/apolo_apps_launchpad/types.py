@@ -15,7 +15,10 @@ from apolo_app_types.protocols.common.networking import (
     ServiceAPI,
 )
 from apolo_app_types.protocols.common.preset import Preset
-from apolo_app_types.protocols.common.schema_extra import SchemaExtraMetadata
+from apolo_app_types.protocols.common.schema_extra import (
+    SchemaExtraMetadata,
+    SchemaMetaType,
+)
 from apolo_app_types.protocols.common.secrets_ import OptionalSecret
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
@@ -321,11 +324,12 @@ class InstalledApps(AbstractAppFieldType):
 class LaunchpadAppOutputs(AppOutputs):
     keycloak_config: KeycloakConfig | None = None
     installed_apps: InstalledApps | None = None
-    auth_middleware: AuthIngressMiddleware = Field(
+    auth_middleware: AuthIngressMiddleware | None = Field(
         ...,
         json_schema_extra=SchemaExtraMetadata(
             title="Keycloak Auth Middleware",
             description="Authentication middleware used to enable custom authentication "
             "for other applications.",
+            meta_type=SchemaMetaType.INTEGRATION,
         ).as_json_schema_extra(),
     )
