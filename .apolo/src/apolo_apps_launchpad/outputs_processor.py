@@ -87,9 +87,10 @@ async def get_launchpad_outputs(
     keycloak_password = helm_values["keycloak"]["auth"]["adminPassword"]
 
     # Construct middleware name using helm chart logic: launchpad-{apolo_app_id}-auth-middleware
-    launchpad_name = get_launchpad_name(app_instance_id)
+    launchpad_name = get_launchpad_name(helm_values.get("apolo_app_id", ""))
     middleware_name = f"platform-{launchpad_name}-auth-middleware"
     print(f"App instance ID: {app_instance_id}")
+    print(f"Apolo App ID: {helm_values.get('apolo_app_id', '')}")
     print(f"Launchpad name: {launchpad_name}")
     print(f"Full middleware name: {middleware_name}")
 
