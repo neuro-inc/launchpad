@@ -271,14 +271,14 @@
     },
     "NoQuickStartConfig": {
       "properties": {
-        "quickstart_type": {
+        "type": {
           "const": "no_quickstart",
-          "title": "Quickstart Type",
+          "title": "Type",
           "type": "string"
         }
       },
       "required": [
-        "quickstart_type"
+        "type"
       ],
       "title": "NoQuickStartConfig",
       "type": "object",
@@ -290,11 +290,6 @@
     },
     "OpenWebUIConfig": {
       "properties": {
-        "quickstart_type": {
-          "const": "openwebui",
-          "title": "Quickstart Type",
-          "type": "string"
-        },
         "llm_config": {
           "$ref": "#/$defs/LLMConfig"
         },
@@ -306,7 +301,6 @@
         }
       },
       "required": [
-        "quickstart_type",
         "llm_config",
         "postgres_config",
         "embeddings_config"
