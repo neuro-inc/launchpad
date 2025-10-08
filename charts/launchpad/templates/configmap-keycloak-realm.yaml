@@ -445,6 +445,8 @@ data:
         {
           "username": "admin",
           "email": "admin@launchpad",
+          "firstName": "Admin",
+          "lastName": "User",
           "enabled": true,
           "emailVerified": true,
           "credentials": [
