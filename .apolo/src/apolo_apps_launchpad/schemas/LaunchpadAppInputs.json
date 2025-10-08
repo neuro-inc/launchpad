@@ -290,6 +290,11 @@
     },
     "OpenWebUIConfig": {
       "properties": {
+        "type": {
+          "const": "openwebui",
+          "title": "Type",
+          "type": "string"
+        },
         "llm_config": {
           "$ref": "#/$defs/LLMConfig"
         },
@@ -301,6 +306,7 @@
         }
       },
       "required": [
+        "type",
         "llm_config",
         "postgres_config",
         "embeddings_config"
