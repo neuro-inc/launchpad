@@ -456,7 +456,7 @@ data:
               "temporary": false
             }
           ],
-          "realmRoles: ["default-roles-master"],
+          "realmRoles": ["default-roles-master"],
           "clientRoles": {
             "frontend": ["admin"]
           }
