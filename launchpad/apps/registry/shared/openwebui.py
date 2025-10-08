@@ -90,9 +90,11 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
     async def _generate_inputs(self) -> dict[str, Any]:
         return {
             "networking_config": {
-                "ingress_http": {"auth": {"type":"no_auth"}},
-                "advanced_networking": {
-                    "ingress_middleware": {"name": self._context.auth_middleware_name}
+                "ingress_http": {
+                    "auth": {
+                        "middleware": {"name": self._context.auth_middleware_name},
+                        "type": "custom_auth",
+                    }
                 },
             },
             "embeddings_api": {
