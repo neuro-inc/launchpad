@@ -7,6 +7,7 @@ from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
 from .types import (
     KeycloakConfig,
     LaunchpadAppOutputs,
+    LaunchpadDefaultAdminUser,
 )
 import typing as t
 
@@ -108,6 +109,11 @@ async def get_launchpad_outputs(
         ),
         installed_apps=None,
         auth_middleware=AuthIngressMiddleware(name=middleware_name),
+        admin_user=LaunchpadDefaultAdminUser(
+            username="admin",
+            email="admin@launchpad.com",
+            password=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],
+        ),
     )
     return outputs.model_dump()
 

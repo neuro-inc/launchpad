@@ -17,7 +17,6 @@ from apolo_app_types.protocols.common.networking import (
 from apolo_app_types.protocols.common.preset import Preset
 from apolo_app_types.protocols.common.schema_extra import (
     SchemaExtraMetadata,
-    SchemaMetaType,
 )
 from apolo_app_types.protocols.common.secrets_ import OptionalSecret
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
@@ -288,11 +287,6 @@ class LaunchpadConfig(AbstractAppFieldType):
     )
 
 
-class LaunchpadAppInputs(AppInputs):
-    launchpad_config: LaunchpadConfig
-    apps_config: AppsConfig
-
-
 class KeycloakConfig(AbstractAppFieldType):
     web_app_url: ServiceAPI[HttpApi]
     auth_admin_password: str = Field(
@@ -321,6 +315,26 @@ class InstalledApps(AbstractAppFieldType):
     )
 
 
+class LaunchpadDefaultAdminUser(AbstractAppFieldType):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Launchpad Default Admin User",
+            description="Default admin user created on installation that "
+            "can be used to add new app templates and app instances to this "
+            "Launchpad instance",
+        ),
+    )
+    username: str
+    email: str
+    password: str
+
+
+class LaunchpadAppInputs(AppInputs):
+    launchpad_config: LaunchpadConfig
+    apps_config: AppsConfig
+
+
 class LaunchpadAppOutputs(AppOutputs):
     keycloak_config: KeycloakConfig | None = None
     installed_apps: InstalledApps | None = None
@@ -332,3 +346,4 @@ class LaunchpadAppOutputs(AppOutputs):
             "for other applications.",
         ).as_json_schema_extra(),
     )
+    admin_user: LaunchpadDefaultAdminUser | None = None

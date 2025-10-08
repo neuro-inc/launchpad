@@ -164,6 +164,30 @@
       "x-title": "",
       "x-type": "KeycloakConfig"
     },
+    "LaunchpadDefaultAdminUser": {
+      "properties": {
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "email": {
+          "title": "Email",
+          "type": "string"
+        },
+        "password": {
+          "title": "Password",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "email",
+        "password"
+      ],
+      "title": "LaunchpadDefaultAdminUser",
+      "type": "object",
+      "x-type": "LaunchpadDefaultAdminUser"
+    },
     "ServiceAPI_HttpApi_": {
       "properties": {
         "internal_url": {
@@ -364,6 +388,17 @@
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
       "x-title": "Keycloak Auth Middleware"
+    },
+    "admin_user": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LaunchpadDefaultAdminUser"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
