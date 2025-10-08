@@ -323,7 +323,7 @@ class LaunchpadDefaultAdminUser(AbstractAppFieldType):
             description="Default admin user created on installation that "
             "can be used to add new app templates and app instances to this "
             "Launchpad instance",
-        ),
+        ).as_json_schema_extra(),
     )
     username: str
     email: str

@@ -25,6 +25,7 @@ from .types import (
     PreConfiguredHuggingFaceLLMModel,
     PreConfiguredLLMModels,
     OpenWebUIConfig,
+    NoQuickStartConfig,
 )
 from apolo_app_types.protocols.postgres import (
     PGBackupConfig,
@@ -51,16 +52,19 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         self,
         input_: LaunchpadAppInputs,
     ) -> LLMInputs:
+        if isinstance(input_.apps_config.quick_start_config, NoQuickStartConfig):
+            raise Exception("NoQuickStartConfig is not allowed for this method")
+
         llm_extra_args: list[str] = []
         if isinstance(
-            input_.apps_config.llm_config.model, PreConfiguredHuggingFaceLLMModel
+            input_.apps_config.quick_start_config.llm_config.model, PreConfiguredHuggingFaceLLMModel
         ):
             llm_model = HuggingFaceModel(
-                model_hf_name=input_.apps_config.llm_config.model.model.value,
-                hf_token=input_.apps_config.llm_config.model.hf_token,
+                model_hf_name=input_.apps_config.quick_start_config.llm_config.model.model.value,
+                hf_token=input_.apps_config.quick_start_config.llm_config.model.hf_token,
             )
-            llm_extra_args = input_.apps_config.llm_config.model.server_extra_args
-            match input_.apps_config.llm_config.model.model:
+            llm_extra_args = input_.apps_config.quick_start_config.llm_config.model.server_extra_args
+            match input_.apps_config.quick_start_config.llm_config.model.model:
                 case PreConfiguredLLMModels.MAGISTRAL_24B:
                     llm_extra_args.extend(
                         [
@@ -72,15 +76,15 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                             "--tensor-parallel-size=2",
                         ]
                     )
-        elif isinstance(input_.apps_config.llm_config.model, HuggingFaceLLMModel):
-            llm_model = input_.apps_config.llm_config.model.hf_model
-            llm_extra_args = input_.apps_config.llm_config.model.server_extra_args
-        elif isinstance(input_.apps_config.llm_config.model, CustomLLMModel):
+        elif isinstance(input_.apps_config.quick_start_config.llm_config.model, HuggingFaceLLMModel):
+            llm_model = input_.apps_config.quick_start_config.llm_config.model.hf_model
+            llm_extra_args = input_.apps_config.quick_start_config.llm_config.model.server_extra_args
+        elif isinstance(input_.apps_config.quick_start_config.llm_config.model, CustomLLMModel):
             # For custom models, we use the model_name as both model and tokenizer
             llm_model = HuggingFaceModel(
-                model_hf_name=input_.apps_config.llm_config.model.model_name,
+                model_hf_name=input_.apps_config.quick_start_config.llm_config.model.model_name,
             )
-            llm_extra_args = input_.apps_config.llm_config.model.server_extra_args
+            llm_extra_args = input_.apps_config.quick_start_config.llm_config.model.server_extra_args
         else:
             err = (
                 "Unsupported LLM model type. Expected "
@@ -90,10 +94,10 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             raise ValueError(err)
 
         # Determine cache configuration based on model type
-        if isinstance(input_.apps_config.llm_config.model, CustomLLMModel):
+        if isinstance(input_.apps_config.quick_start_config.llm_config.model, CustomLLMModel):
             # For custom models, mount the model path as cache
             cache_config = HuggingFaceCache(
-                files_path=input_.apps_config.llm_config.model.model_apolo_path
+                files_path=input_.apps_config.quick_start_config.llm_config.model.model_apolo_path
             )
         else:
             # For HuggingFace models, use the standard cache
@@ -104,7 +108,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         return LLMInputs(
             hugging_face_model=llm_model,
             tokenizer_hf_name=llm_model.model_hf_name,
-            preset=input_.apps_config.llm_config.llm_preset,
+            preset=input_.apps_config.quick_start_config.llm_config.llm_preset,
             server_extra_args=llm_extra_args,
             cache_config=cache_config,
         )
@@ -113,15 +117,18 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         self,
         input_: LaunchpadAppInputs,
     ) -> PostgresInputs:
+        if isinstance(input_.apps_config.quick_start_config, NoQuickStartConfig):
+            raise Exception("NoQuickStartConfig is not allowed for this method")
+        
         return PostgresInputs(
-            preset=input_.apps_config.postgres_config.preset,
+            preset=input_.apps_config.quick_start_config.postgres_config.preset,
             postgres_config=PostgresConfig(
-                instance_replicas=input_.apps_config.postgres_config.replicas,
+                instance_replicas=input_.apps_config.quick_start_config.postgres_config.replicas,
                 db_users=[PostgresDBUser(name="launchpaduser", db_names=["launchpad"])],
             ),
             pg_bouncer=PGBouncer(
-                preset=input_.apps_config.postgres_config.preset,
-                replicas=input_.apps_config.postgres_config.replicas,
+                preset=input_.apps_config.quick_start_config.postgres_config.preset,
+                replicas=input_.apps_config.quick_start_config.postgres_config.replicas,
             ),
             backup=PGBackupConfig(enable=True),
         )
@@ -130,28 +137,31 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         self,
         input_: LaunchpadAppInputs,
     ) -> TextEmbeddingsInferenceAppInputs:
+        if isinstance(input_.apps_config.quick_start_config, NoQuickStartConfig):
+            raise Exception("NoQuickStartConfig is not allowed for this method")
+        
         extra_args: list[str] = []
         if isinstance(
-            input_.apps_config.embeddings_config.model,
+            input_.apps_config.quick_start_config.embeddings_config.model,
             PreConfiguredEmbeddingsModels,
         ):
-            model_name = input_.apps_config.embeddings_config.model.value
+            model_name = input_.apps_config.quick_start_config.embeddings_config.model.value
             model = HuggingFaceModel(
                 model_hf_name=model_name,
             )
         elif isinstance(
-            input_.apps_config.embeddings_config.model,
+            input_.apps_config.quick_start_config.embeddings_config.model,
             HuggingFaceEmbeddingsModel,
         ):
-            model = input_.apps_config.embeddings_config.model.hf_model
-            extra_args = input_.apps_config.embeddings_config.model.server_extra_args
+            model = input_.apps_config.quick_start_config.embeddings_config.model.hf_model
+            extra_args = input_.apps_config.quick_start_config.embeddings_config.model.server_extra_args
         else:
             err = "Unsupported embeddings model type."
             raise ValueError(err)
 
         return TextEmbeddingsInferenceAppInputs(
             model=model,
-            preset=input_.apps_config.embeddings_config.preset,
+            preset=input_.apps_config.quick_start_config.embeddings_config.preset,
             server_extra_args=extra_args,
         )
 
