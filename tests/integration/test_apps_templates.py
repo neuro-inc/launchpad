@@ -229,7 +229,9 @@ class TestHandlerAppInstall:
         # Now install OpenWebUI
         response = app_client.post("/api/v1/apps/openwebui")
 
-        assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.json()}"
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 but got {response.status_code}: {response.json()}"
         data = response.json()
 
         # Verify app was installed with correct name
@@ -258,7 +260,9 @@ class TestHandlerAppInstall:
         # Now install the app
         response = app_client.post("/api/v1/apps/test-service")
 
-        assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.json()}"
+        assert (
+            response.status_code == 200
+        ), f"Expected 200 but got {response.status_code}: {response.json()}"
         data = response.json()
 
         # Verify app was installed
@@ -296,6 +300,68 @@ class TestHandlerAppInstall:
         assert response.status_code == 200
         data = response.json()
         assert data["launchpad_app_name"] == "custom-service"
+
+    def test_service_deployment_adds_middleware_to_payload(
+        self, app_client: TestClient, mock_apps_api_client
+    ) -> None:
+        """Test that ServiceDeploymentApp adds ingress_middleware to the Apps API payload"""
+        # Import template with ServiceDeploymentApp handler
+        app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "service-deployment",
+                "template_version": "1.0.0",
+                "name": "middleware-test",
+                "handler_class": "ServiceDeploymentApp",
+                "default_inputs": {
+                    "displayName": "Test Service",
+                    "preset": {"name": "cpu-small"},
+                },
+            },
+        )
+
+        # Install the app
+        response = app_client.post("/api/v1/apps/middleware-test")
+        assert (
+            response.status_code == 200
+        ), f"Failed: {response.status_code} - {response.json()}"
+
+        # Check that install_app was called with the correct payload
+        mock_apps_api_client.install_app.assert_called()
+        call_args = mock_apps_api_client.install_app.call_args
+
+        # Extract the payload from the call
+        payload = call_args[1]["payload"]  # kwargs
+
+        # Print payload for debugging
+        import json
+
+        print("\n=== Apps API Payload ===")
+        print(json.dumps(payload, indent=2))
+        print("=== End Payload ===\n")
+
+        # Verify the middleware config was added
+        assert "input" in payload, "Payload missing 'input' field"
+        inputs = payload["input"]
+        assert (
+            "networking_config" in inputs
+        ), f"Inputs missing 'networking_config': {list(inputs.keys())}"
+        assert (
+            "advanced_networking" in inputs["networking_config"]
+        ), f"networking_config missing 'advanced_networking': {list(inputs['networking_config'].keys())}"
+        assert (
+            "ingress_middleware" in inputs["networking_config"]["advanced_networking"]
+        ), f"advanced_networking missing 'ingress_middleware': {list(inputs['networking_config']['advanced_networking'].keys())}"
+        assert (
+            inputs["networking_config"]["advanced_networking"]["ingress_middleware"][
+                "name"
+            ]
+            == "test-middleware"
+        ), f"Expected middleware name 'test-middleware' but got {inputs['networking_config']['advanced_networking']['ingress_middleware']['name']}"
+
+        # Verify original inputs are preserved
+        assert inputs["displayName"] == "Test Service"
+        assert inputs["preset"]["name"] == "cpu-small"
 
 
 class TestAppPool:

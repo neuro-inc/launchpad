@@ -253,6 +253,7 @@ class OpenWebUIConfig(AbstractAppFieldType):
             description="Install OpenWebUI and its dependencies on Launchpad startup",
         ).as_json_schema_extra(),
     )
+    type: Literal["openwebui"]
     llm_config: LLMConfig
     postgres_config: PostgresConfig
     embeddings_config: TextEmbeddingsConfig
