@@ -51,25 +51,42 @@ async def view_post_authorize(
         logger.info("unable to decode token. redirecting to keycloak")
         return oauth.redirect(original_redirect_uri=app_url)
 
+    logger.info(f"Decoded token keys: {list(decoded_token.keys())}")
+    logger.info(f"Token realm_access: {decoded_token.get('realm_access')}")
+    logger.info(f"Token groups: {decoded_token.get('groups')}")
+
     try:
         email = decoded_token["email"]
     except KeyError:
         logger.error("malformed token. forbidden")
         raise Forbidden()
 
+    # extract username from token
+    username = decoded_token.get("preferred_username", email)
+
+    # extract groups from token
+    groups = decoded_token.get("groups", [])
+    groups_str = ",".join(groups) if groups else ""
+
+    logger.info(f"Authorizing user - Email: {email}, Username: {username}, Groups: {groups_str}")
+
     # check permissions for individual apps
     if not installed_app.is_shared and email != installed_app.user_id:
         logger.info(f"permission denied for user {email}")
         raise Forbidden()
 
+    response_headers = {
+        # pass headers to a downstream app via traefik auth middleware
+        HEADER_X_AUTH_REQUEST_EMAIL: email,
+        HEADER_X_AUTH_REQUEST_USERNAME: username,
+    }
+
+    logger.info(f"Returning headers: {response_headers}")
+
     return PlainTextResponse(
         "OK",
         status_code=200,
-        headers={
-            # pass headers to a downstream app via traefik auth middleware
-            HEADER_X_AUTH_REQUEST_EMAIL: email,
-            HEADER_X_AUTH_REQUEST_USERNAME: email,
-        },
+        headers=response_headers,
     )
 
 
