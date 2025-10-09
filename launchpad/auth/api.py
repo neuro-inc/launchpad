@@ -9,6 +9,7 @@ from launchpad.auth import (
     HEADER_X_FORWARDED_HOST,
     HEADER_X_AUTH_REQUEST_EMAIL,
     HEADER_X_AUTH_REQUEST_USERNAME,
+    HEADER_X_AUTH_REQUEST_GROUPS,
 )
 from launchpad.auth.dependencies import token_from_string
 from launchpad.auth.oauth import DepOauth, OauthError
@@ -51,9 +52,9 @@ async def view_post_authorize(
         logger.info("unable to decode token. redirecting to keycloak")
         return oauth.redirect(original_redirect_uri=app_url)
 
-    logger.info(f"Decoded token keys: {list(decoded_token.keys())}")
-    logger.info(f"Token realm_access: {decoded_token.get('realm_access')}")
-    logger.info(f"Token groups: {decoded_token.get('groups')}")
+    logger.debug(f"Decoded token keys: {list(decoded_token.keys())}")
+    logger.debug(f"Token realm_access: {decoded_token.get('realm_access')}")
+    logger.debug(f"Token groups: {decoded_token.get('groups')}")
 
     try:
         email = decoded_token["email"]
@@ -64,11 +65,14 @@ async def view_post_authorize(
     # extract username from token
     username = decoded_token.get("preferred_username", email)
 
-    # extract groups from token
+    # extract groups from token (can be in "groups" or "realm_access.roles")
     groups = decoded_token.get("groups", [])
+    if not groups:
+        # fallback to roles if no groups claim exists
+        groups = decoded_token.get("realm_access", {}).get("roles", [])
     groups_str = ",".join(groups) if groups else ""
 
-    logger.info(f"Authorizing user - Email: {email}, Username: {username}, Groups: {groups_str}")
+    logger.debug(f"Authorizing user - Email: {email}, Username: {username}, Groups: {groups_str}")
 
     # check permissions for individual apps
     if not installed_app.is_shared and email != installed_app.user_id:
@@ -79,9 +83,10 @@ async def view_post_authorize(
         # pass headers to a downstream app via traefik auth middleware
         HEADER_X_AUTH_REQUEST_EMAIL: email,
         HEADER_X_AUTH_REQUEST_USERNAME: username,
+        HEADER_X_AUTH_REQUEST_GROUPS: groups_str,
     }
 
-    logger.info(f"Returning headers: {response_headers}")
+    logger.debug(f"Returning auth headers: {response_headers}")
 
     return PlainTextResponse(
         "OK",
