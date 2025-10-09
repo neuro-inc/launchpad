@@ -176,6 +176,10 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                     {
                         "name": "GLOBAL_LOG_LEVEL",
                         "value": "DEBUG"
+                    },
+                    {
+                        "name": "ENABLE_LOGIN_FORM",
+                        "value": "false",
                     }
                 ]
             },
