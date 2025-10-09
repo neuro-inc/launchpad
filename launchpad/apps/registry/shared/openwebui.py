@@ -122,6 +122,10 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
             "openwebui_specific": {
                 "env": [
                     {
+                        "name": "DEFAULT_USER_ROLE",
+                        "value": "user",
+                    },
+                    {
                         "name": "ENABLE_OAUTH_SIGNUP",
                         "value": "true",
                     },
@@ -143,7 +147,7 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                     },
                     {
                         "name": "OAUTH_ALLOWED_ROLES",
-                        "value": "admin,editor,viewer",
+                        "value": "admin,user",
                     },
                     {
                         "name": "OAUTH_ADMIN_ROLES",
