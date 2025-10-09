@@ -775,14 +775,14 @@ data:
             "roles",
             "profile",
             "basic",
-            "email"
+            "email",
+            "microprofile-jwt"
           ],
           "optionalClientScopes": [
             "address",
             "phone",
             "offline_access",
-            "organization",
-            "microprofile-jwt"
+            "organization"
           ]
         },
         {
@@ -1500,16 +1500,15 @@ data:
               "id": "6bb7738b-a9fc-49f4-ab66-39d0d6408806",
               "name": "groups",
               "protocol": "openid-connect",
-              "protocolMapper": "oidc-usermodel-realm-role-mapper",
+              "protocolMapper": "oidc-group-membership-mapper",
               "consentRequired": false,
               "config": {
                 "introspection.token.claim": "true",
-                "multivalued": "true",
-                "user.attribute": "foo",
+                "full.path": "false",
                 "id.token.claim": "true",
                 "access.token.claim": "true",
                 "claim.name": "groups",
-                "jsonType.label": "String"
+                "userinfo.token.claim": "true"
               }
             },
             {
