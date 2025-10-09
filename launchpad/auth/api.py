@@ -9,6 +9,7 @@ from launchpad.auth import (
     HEADER_X_FORWARDED_HOST,
     HEADER_X_AUTH_REQUEST_EMAIL,
     HEADER_X_AUTH_REQUEST_USERNAME,
+    HEADER_X_AUTH_REQUEST_GROUPS,
 )
 from launchpad.auth.dependencies import token_from_string
 from launchpad.auth.oauth import DepOauth, OauthError
@@ -62,6 +63,13 @@ async def view_post_authorize(
         logger.info(f"permission denied for user {email}")
         raise Forbidden()
 
+    # extract groups from token (can be in "groups" or "realm_access.roles")
+    groups = decoded_token.get("groups", [])
+    if not groups:
+        # fallback to roles if no groups claim exists
+        groups = decoded_token.get("realm_access", {}).get("roles", [])
+    groups_str = ",".join(groups) if groups else ""
+
     return PlainTextResponse(
         "OK",
         status_code=200,
@@ -69,6 +77,7 @@ async def view_post_authorize(
             # pass headers to a downstream app via traefik auth middleware
             HEADER_X_AUTH_REQUEST_EMAIL: email,
             HEADER_X_AUTH_REQUEST_USERNAME: email,
+            HEADER_X_AUTH_REQUEST_GROUPS: groups_str,
         },
     )
 
