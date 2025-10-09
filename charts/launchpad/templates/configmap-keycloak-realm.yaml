@@ -450,26 +450,7 @@ data:
           ]
         }
       },
-      "groups": [
-        {
-          "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-          "name": "admin",
-          "path": "/admin",
-          "attributes": {},
-          "realmRoles": [],
-          "clientRoles": {},
-          "subGroups": []
-        },
-        {
-          "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-          "name": "user",
-          "path": "/user",
-          "attributes": {},
-          "realmRoles": [],
-          "clientRoles": {},
-          "subGroups": []
-        }
-      ],
+      "groups": [],
       "users": [
         {
           "username": "admin",
@@ -488,10 +469,7 @@ data:
           "realmRoles": ["default-roles-master", "admin"],
           "clientRoles": {
             "frontend": ["admin"]
-          },
-          "groups": [
-            "/admin"
-          ]
+          }
         }
       ],
       "defaultRole": {
@@ -502,9 +480,6 @@ data:
         "clientRole": false,
         "containerId": "f3806410-a4e6-476a-b806-b2722de95259"
       },
-      "defaultGroups": [
-        "/user"
-      ],
       "requiredCredentials": [
         "password"
       ],

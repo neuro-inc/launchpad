@@ -9,7 +9,7 @@ from launchpad.apps.registry.base import BaseContext
 from launchpad.apps.registry.internal.embeddings import APP_NAME_EMBEDDINGS
 from launchpad.apps.registry.internal.llm_inference import APP_NAME_LLM_INFERENCE
 from launchpad.apps.registry.internal.postgres import APP_NAME_POSTGRES
-from launchpad.auth import HEADER_X_AUTH_REQUEST_EMAIL, HEADER_X_AUTH_REQUEST_USERNAME, HEADER_X_AUTH_REQUEST_GROUPS
+from launchpad.auth import HEADER_X_AUTH_REQUEST_EMAIL, HEADER_X_AUTH_REQUEST_USERNAME
 from launchpad.errors import BadRequest
 
 APP_NAME_OPEN_WEB_UI = "openwebui"
@@ -126,20 +126,44 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                         "value": "user",
                     },
                     {
+                        "name": "ENABLE_OAUTH_SIGNUP",
+                        "value": "true",
+                    },
+                    {
+                        "name": "ENABLE_OAUTH_GROUP_MANAGEMENT",
+                        "value": "true",
+                    },
+                    {
+                        "name": "ENABLE_OAUTH_GROUP_CREATION",
+                        "value": "true",
+                    },
+                    {
+                        "name": "OAUTH_GROUPS_CLAIM",
+                        "value": "groups",
+                    },
+                    {
+                        "name": "ENABLE_OAUTH_ROLE_MANAGEMENT",
+                        "value": "true",
+                    },
+                    {
+                        "name": "OAUTH_ALLOWED_ROLES",
+                        "value": "admin,user",
+                    },
+                    {
+                        "name": "OAUTH_ADMIN_ROLES",
+                        "value": "admin",
+                    },
+                    {
+                        "name": "OAUTH_ROLES_CLAIM",
+                        "value": "realm_access.roles",
+                    },
+                    {
                         "name": "WEBUI_AUTH_TRUSTED_EMAIL_HEADER",
                         "value": HEADER_X_AUTH_REQUEST_EMAIL,
                     },
                     {
                         "name": "WEBUI_AUTH_TRUSTED_NAME_HEADER",
                         "value": HEADER_X_AUTH_REQUEST_USERNAME,
-                    },
-                    {
-                        "name": "WEBUI_AUTH_TRUSTED_GROUPS_HEADER",
-                        "value": HEADER_X_AUTH_REQUEST_GROUPS,
-                    },
-                    {
-                        "name": "ENABLE_ADMIN_CHAT_ACCESS",
-                        "value": "true",
                     },
                     {
                         "name": "GLOBAL_LOG_LEVEL",
