@@ -444,7 +444,7 @@ data:
       "users": [
         {
           "username": "admin",
-          "email": "admin@launchpad",
+          "email": "admin@launchpad.com",
           "firstName": "Admin",
           "lastName": "User",
           "enabled": true,
