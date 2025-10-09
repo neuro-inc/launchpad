@@ -165,6 +165,10 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                         "name": "WEBUI_AUTH_TRUSTED_NAME_HEADER",
                         "value": HEADER_X_AUTH_REQUEST_USERNAME,
                     },
+                    {
+                        "name": "GLOBAL_LOG_LEVEL",
+                        "value": "DEBUG"
+                    }
                 ]
             },
         }

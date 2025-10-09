@@ -124,6 +124,15 @@ data:
             "attributes": {}
           },
           {
+            "id": "b1c2d3e4-f5g6-7h8i-9j0k-1l2m3n4o5p6q",
+            "name": "user",
+            "description": "Standard user role",
+            "composite": false,
+            "clientRole": false,
+            "containerId": "f3806410-a4e6-476a-b806-b2722de95259",
+            "attributes": {}
+          },
+          {
             "id": "06f7d60e-180b-41a7-b86c-dd52f640671e",
             "name": "default-roles-master",
             "description": "${role_default-roles}",
@@ -131,7 +140,8 @@ data:
             "composites": {
               "realm": [
                 "offline_access",
-                "uma_authorization"
+                "uma_authorization",
+                "user"
               ],
               "client": {
                 "account": [
@@ -456,7 +466,7 @@ data:
               "temporary": false
             }
           ],
-          "realmRoles": ["default-roles-master"],
+          "realmRoles": ["default-roles-master", "admin"],
           "clientRoles": {
             "frontend": ["admin"]
           }
