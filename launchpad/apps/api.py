@@ -217,8 +217,7 @@ async def view_post_import_template(
         "is_shared": false,
         "name": "my-custom-name",
         "verbose_name": "My Custom Template",
-        "description_short": "A custom template",
-        "handler_class": "CustomHandler"
+        "description_short": "A custom template"
     }
     ```
     """

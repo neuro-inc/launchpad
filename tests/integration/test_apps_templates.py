@@ -1,7 +1,6 @@
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock
 
 
 class TestTemplateImport:
@@ -92,8 +91,8 @@ class TestTemplateImport:
         assert data2["verbose_name"] == "Second Import"
         assert data2["template_version"] == "2.0.0"  # Updated
 
-    def test_import_template_with_handler_class(self, app_client: TestClient) -> None:
-        """Test importing a template with a custom handler_class"""
+    def test_import_template_with_default_inputs(self, app_client: TestClient) -> None:
+        """Test importing a template with default_inputs"""
         response = app_client.post(
             "/api/v1/apps/templates/import",
             json={
@@ -101,7 +100,6 @@ class TestTemplateImport:
                 "template_version": "1.0.0",
                 "name": "custom-service",
                 "verbose_name": "Custom Service Deployment",
-                "handler_class": "ServiceDeploymentApp",
                 "default_inputs": {
                     "displayName": "My Service",
                     "preset": {"name": "cpu-small"},
@@ -210,7 +208,7 @@ class TestGenericAppInstall:
 
 
 class TestHandlerAppInstall:
-    """Integration tests for installing apps with custom handler classes"""
+    """Integration tests for installing apps with built-in handler classes"""
 
     def test_install_openwebui_app(self, app_client: TestClient) -> None:
         """Test installing OpenWebUI app with OpenWebUIApp handler"""
@@ -238,131 +236,6 @@ class TestHandlerAppInstall:
         # Verify app was installed with correct name
         assert data["launchpad_app_name"] == "openwebui"
         assert data["is_shared"] is True
-
-    def test_install_service_deployment_app(self, app_client: TestClient) -> None:
-        """Test installing an app with ServiceDeploymentApp handler"""
-        # First import a template with ServiceDeploymentApp handler
-        import_response = app_client.post(
-            "/api/v1/apps/templates/import",
-            json={
-                "template_name": "service-deployment",
-                "template_version": "1.0.0",
-                "name": "test-service",
-                "verbose_name": "Test Service Deployment",
-                "handler_class": "ServiceDeploymentApp",
-                "default_inputs": {
-                    "displayName": "Test Service",
-                    "preset": {"name": "cpu-small"},
-                },
-            },
-        )
-        assert import_response.status_code == 200
-
-        # Now install the app
-        response = app_client.post("/api/v1/apps/test-service")
-
-        assert (
-            response.status_code == 200
-        ), f"Expected 200 but got {response.status_code}: {response.json()}"
-        data = response.json()
-
-        # Verify app was installed
-        assert data["launchpad_app_name"] == "test-service"
-        assert data["is_shared"] is True
-
-    def test_install_service_deployment_with_user_inputs(
-        self, app_client: TestClient
-    ) -> None:
-        """Test installing ServiceDeploymentApp with user-provided inputs"""
-        # Import template
-        app_client.post(
-            "/api/v1/apps/templates/import",
-            json={
-                "template_name": "service-deployment",
-                "template_version": "1.0.0",
-                "name": "custom-service",
-                "handler_class": "ServiceDeploymentApp",
-                "default_inputs": {
-                    "displayName": "Default Service",
-                    "preset": {"name": "cpu-small"},
-                },
-            },
-        )
-
-        # Install with custom inputs
-        response = app_client.post(
-            "/api/v1/apps/custom-service",
-            json={
-                "displayName": "Custom Display Name",
-                "preset": {"name": "cpu-large"},
-            },
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["launchpad_app_name"] == "custom-service"
-
-    def test_service_deployment_adds_middleware_to_payload(
-        self, app_client: TestClient, mock_apps_api_client: AsyncMock
-    ) -> None:
-        """Test that ServiceDeploymentApp adds ingress_middleware to the Apps API payload"""
-        # Import template with ServiceDeploymentApp handler
-        app_client.post(
-            "/api/v1/apps/templates/import",
-            json={
-                "template_name": "service-deployment",
-                "template_version": "1.0.0",
-                "name": "middleware-test",
-                "handler_class": "ServiceDeploymentApp",
-                "default_inputs": {
-                    "displayName": "Test Service",
-                    "preset": {"name": "cpu-small"},
-                },
-            },
-        )
-
-        # Install the app
-        response = app_client.post("/api/v1/apps/middleware-test")
-        assert (
-            response.status_code == 200
-        ), f"Failed: {response.status_code} - {response.json()}"
-
-        # Check that install_app was called with the correct payload
-        mock_apps_api_client.install_app.assert_called()
-        call_args = mock_apps_api_client.install_app.call_args
-
-        # Extract the payload from the call
-        payload = call_args[1]["payload"]  # kwargs
-
-        # Print payload for debugging
-        import json
-
-        print("\n=== Apps API Payload ===")
-        print(json.dumps(payload, indent=2))
-        print("=== End Payload ===\n")
-
-        # Verify the middleware config was added
-        assert "input" in payload, "Payload missing 'input' field"
-        inputs = payload["input"]
-        assert (
-            "networking_config" in inputs
-        ), f"Inputs missing 'networking_config': {list(inputs.keys())}"
-        assert (
-            "advanced_networking" in inputs["networking_config"]
-        ), f"networking_config missing 'advanced_networking': {list(inputs['networking_config'].keys())}"
-        assert (
-            "ingress_middleware" in inputs["networking_config"]["advanced_networking"]
-        ), f"advanced_networking missing 'ingress_middleware': {list(inputs['networking_config']['advanced_networking'].keys())}"
-        assert (
-            inputs["networking_config"]["advanced_networking"]["ingress_middleware"][
-                "name"
-            ]
-            == "test-middleware"
-        ), f"Expected middleware name 'test-middleware' but got {inputs['networking_config']['advanced_networking']['ingress_middleware']['name']}"
-
-        # Verify original inputs are preserved
-        assert inputs["displayName"] == "Test Service"
-        assert inputs["preset"]["name"] == "cpu-small"
 
 
 class TestAppPool:

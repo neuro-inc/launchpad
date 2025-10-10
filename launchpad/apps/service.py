@@ -604,7 +604,6 @@ class AppService:
         is_shared: bool = True,
         fallback_verbose_name: str | None = None,
         default_inputs: dict[str, Any] | None = None,
-        handler_class: str | None = None,
     ) -> AppTemplate:
         """
         Fetch template metadata from Apps API and create/update AppTemplate.
@@ -629,7 +628,6 @@ class AppService:
             is_shared: Whether apps from this template can be shared
             fallback_verbose_name: Fallback for verbose_name (used by import_app for display_name)
             default_inputs: Default inputs to merge when installing
-            handler_class: Custom handler class for the template
 
         Returns:
             The created/updated AppTemplate record
@@ -698,7 +696,7 @@ class AppService:
                     tags=resolved_tags,
                     is_internal=is_internal,
                     is_shared=is_shared,
-                    handler_class=handler_class,
+                    handler_class=None,
                     default_inputs=default_inputs,
                 )
 
@@ -761,7 +759,6 @@ class AppService:
             is_internal=import_request.is_internal,
             is_shared=import_request.is_shared,
             default_inputs=import_request.default_inputs,
-            handler_class=import_request.handler_class,
         )
 
     async def delete(self, app_id: UUID) -> None:

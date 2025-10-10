@@ -30,9 +30,6 @@ class ImportTemplateRequest(BaseModel):
         default_factory=dict,
         description="Default inputs to merge with user-provided inputs when installing",
     )
-    handler_class: str | None = Field(
-        None, description="Custom handler class for the template"
-    )
 
 
 class ImportAppRequest(BaseModel):
