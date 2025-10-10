@@ -164,6 +164,19 @@
       "x-title": "",
       "x-type": "KeycloakConfig"
     },
+    "LaunchpadAdminApi": {
+      "properties": {
+        "api_url": {
+          "$ref": "#/$defs/ServiceAPI_HttpApi_"
+        }
+      },
+      "required": [
+        "api_url"
+      ],
+      "title": "LaunchpadAdminApi",
+      "type": "object",
+      "x-type": "LaunchpadAdminApi"
+    },
     "LaunchpadDefaultAdminUser": {
       "properties": {
         "username": {
@@ -397,6 +410,17 @@
       "anyOf": [
         {
           "$ref": "#/$defs/LaunchpadDefaultAdminUser"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "admin_api": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LaunchpadAdminApi"
         },
         {
           "type": "null"
