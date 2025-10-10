@@ -9,7 +9,11 @@ from launchpad.apps.registry.base import BaseContext
 from launchpad.apps.registry.internal.embeddings import APP_NAME_EMBEDDINGS
 from launchpad.apps.registry.internal.llm_inference import APP_NAME_LLM_INFERENCE
 from launchpad.apps.registry.internal.postgres import APP_NAME_POSTGRES
-from launchpad.auth import HEADER_X_AUTH_REQUEST_EMAIL, HEADER_X_AUTH_REQUEST_USERNAME, HEADER_X_AUTH_REQUEST_GROUPS
+from launchpad.auth import (
+    HEADER_X_AUTH_REQUEST_EMAIL,
+    HEADER_X_AUTH_REQUEST_USERNAME,
+    HEADER_X_AUTH_REQUEST_GROUPS,
+)
 from launchpad.errors import BadRequest
 
 APP_NAME_OPEN_WEB_UI = "openwebui"
@@ -173,10 +177,7 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                         "name": "ENABLE_SIGNUP",
                         "value": "true",
                     },
-                    {
-                        "name": "GLOBAL_LOG_LEVEL",
-                        "value": "DEBUG"
-                    }
+                    {"name": "GLOBAL_LOG_LEVEL", "value": "DEBUG"},
                 ]
             },
         }

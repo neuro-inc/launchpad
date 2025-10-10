@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from unittest.mock import AsyncMock
 
 
 class TestTemplateImport:
@@ -302,7 +303,7 @@ class TestHandlerAppInstall:
         assert data["launchpad_app_name"] == "custom-service"
 
     def test_service_deployment_adds_middleware_to_payload(
-        self, app_client: TestClient, mock_apps_api_client
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
         """Test that ServiceDeploymentApp adds ingress_middleware to the Apps API payload"""
         # Import template with ServiceDeploymentApp handler

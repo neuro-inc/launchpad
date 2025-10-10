@@ -72,7 +72,9 @@ async def view_post_authorize(
         groups = decoded_token.get("realm_access", {}).get("roles", [])
     groups_str = ",".join(groups) if groups else ""
 
-    logger.debug(f"Authorizing user - Email: {email}, Username: {username}, Groups: {groups_str}")
+    logger.debug(
+        f"Authorizing user - Email: {email}, Username: {username}, Groups: {groups_str}"
+    )
 
     # check permissions for individual apps
     if not installed_app.is_shared and email != installed_app.user_id:

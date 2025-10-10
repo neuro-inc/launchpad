@@ -241,7 +241,7 @@ class NoQuickStartConfig(AbstractAppFieldType):
             description="Install only Launchpad. You can add new apps to Launchpad later",
         ).as_json_schema_extra(),
     )
-    type: Literal["no_quickstart"]
+    no_quickstart: Literal[True]
 
 
 class OpenWebUIConfig(AbstractAppFieldType):
@@ -252,6 +252,7 @@ class OpenWebUIConfig(AbstractAppFieldType):
             description="Install OpenWebUI and its dependencies on Launchpad startup",
         ).as_json_schema_extra(),
     )
+    openweb_quickstart: Literal[True]
     llm_config: LLMConfig
     postgres_config: PostgresConfig
     embeddings_config: TextEmbeddingsConfig
