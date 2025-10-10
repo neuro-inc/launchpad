@@ -29,13 +29,13 @@ ACCESS_TOKEN=$(./scripts/get-token.sh \
 
 ```bash
 LAUNCHPAD_URL="https://your-launchpad.example.com"
-USERNAME="your-username@example.com"
-PASSWORD="your-password"
+LAUNCHPAD_USERNAME="your-username@example.com"
+LAUNCHPAD_PASSWORD="your-password"
 SCOPE="openid profile email offline_access"
 
 TOKEN_RESPONSE=$(curl -s -X POST "${LAUNCHPAD_URL}/auth/token" \
     -H "Content-Type: application/json" \
-    -d "{\"username\":\"$USERNAME\",\"password\":\"$PASSWORD\",\"scope\":\"$SCOPE\"}")
+    -d "{\"username\":\"$LAUNCHPAD_USERNAME\",\"password\":\"$LAUNCHPAD_PASSWORD\",\"scope\":\"$SCOPE\"}")
 
 ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
 REFRESH_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.refresh_token')
