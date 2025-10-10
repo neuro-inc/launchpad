@@ -186,6 +186,10 @@
       ],
       "title": "LaunchpadDefaultAdminUser",
       "type": "object",
+      "x-description": "Default admin user created on installation that can be used to add new app templates and app instances to this Launchpad instance",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "Launchpad Default Admin User",
       "x-type": "LaunchpadDefaultAdminUser"
     },
     "ServiceAPI_HttpApi_": {
