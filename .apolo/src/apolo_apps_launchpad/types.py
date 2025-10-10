@@ -332,7 +332,7 @@ class LaunchpadDefaultAdminUser(AbstractAppFieldType):
 
 
 class LaunchpadAdminApi(AbstractAppFieldType):
-    model_config: ConfigDict(
+    model_config = ConfigDict(
         protected_namespaces=(),
         json_schema_extra=SchemaExtraMetadata(
             title="Launchpad Admin API",
