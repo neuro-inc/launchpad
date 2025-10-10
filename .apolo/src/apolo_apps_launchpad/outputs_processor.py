@@ -8,6 +8,7 @@ from .types import (
     KeycloakConfig,
     LaunchpadAppOutputs,
     LaunchpadDefaultAdminUser,
+    LaunchpadAdminApi,
 )
 import typing as t
 
@@ -56,6 +57,35 @@ async def get_launchpad_outputs(
             protocol="https",
         )
 
+    # -------------- API ----------------
+    launchpad_api_labels = {
+        **labels,
+        "service": "launchpad",
+    }
+    internal_host, internal_port = await get_service_host_port(
+        match_labels=launchpad_api_labels
+    )
+    internal_api_url = None
+    if internal_host:
+        internal_api_url = HttpApi(
+            host=internal_host,
+            port=int(internal_port),
+            base_path="/",
+            protocol="http",
+        )
+
+    host_port = await get_ingress_host_port(match_labels=launchpad_api_labels)
+    external_api_url = None
+    if host_port:
+        host, port = host_port
+        external_api_url = HttpApi(
+            host=host,
+            port=int(port),
+            base_path="/",
+            protocol="https",
+        )
+
+    # -------------- KEYCLOAK ----------------
     # keycloak urls
     keycloak_labels = {
         **labels,
@@ -87,6 +117,7 @@ async def get_launchpad_outputs(
 
     keycloak_password = helm_values["keycloak"]["auth"]["adminPassword"]
 
+    # -------------- MIDDLEWARE ----------------
     # Construct middleware name using helm chart logic: launchpad-{apolo_app_id}-auth-middleware
     launchpad_name = get_launchpad_name(helm_values.get("apolo_app_id", ""))
     middleware_name = f"platform-{launchpad_name}-auth-middleware"
@@ -95,6 +126,7 @@ async def get_launchpad_outputs(
     print(f"Launchpad name: {launchpad_name}")
     print(f"Full middleware name: {middleware_name}")
 
+    # -------------- FINAL OUTPUT ----------------
     outputs = LaunchpadAppOutputs(
         app_url=ServiceAPI[WebApp](
             internal_url=internal_web_app_url,
@@ -113,6 +145,12 @@ async def get_launchpad_outputs(
             username="admin",
             email="admin@launchpad.com",
             password=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],
+        ),
+        admin_api=LaunchpadAdminApi(
+            api_url=ServiceAPI[HttpApi](
+                internal_url=internal_api_url,
+                external_url=external_api_url,
+            )
         ),
     )
     return outputs.model_dump()

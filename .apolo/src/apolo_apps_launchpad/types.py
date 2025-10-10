@@ -331,6 +331,18 @@ class LaunchpadDefaultAdminUser(AbstractAppFieldType):
     password: str
 
 
+class LaunchpadAdminApi(AbstractAppFieldType):
+    model_config: ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Launchpad Admin API",
+            description="Admin API used to add new App Templates and "
+            "App Instances to Launchpad",
+        ),
+    )
+    api_url: ServiceAPI[HttpApi]
+
+
 class LaunchpadAppInputs(AppInputs):
     launchpad_config: LaunchpadConfig
     apps_config: AppsConfig
@@ -348,3 +360,4 @@ class LaunchpadAppOutputs(AppOutputs):
         ).as_json_schema_extra(),
     )
     admin_user: LaunchpadDefaultAdminUser | None = None
+    admin_api: LaunchpadAdminApi | None = None

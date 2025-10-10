@@ -1,8 +1,9 @@
 import logging
 
 from fastapi import APIRouter
+from pydantic import BaseModel
 from starlette.requests import Request
-from starlette.responses import Response, PlainTextResponse
+from starlette.responses import Response, PlainTextResponse, JSONResponse
 
 from launchpad.apps.storage import select_app
 from launchpad.auth import (
@@ -19,6 +20,50 @@ from launchpad.errors import Forbidden, Unauthorized
 logger = logging.getLogger(__name__)
 
 auth_router = APIRouter()
+
+
+class TokenRequest(BaseModel):
+    username: str
+    password: str
+    scope: str = "openid profile email offline_access"
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: int
+    refresh_token: str | None = None
+    scope: str | None = None
+
+
+@auth_router.post("/token", response_model=TokenResponse)
+async def get_token(
+    request: Request,
+    token_request: TokenRequest,
+) -> JSONResponse:
+    """
+    Obtain an access token using username and password.
+    This proxies the request to Keycloak's token endpoint.
+    """
+    keycloak_config = request.app.config.keycloak
+    token_url = f"{keycloak_config.url}/realms/{keycloak_config.realm}/protocol/openid-connect/token"
+
+    data = {
+        "grant_type": "password",
+        "client_id": keycloak_config.client_id,
+        "username": token_request.username,
+        "password": token_request.password,
+        "scope": token_request.scope,
+    }
+
+    try:
+        async with request.app.http.post(token_url, data=data, ssl=False) as response:
+            response.raise_for_status()
+            token_data = await response.json()
+            return JSONResponse(content=token_data)
+    except Exception as e:
+        logger.error(f"Failed to obtain token from Keycloak: {e}")
+        raise Unauthorized("Failed to authenticate with provided credentials")
 
 
 @auth_router.get("/authorize", status_code=200)
