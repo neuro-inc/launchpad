@@ -79,12 +79,31 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            github.rest.issues.createComment({
+            const imageTag = '${{ env.IMAGE_TAG }}';
+            const commentBody = `🐳 Docker image for this PR has been built and pushed:\n\n\`ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${imageTag}\``;
+
+            // Get all comments on the PR
+            const { data: comments } = await github.rest.issues.listComments({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🐳 Docker image for this PR has been built and pushed:\n\n\`ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}\``
-            })
+            });
+
+            // Check if bot already commented
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('Docker image for this PR has been built')
+            );
+
+            // Only create comment if it doesn't exist
+            if (!botComment) {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody
+              });
+            }
 
   release-hook-image:
     name: Release hook image
