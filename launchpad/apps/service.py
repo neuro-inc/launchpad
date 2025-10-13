@@ -1,13 +1,23 @@
 import asyncio
 import logging
-from typing import Annotated, Any, Any as AnyType, cast
+from typing import TYPE_CHECKING, Annotated, Any, Any as AnyType, cast
 from uuid import UUID
 
 import backoff
 from fastapi import Depends
 from starlette.requests import Request
 
-from launchpad.app import Launchpad
+
+if TYPE_CHECKING:
+    from launchpad.app import Launchpad
+
+from launchpad.apps.exceptions import (
+    AppMissingUrlError,
+    AppNotInstalledError,
+    AppServiceError,
+    AppTemplateNotFound,
+    AppUnhealthyError,
+)
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.registry import (
     APPS_CONTEXT,
@@ -37,25 +47,8 @@ logger = logging.getLogger(__name__)
 HEALTHY_STATUSES = {"queued", "progressing", "healthy"}
 
 
-class AppServiceError(Exception): ...
-
-
-class AppNotInstalledError(AppServiceError): ...
-
-
-class AppUnhealthyError(AppServiceError):
-    def __init__(self, app_id: UUID):
-        self.app_id = app_id
-
-
-class AppTemplateNotFound(AppServiceError): ...
-
-
-class AppMissingUrlError(AppServiceError): ...
-
-
 class AppService:
-    def __init__(self, app: Launchpad):
+    def __init__(self, app: "Launchpad"):
         self._db = app.db
         self._apps_api_client = app.apps_api_client
         self._instance_id = app.config.instance_id
@@ -820,7 +813,7 @@ class AppService:
 
 
 async def dep_app_service(request: Request) -> AppService:
-    app: Launchpad = request.app
+    app: "Launchpad" = request.app
     return app.app_service
 
 

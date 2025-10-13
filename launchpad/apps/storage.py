@@ -2,7 +2,7 @@ import logging
 import typing
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, delete, select
+from sqlalchemy import and_, delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -91,7 +91,6 @@ async def update_app_url(
     url: str,
 ) -> InstalledApp | None:
     """Update the URL of an installed app"""
-    from sqlalchemy import update
 
     query = (
         update(InstalledApp)

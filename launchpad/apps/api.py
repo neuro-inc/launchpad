@@ -7,6 +7,12 @@ from starlette.requests import Request
 from starlette.status import HTTP_200_OK
 
 from launchpad.app import Launchpad
+from launchpad.apps.exceptions import (
+    AppNotInstalledError,
+    AppServiceError,
+    AppTemplateNotFound,
+    AppUnhealthyError,
+)
 from launchpad.apps.resources import (
     GenericAppInstallRequest,
     ImportAppRequest,
@@ -15,13 +21,7 @@ from launchpad.apps.resources import (
     LaunchpadInstalledAppRead,
     LaunchpadTemplateRead,
 )
-from launchpad.apps.service import (
-    AppNotInstalledError,
-    AppServiceError,
-    AppTemplateNotFound,
-    AppUnhealthyError,
-    DepAppService,
-)
+from launchpad.apps.service import DepAppService
 from launchpad.apps.template_storage import insert_template, list_templates
 from launchpad.auth.dependencies import AdminAuth, Auth
 from launchpad.db.dependencies import Db

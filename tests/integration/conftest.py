@@ -2,14 +2,19 @@ import logging
 from collections.abc import Iterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
 from testcontainers.postgres import PostgresContainer
 from yarl import URL
 
 from launchpad.app_factory import create_app
+from launchpad.auth.dependencies import (
+    admin_role_required,
+    auth_required,
+)
 from launchpad.auth.models import User
 from launchpad.config import (
     ApoloConfig,
@@ -19,6 +24,7 @@ from launchpad.config import (
     PostgresConfig,
     ServerConfig,
 )
+from launchpad.db.base import Base
 
 
 # Suppress verbose logging from libraries during tests
@@ -124,7 +130,6 @@ def mock_apps_api_client() -> AsyncMock:
         }
 
     # Mock install_app response
-    from uuid import uuid4
 
     def install_app_side_effect(payload: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -159,9 +164,6 @@ def app_client(
 ) -> Iterator[TestClient]:
     """Create test client with mocked dependencies and real PostgreSQL"""
     # Create tables before app starts using a temporary engine
-    from sqlalchemy import create_engine
-
-    from launchpad.db.base import Base
 
     # Create sync engine for table setup/teardown
     sync_dsn = config.postgres.dsn.replace("+asyncpg", "+psycopg2")
@@ -179,10 +181,6 @@ def app_client(
                 app = create_app(config)
 
                 # Override auth dependencies
-                from launchpad.auth.dependencies import (
-                    admin_role_required,
-                    auth_required,
-                )
 
                 app.dependency_overrides[auth_required] = mock_auth_dependency
                 app.dependency_overrides[admin_role_required] = mock_auth_dependency

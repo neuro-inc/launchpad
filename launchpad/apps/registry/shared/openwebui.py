@@ -4,6 +4,7 @@ from uuid import UUID
 
 from starlette.requests import Request
 
+from launchpad.apps.exceptions import AppNotInstalledError, AppUnhealthyError
 from launchpad.apps.registry.base import App, BaseContext
 from launchpad.apps.registry.internal.embeddings import APP_NAME_EMBEDDINGS
 from launchpad.apps.registry.internal.llm_inference import APP_NAME_LLM_INFERENCE
@@ -32,7 +33,6 @@ class OpenWebUIAppContext(BaseContext):
         request: Request,
     ) -> Self:
         # todo: fix this circular import
-        from launchpad.apps.service import AppNotInstalledError, AppUnhealthyError
 
         app_service = request.app.app_service
         params = {

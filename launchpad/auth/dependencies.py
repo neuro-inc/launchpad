@@ -9,7 +9,10 @@ from aiohttp import ClientSession
 from asyncache import cached
 from cachetools import LRUCache
 from fastapi import Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from starlette.exceptions import HTTPException
 from starlette.requests import Request
+from starlette.status import HTTP_401_UNAUTHORIZED
 
 from launchpad.auth.models import User
 from launchpad.config import KeycloakConfig
@@ -154,9 +157,6 @@ async def admin_auth_required(
 ) -> User:
     # use basic auth for admin endpoints
     # get admin password from env variable LAUNCHPAD_ADMIN_PASSWORD
-    from fastapi.security import HTTPBasic, HTTPBasicCredentials
-    from starlette.exceptions import HTTPException
-    from starlette.status import HTTP_401_UNAUTHORIZED
 
     security = HTTPBasic()
     credentials: HTTPBasicCredentials | None = await security(request)
