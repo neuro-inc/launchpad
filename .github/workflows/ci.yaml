@@ -15,9 +15,14 @@ jobs:
   test:
     name: Test and Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout commit
         uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -58,6 +63,10 @@ jobs:
 
       - name: Run integration tests
         run: make test-integration
+        env:
+          # Configure testcontainers for CI environment
+          TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+          TESTCONTAINERS_RYUK_DISABLED: false
 
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v5
