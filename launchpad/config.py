@@ -69,6 +69,7 @@ class Config:
     apps: AppsConfig | None
     server: ServerConfig = ServerConfig()
     instance_id: UUID | None = None
+    skip_seed_templates: bool = False
 
 
 class EnvironConfigFactory:
@@ -88,6 +89,9 @@ class EnvironConfigFactory:
             apps=self.create_apps(),
             postgres=self.create_postgres(),
             instance_id=self.get_instance_id(),
+            skip_seed_templates=bool(
+                self._environ.get("LAUNCHPAD_SKIP_SEED_TEMPLATES")
+            ),
         )
 
     def get_instance_id(self) -> UUID | None:

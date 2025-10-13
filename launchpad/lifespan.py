@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import typing as t
 from contextlib import AsyncExitStack, asynccontextmanager
 
@@ -66,7 +65,7 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
             )
         else:
             # Seed app templates on startup (can be disabled with LAUNCHPAD_SKIP_SEED_TEMPLATES=1)
-            if not os.getenv("LAUNCHPAD_SKIP_SEED_TEMPLATES"):
+            if not app.config.skip_seed_templates:
                 logger.info("Seeding app templates on startup")
                 async with app.db() as db:
                     async with db.begin():
