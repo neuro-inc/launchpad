@@ -59,10 +59,10 @@
       ],
       "title": "AppsConfig",
       "type": "object",
-      "x-description": "Choose some available configuration presets to jump start this Launchpad instance with some preinstalled applications",
+      "x-description": "Choose some available configuration to jump start this Launchpad instance with some preinstalled applications",
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
-      "x-title": "Quickstart Presets",
+      "x-title": "Quickstart Apps",
       "x-type": "AppsConfig"
     },
     "CustomLLMModel": {
@@ -316,7 +316,7 @@
       "x-description": "Install OpenWebUI and its dependencies on Launchpad startup",
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
-      "x-title": "OpenWebUI Presets",
+      "x-title": "OpenWebUI",
       "x-type": "OpenWebUIConfig"
     },
     "PostgresConfig": {
