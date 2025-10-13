@@ -116,7 +116,7 @@ async def list_apps(
     is_internal: bool | None = None,
     is_shared: bool | None = None,
 ) -> typing.Sequence[InstalledApp]:
-    logger.info(
+    logger.debug(
         f"list_apps called with filters: user_id={user_id}, "
         f"is_internal={is_internal}, is_shared={is_shared}"
     )
@@ -133,9 +133,9 @@ async def list_apps(
     if where:
         query = query.where(and_(*where))
 
-    logger.info(f"Executing query: {query}")
+    logger.debug(f"Executing query: {query}")
     cursor = await db.execute(query)
     results = cursor.scalars().all()
-    logger.info(f"Query returned {len(results)} results")
+    logger.debug(f"Query returned {len(results)} results")
 
     return results
