@@ -77,6 +77,12 @@ class AppsApiClient:
             method="GET", url=f"{self.v1_url}/instances/{app_id}/output"
         )
 
+    async def get_inputs(self, app_id: UUID) -> dict[str, Any]:
+        """Get the input parameters that were used when installing the app"""
+        return await self._request(
+            method="GET", url=f"{self.v1_url}/instances/{app_id}/input"
+        )
+
     async def install_app(self, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self.v1_url}/instances"
         return await self._request(

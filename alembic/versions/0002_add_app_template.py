@@ -41,7 +41,10 @@ def upgrade() -> None:
         sa.Column("is_shared", sa.Boolean(), nullable=False),
         sa.Column("handler_class", sa.String(), nullable=True),
         sa.Column(
-            "default_inputs", postgresql.JSON(astext_type=sa.Text()), nullable=True
+            "default_inputs",
+            postgresql.JSON(astext_type=sa.Text()),
+            nullable=False,
+            server_default="{}",
         ),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column(
@@ -66,17 +69,8 @@ def upgrade() -> None:
         unique=True,
     )
 
-    # Add template_name column to installed_apps
-    op.add_column(
-        "installed_apps",
-        sa.Column("template_name", sa.String(), nullable=False, server_default=""),
-    )
-
 
 def downgrade() -> None:
-    # Remove template_name column from installed_apps
-    op.drop_column("installed_apps", "template_name")
-
     # Drop app_templates table
     op.drop_index(op.f("ix_app_templates_name"), table_name="app_templates")
     op.drop_table("app_templates")

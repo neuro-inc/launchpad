@@ -503,8 +503,9 @@ class AppService:
 
         This method:
         1. Fetches the app instance details from Apps API
-        2. Fetches the template metadata (description, logo, tags, etc.)
-        3. Uses the following priority for metadata:
+        2. Fetches the actual inputs used when the app was installed (for default_inputs)
+        3. Fetches the template metadata (description, logo, tags, etc.)
+        4. Uses the following priority for metadata:
            - User-provided overrides (from import_request)
            - Template metadata (from template definition)
            - Instance display_name (from app instance)
@@ -547,6 +548,18 @@ class AppService:
                 f"Unable to retrieve app with id {import_request.app_id} from Apps API"
             )
 
+        # Fetch the actual inputs that were used when the app was installed
+        # This provides accurate default_inputs for the template
+        app_inputs = {}
+        try:
+            app_inputs = await self._apps_api_client.get_inputs(import_request.app_id)
+            logger.info(f"Fetched inputs for app {import_request.app_id}: {list(app_inputs.keys())}")
+        except AppsApiError:
+            logger.warning(
+                f"Failed to fetch inputs for app {import_request.app_id}, "
+                "will use empty dict for default_inputs"
+            )
+
         # Extract template information from Apps API response
         template_name = app_info.get("template_name", "unknown")
         template_version = app_info.get("template_version", "unknown")
@@ -568,6 +581,7 @@ class AppService:
             is_internal=import_request.is_internal,
             is_shared=True,  # Imported installed apps are always shared
             fallback_verbose_name=display_name,  # Use display_name as fallback
+            default_inputs=app_inputs,  # Use actual inputs from the running app
         )
 
         # Link the app installation

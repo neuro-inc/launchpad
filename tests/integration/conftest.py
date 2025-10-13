@@ -134,9 +134,18 @@ def mock_apps_api_client() -> AsyncMock:
             "state": "queued",
         }
 
+    # Mock get_inputs response
+    def get_inputs_side_effect(app_id: UUID) -> dict[str, Any]:
+        return {
+            "displayName": "Test App Instance",
+            "preset": {"name": "cpu-small"},
+            "custom_config": {"key": "value"},
+        }
+
     mock_client.get_by_id.side_effect = get_by_id_side_effect
     mock_client.get_template.side_effect = get_template_side_effect
     mock_client.install_app.side_effect = install_app_side_effect
+    mock_client.get_inputs.side_effect = get_inputs_side_effect
     mock_client.get_outputs.return_value = {}
     mock_client.update_outputs.return_value = None
 

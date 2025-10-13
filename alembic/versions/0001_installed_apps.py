@@ -29,6 +29,7 @@ def upgrade() -> None:
         sa.Column("is_shared", sa.Boolean(), nullable=False),
         sa.Column("user_id", sa.String(), nullable=True),
         sa.Column("url", sa.String(), nullable=True),
+        sa.Column("template_name", sa.String(), nullable=False, server_default=""),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column(
             "created_at",
