@@ -24,6 +24,7 @@ from launchpad.apps.service import (
 )
 from launchpad.apps.template_storage import insert_template, list_templates
 from launchpad.auth.dependencies import AdminAuth, Auth
+from launchpad.db.dependencies import Db
 from launchpad.errors import BadRequest, NotFound
 from launchpad.ext.apps_api import NotFound as AppsApiNotFound
 
@@ -35,7 +36,7 @@ apps_router = APIRouter()
 
 @apps_router.get("", response_model=Page[LaunchpadAppRead])
 async def view_get_apps_pool(
-    request: Request,
+    db: Db,
 ) -> Any:
     """
     Get the pool of available app templates.
@@ -44,12 +45,9 @@ async def view_get_apps_pool(
     """
     logger.info("GET /api/v1/apps - Fetching app pool (non-internal templates)")
 
-    app: Launchpad = request.app
-
-    async with app.db() as db:
-        # Get all non-internal templates
-        templates = await list_templates(db, is_internal=False)
-        logger.info(f"Retrieved {len(templates)} non-internal templates from storage")
+    # Get all non-internal templates
+    templates = await list_templates(db, is_internal=False)
+    logger.info(f"Retrieved {len(templates)} non-internal templates from storage")
 
     # Convert AppTemplate to LaunchpadAppRead
     app_reads = [
@@ -84,6 +82,7 @@ async def view_post_install_generic_app(
     generic_app_request: GenericAppInstallRequest,
     app_service: DepAppService,
     user: Auth,
+    db: Db,
 ) -> Any:
     """
     Install a generic app with custom template and configuration.
@@ -110,30 +109,27 @@ async def view_post_install_generic_app(
     ```
     """
 
-    app: Launchpad = request.app
-
     # Create or update the template
-    async with app.db() as db:
-        async with db.begin():
-            await insert_template(
-                db=db,
-                name=generic_app_request.name or generic_app_request.template_name,
-                template_name=generic_app_request.template_name,
-                template_version=generic_app_request.template_version,
-                verbose_name=generic_app_request.verbose_name
-                or generic_app_request.name
-                or generic_app_request.template_name,
-                description_short=generic_app_request.description_short,
-                description_long=generic_app_request.description_long,
-                logo=generic_app_request.logo,
-                documentation_urls=generic_app_request.documentation_urls,
-                external_urls=generic_app_request.external_urls,
-                tags=generic_app_request.tags,
-                is_internal=generic_app_request.is_internal,
-                is_shared=generic_app_request.is_shared,
-                handler_class=None,  # No handler for generic apps
-                default_inputs=generic_app_request.inputs,
-            )
+    async with db.begin():
+        await insert_template(
+            db=db,
+            name=generic_app_request.name or generic_app_request.template_name,
+            template_name=generic_app_request.template_name,
+            template_version=generic_app_request.template_version,
+            verbose_name=generic_app_request.verbose_name
+            or generic_app_request.name
+            or generic_app_request.template_name,
+            description_short=generic_app_request.description_short,
+            description_long=generic_app_request.description_long,
+            logo=generic_app_request.logo,
+            documentation_urls=generic_app_request.documentation_urls,
+            external_urls=generic_app_request.external_urls,
+            tags=generic_app_request.tags,
+            is_internal=generic_app_request.is_internal,
+            is_shared=generic_app_request.is_shared,
+            handler_class=None,  # No handler for generic apps
+            default_inputs=generic_app_request.inputs,
+        )
 
     # Install from the template
     try:
