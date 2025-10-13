@@ -37,11 +37,13 @@ from .types import (
 
 
 PASSWORD_CHAR_POOL = string.ascii_letters + string.digits
+PASSWORD_DEFAULT_LENGTH = 12
+PASSWORD_MIN_LENGTH = 4
 
 
-def _generate_password(length: int = 12) -> str:
-    if length < 4:
-        err_msg = "Password length must be at least 4"
+def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
+    if length < PASSWORD_MIN_LENGTH:
+        err_msg = f"Password length must be at least {PASSWORD_MIN_LENGTH}"
         raise ValueError(err_msg)
 
     return "".join([random.choice(PASSWORD_CHAR_POOL) for _ in range(length)])
@@ -283,9 +285,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         return {
             **values,
-            "image": {
-                "tag": os.getenv("APP_IMAGE_TAG", "latest")
-            },
+            "image": {"tag": os.getenv("APP_IMAGE_TAG", "latest")},
             "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": realm_import_config_map_name,
             "postgresql": {
