@@ -238,7 +238,7 @@ class OpenWebUIConfig(AbstractAppFieldType):
     model_config = ConfigDict(
         protected_namespaces=(),
         json_schema_extra=SchemaExtraMetadata(
-            title="OpenWebUI Presets",
+            title="OpenWebUI",
             description="Install OpenWebUI and its dependencies on Launchpad startup",
         ).as_json_schema_extra(),
     )
@@ -252,9 +252,9 @@ class AppsConfig(AbstractAppFieldType):
     model_config = ConfigDict(
         protected_namespaces=(),
         json_schema_extra=SchemaExtraMetadata(
-            title="Quickstart Presets",
+            title="Quickstart Apps",
             description="Choose some available configuration"
-            " presets to jump start this Launchpad instance"
+            " to jump start this Launchpad instance"
             " with some preinstalled applications",
         ).as_json_schema_extra(),
     )
