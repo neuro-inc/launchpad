@@ -250,7 +250,7 @@
       "x-title": "LLM Configuration",
       "x-type": "LLMConfig"
     },
-    "LaunchpadConfig": {
+    "LaunchpadWebAppConfig": {
       "properties": {
         "preset": {
           "$ref": "#/$defs/Preset",
@@ -261,13 +261,13 @@
       "required": [
         "preset"
       ],
-      "title": "LaunchpadConfig",
+      "title": "LaunchpadWebAppConfig",
       "type": "object",
       "x-description": "Configuration for the Launchpad application.",
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
       "x-title": "Launchpad Configuration",
-      "x-type": "LaunchpadConfig"
+      "x-type": "LaunchpadWebAppConfig"
     },
     "NoQuickStartConfig": {
       "properties": {
@@ -467,15 +467,15 @@
     }
   },
   "properties": {
-    "launchpad_config": {
-      "$ref": "#/$defs/LaunchpadConfig"
+    "launchpad_web_app_config": {
+      "$ref": "#/$defs/LaunchpadWebAppConfig"
     },
     "apps_config": {
       "$ref": "#/$defs/AppsConfig"
     }
   },
   "required": [
-    "launchpad_config",
+    "launchpad_web_app_config",
     "apps_config"
   ],
   "title": "LaunchpadAppInputs",

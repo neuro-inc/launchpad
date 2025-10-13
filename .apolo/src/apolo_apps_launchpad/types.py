@@ -271,7 +271,7 @@ class AppsConfig(AbstractAppFieldType):
     quick_start_config: NoQuickStartConfig | OpenWebUIConfig
 
 
-class LaunchpadConfig(AbstractAppFieldType):
+class LaunchpadWebAppConfig(AbstractAppFieldType):
     model_config = ConfigDict(
         protected_namespaces=(),
         json_schema_extra=SchemaExtraMetadata(
@@ -344,7 +344,7 @@ class LaunchpadAdminApi(AbstractAppFieldType):
 
 
 class LaunchpadAppInputs(AppInputs):
-    launchpad_config: LaunchpadConfig
+    launchpad_web_app_config: LaunchpadWebAppConfig
     apps_config: AppsConfig
 
 

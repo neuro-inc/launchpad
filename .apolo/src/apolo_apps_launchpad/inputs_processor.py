@@ -235,7 +235,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         values = await gen_extra_values(
             apolo_client=self.client,
-            preset_type=input_.launchpad_config.preset,
+            preset_type=input_.launchpad_web_app_config.preset,
             namespace=namespace,
             app_id=app_id,
             app_type=AppType.Launchpad,
@@ -244,6 +244,8 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             client=self.client,
         )
         domain = ingress_template.split(".", 1)[1]
+        if domain.endswith("."):
+            domain = domain[:-1]
         keycloak_admin_password = _generate_password()
         db_secret_name = f"launchpad-{app_id}-db-secret"
         realm_import_config_map_name = f"launchpad-{app_id}-keycloak-realm"
