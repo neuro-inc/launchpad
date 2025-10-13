@@ -27,7 +27,11 @@ from launchpad.apps.registry import (
 )
 from launchpad.apps.registry.base import GenericApp
 from launchpad.apps.registry.internal.context import InternalAppContext
-from launchpad.apps.resources import ImportAppRequest, ImportTemplateRequest
+from launchpad.apps.resources import (
+    ImportAppRequest,
+    ImportTemplateRequest,
+    LaunchpadAppRead,
+)
 from launchpad.apps.storage import (
     delete_app,
     insert_app,
@@ -36,7 +40,11 @@ from launchpad.apps.storage import (
     update_app_url,
 )
 from launchpad.apps.template_models import AppTemplate
-from launchpad.apps.template_storage import insert_template, select_template
+from launchpad.apps.template_storage import (
+    insert_template,
+    list_templates,
+    select_template,
+)
 from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import AppsApiError, NotFound
 
@@ -704,6 +712,83 @@ class AppService:
 
         return template
 
+    async def create_or_update_template(
+        self,
+        name: str,
+        template_name: str,
+        template_version: str,
+        verbose_name: str,
+        description_short: str | None = None,
+        description_long: str | None = None,
+        logo: str | None = None,
+        documentation_urls: list[dict[str, str]] | None = None,
+        external_urls: list[dict[str, str]] | None = None,
+        tags: list[str] | None = None,
+        is_internal: bool = False,
+        is_shared: bool = True,
+        handler_class: str | None = None,
+        default_inputs: dict[str, Any] | None = None,
+    ) -> AppTemplate:
+        """
+        Create or update an AppTemplate record.
+
+        This method encapsulates template creation logic that was previously
+        done directly in the API layer.
+
+        Args:
+            name: Unique name for the template (used as identifier)
+            template_name: Apps API template name
+            template_version: Apps API template version
+            verbose_name: User-friendly display name
+            description_short: Short description
+            description_long: Long description
+            logo: URL to logo
+            documentation_urls: Documentation URLs
+            external_urls: External URLs
+            tags: Tags for categorization
+            is_internal: Whether template is internal
+            is_shared: Whether apps from this template can be shared
+            handler_class: Optional handler class for custom behavior
+            default_inputs: Default inputs to merge when installing
+
+        Returns:
+            The created/updated AppTemplate record
+
+        Raises:
+            AppServiceError: If there's an error storing the template
+
+        Example:
+            ```python
+            template = await app_service.create_or_update_template(
+                name="my-app",
+                template_name="my-template",
+                template_version="1.0.0",
+                verbose_name="My App",
+                description_short="A custom application",
+                default_inputs={"preset": {"name": "cpu-small"}}
+            )
+            ```
+        """
+        async with self._db() as db:
+            async with db.begin():
+                return await insert_template(
+                    db=db,
+                    name=name,
+                    template_name=template_name,
+                    template_version=template_version,
+                    verbose_name=verbose_name,
+                    description_short=description_short or "",
+                    description_long=description_long or "",
+                    logo=logo or "",
+                    documentation_urls=documentation_urls or [],
+                    external_urls=external_urls or [],
+                    tags=tags or [],
+                    is_internal=is_internal,
+                    is_shared=is_shared,
+                    handler_class=handler_class,
+                    default_inputs=default_inputs,
+                )
+
     async def import_template(
         self,
         import_request: ImportTemplateRequest,
@@ -794,6 +879,55 @@ class AppService:
         app_context_class = cast(Any, APPS_CONTEXT[handler_class.__name__])
         app_context = await app_context_class.from_request(request=request)
         return app_class(context=app_context)
+
+    async def list_app_pool(
+        self,
+        is_internal: bool = False,
+    ) -> list[LaunchpadAppRead]:
+        """
+        Get the pool of available app templates.
+
+        This method fetches templates from the database and converts them
+        to LaunchpadAppRead format for API responses.
+
+        Args:
+            is_internal: Whether to include internal templates (default: False)
+
+        Returns:
+            List of LaunchpadAppRead objects representing available templates
+
+        Example:
+            ```python
+            # Get non-internal templates (user-facing app pool)
+            apps = await app_service.list_app_pool(is_internal=False)
+
+            # Get all templates including internal ones
+            all_apps = await app_service.list_app_pool(is_internal=True)
+            ```
+        """
+        async with self._db() as db:
+            templates = await list_templates(db, is_internal=is_internal)
+
+        logger.info(f"Retrieved {len(templates)} templates (is_internal={is_internal})")
+
+        # Convert AppTemplate to LaunchpadAppRead
+        app_reads = [
+            LaunchpadAppRead.model_validate(
+                {
+                    "verbose_name": template.verbose_name,
+                    "name": template.name,
+                    "description_short": template.description_short,
+                    "description_long": template.description_long,
+                    "logo": template.logo,
+                    "documentation_urls": template.documentation_urls,
+                    "external_urls": template.external_urls,
+                    "tags": template.tags,
+                }
+            )
+            for template in templates
+        ]
+
+        return app_reads
 
     async def list_installed_apps(
         self,

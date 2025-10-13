@@ -22,9 +22,7 @@ from launchpad.apps.resources import (
     LaunchpadTemplateRead,
 )
 from launchpad.apps.service import DepAppService
-from launchpad.apps.template_storage import insert_template, list_templates
 from launchpad.auth.dependencies import AdminAuth, Auth
-from launchpad.db.dependencies import Db
 from launchpad.errors import BadRequest, NotFound
 from launchpad.ext.apps_api import NotFound as AppsApiNotFound
 
@@ -36,7 +34,7 @@ apps_router = APIRouter()
 
 @apps_router.get("", response_model=Page[LaunchpadAppRead])
 async def view_get_apps_pool(
-    db: Db,
+    app_service: DepAppService,
 ) -> Any:
     """
     Get the pool of available app templates.
@@ -46,27 +44,9 @@ async def view_get_apps_pool(
     logger.info("GET /api/v1/apps - Fetching app pool (non-internal templates)")
 
     # Get all non-internal templates
-    templates = await list_templates(db, is_internal=False)
-    logger.info(f"Retrieved {len(templates)} non-internal templates from storage")
+    app_reads = await app_service.list_app_pool(is_internal=False)
+    logger.info(f"Retrieved {len(app_reads)} non-internal templates")
 
-    # Convert AppTemplate to LaunchpadAppRead
-    app_reads = [
-        LaunchpadAppRead.model_validate(
-            {
-                "verbose_name": template.verbose_name,
-                "name": template.name,
-                "description_short": template.description_short,
-                "description_long": template.description_long,
-                "logo": template.logo,
-                "documentation_urls": template.documentation_urls,
-                "external_urls": template.external_urls,
-                "tags": template.tags,
-            }
-        )
-        for template in templates
-    ]
-
-    logger.info(f"Converted to {len(app_reads)} LaunchpadAppRead objects")
     result = paginate(app_reads)
     logger.info("Returning paginated result")
     return result
@@ -82,7 +62,6 @@ async def view_post_install_generic_app(
     generic_app_request: GenericAppInstallRequest,
     app_service: DepAppService,
     user: Auth,
-    db: Db,
 ) -> Any:
     """
     Install a generic app with custom template and configuration.
@@ -110,26 +89,24 @@ async def view_post_install_generic_app(
     """
 
     # Create or update the template
-    async with db.begin():
-        await insert_template(
-            db=db,
-            name=generic_app_request.name or generic_app_request.template_name,
-            template_name=generic_app_request.template_name,
-            template_version=generic_app_request.template_version,
-            verbose_name=generic_app_request.verbose_name
-            or generic_app_request.name
-            or generic_app_request.template_name,
-            description_short=generic_app_request.description_short,
-            description_long=generic_app_request.description_long,
-            logo=generic_app_request.logo,
-            documentation_urls=generic_app_request.documentation_urls,
-            external_urls=generic_app_request.external_urls,
-            tags=generic_app_request.tags,
-            is_internal=generic_app_request.is_internal,
-            is_shared=generic_app_request.is_shared,
-            handler_class=None,  # No handler for generic apps
-            default_inputs=generic_app_request.inputs,
-        )
+    await app_service.create_or_update_template(
+        name=generic_app_request.name or generic_app_request.template_name,
+        template_name=generic_app_request.template_name,
+        template_version=generic_app_request.template_version,
+        verbose_name=generic_app_request.verbose_name
+        or generic_app_request.name
+        or generic_app_request.template_name,
+        description_short=generic_app_request.description_short,
+        description_long=generic_app_request.description_long,
+        logo=generic_app_request.logo,
+        documentation_urls=generic_app_request.documentation_urls,
+        external_urls=generic_app_request.external_urls,
+        tags=generic_app_request.tags,
+        is_internal=generic_app_request.is_internal,
+        is_shared=generic_app_request.is_shared,
+        handler_class=None,  # No handler for generic apps
+        default_inputs=generic_app_request.inputs,
+    )
 
     # Install from the template
     try:
