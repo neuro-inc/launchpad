@@ -553,7 +553,9 @@ class AppService:
         app_inputs = {}
         try:
             app_inputs = await self._apps_api_client.get_inputs(import_request.app_id)
-            logger.info(f"Fetched inputs for app {import_request.app_id}: {list(app_inputs.keys())}")
+            logger.info(
+                f"Fetched inputs for app {import_request.app_id}: {list(app_inputs.keys())}"
+            )
         except AppsApiError:
             logger.warning(
                 f"Failed to fetch inputs for app {import_request.app_id}, "

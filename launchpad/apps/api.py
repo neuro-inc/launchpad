@@ -1,3 +1,4 @@
+from launchpad.apps.template_storage import list_templates
 import logging
 from typing import Any
 
@@ -42,7 +43,6 @@ async def view_get_apps_pool(
     Returns all non-internal templates from the AppTemplate table.
     """
     logger.info("GET /api/v1/apps - Fetching app pool (non-internal templates)")
-    from launchpad.apps.template_storage import list_templates
 
     app: Launchpad = request.app
 
