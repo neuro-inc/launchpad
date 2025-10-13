@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Annotated
+from typing import Annotated, Any
 
 import aiohttp
 import backoff
@@ -14,6 +14,7 @@ from starlette.requests import Request
 from launchpad.auth.models import User
 from launchpad.config import KeycloakConfig
 from launchpad.errors import Unauthorized
+
 
 logger = logging.getLogger(__name__)
 
@@ -154,8 +155,8 @@ async def admin_auth_required(
     # use basic auth for admin endpoints
     # get admin password from env variable LAUNCHPAD_ADMIN_PASSWORD
     from fastapi.security import HTTPBasic, HTTPBasicCredentials
-    from starlette.status import HTTP_401_UNAUTHORIZED
     from starlette.exceptions import HTTPException
+    from starlette.status import HTTP_401_UNAUTHORIZED
 
     security = HTTPBasic()
     credentials: HTTPBasicCredentials | None = await security(request)

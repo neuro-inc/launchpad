@@ -13,6 +13,7 @@ from yarl import URL
 
 from launchpad.db.base import DSN
 
+
 APP_DIR = Path(__file__).parent
 ROOT_DIR = APP_DIR.parent
 

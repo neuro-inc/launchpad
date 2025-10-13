@@ -3,6 +3,7 @@ from typing import Any
 from launchpad.apps.registry.base import App
 from launchpad.apps.registry.internal.context import InternalAppContext
 
+
 APP_NAME_LLM_INFERENCE = "vllm-llama-3.1-8b"
 
 

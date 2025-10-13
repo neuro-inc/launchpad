@@ -1,8 +1,8 @@
+import logging
 from collections.abc import Iterator
 from typing import Any
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
-import logging
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,13 +12,14 @@ from yarl import URL
 from launchpad.app_factory import create_app
 from launchpad.auth.models import User
 from launchpad.config import (
-    Config,
-    KeycloakConfig,
     ApoloConfig,
     AppsConfig,
+    Config,
+    KeycloakConfig,
     PostgresConfig,
     ServerConfig,
 )
+
 
 # Suppress verbose logging from libraries during tests
 logging.getLogger("aiosqlite").setLevel(logging.WARNING)
@@ -158,8 +159,9 @@ def app_client(
 ) -> Iterator[TestClient]:
     """Create test client with mocked dependencies and real PostgreSQL"""
     # Create tables before app starts using a temporary engine
-    from launchpad.db.base import Base
     from sqlalchemy import create_engine
+
+    from launchpad.db.base import Base
 
     # Create sync engine for table setup/teardown
     sync_dsn = config.postgres.dsn.replace("+asyncpg", "+psycopg2")
@@ -178,8 +180,8 @@ def app_client(
 
                 # Override auth dependencies
                 from launchpad.auth.dependencies import (
-                    auth_required,
                     admin_role_required,
+                    auth_required,
                 )
 
                 app.dependency_overrides[auth_required] = mock_auth_dependency

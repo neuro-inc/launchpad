@@ -4,17 +4,17 @@ from uuid import UUID
 
 from starlette.requests import Request
 
-from launchpad.apps.registry.base import App
-from launchpad.apps.registry.base import BaseContext
+from launchpad.apps.registry.base import App, BaseContext
 from launchpad.apps.registry.internal.embeddings import APP_NAME_EMBEDDINGS
 from launchpad.apps.registry.internal.llm_inference import APP_NAME_LLM_INFERENCE
 from launchpad.apps.registry.internal.postgres import APP_NAME_POSTGRES
 from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_EMAIL,
-    HEADER_X_AUTH_REQUEST_USERNAME,
     HEADER_X_AUTH_REQUEST_GROUPS,
+    HEADER_X_AUTH_REQUEST_USERNAME,
 )
 from launchpad.errors import BadRequest
+
 
 APP_NAME_OPEN_WEB_UI = "openwebui"
 

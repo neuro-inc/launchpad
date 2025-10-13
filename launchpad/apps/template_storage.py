@@ -3,11 +3,12 @@ import typing
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, and_, delete
+from sqlalchemy import and_, delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from launchpad.apps.template_models import AppTemplate
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,10 @@ async def seed_templates(db: AsyncSession) -> None:
     Seed all app templates into the AppTemplate table.
     This includes both internal apps (vllm, postgres, embeddings) and user-facing apps (OpenWebUI).
     """
-    from launchpad.apps.registry.shared.openwebui import OpenWebUIApp
+    from launchpad.apps.registry.internal.embeddings import EmbeddingsApp
     from launchpad.apps.registry.internal.llm_inference import LlmInferenceApp
     from launchpad.apps.registry.internal.postgres import PostgresApp
-    from launchpad.apps.registry.internal.embeddings import EmbeddingsApp
+    from launchpad.apps.registry.shared.openwebui import OpenWebUIApp
 
     logger.info("Seeding app templates")
 

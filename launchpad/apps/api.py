@@ -1,10 +1,8 @@
-from launchpad.apps.template_storage import list_templates
 import logging
 from typing import Any
 
 from fastapi import APIRouter
-from fastapi_pagination import Page
-from fastapi_pagination import paginate
+from fastapi_pagination import Page, paginate
 from starlette.requests import Request
 from starlette.status import HTTP_200_OK
 
@@ -18,15 +16,17 @@ from launchpad.apps.resources import (
     LaunchpadTemplateRead,
 )
 from launchpad.apps.service import (
-    AppTemplateNotFound,
-    DepAppService,
     AppNotInstalledError,
-    AppUnhealthyError,
     AppServiceError,
+    AppTemplateNotFound,
+    AppUnhealthyError,
+    DepAppService,
 )
-from launchpad.auth.dependencies import Auth, AdminAuth
-from launchpad.errors import NotFound, BadRequest
+from launchpad.apps.template_storage import insert_template, list_templates
+from launchpad.auth.dependencies import AdminAuth, Auth
+from launchpad.errors import BadRequest, NotFound
 from launchpad.ext.apps_api import NotFound as AppsApiNotFound
+
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,6 @@ async def view_post_install_generic_app(
     }
     ```
     """
-    from launchpad.apps.template_storage import insert_template
 
     app: Launchpad = request.app
 

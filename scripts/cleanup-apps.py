@@ -21,6 +21,7 @@ from yarl import URL
 # Import existing API client
 from launchpad.ext.apps_api import AppsApiClient, AppsApiError, NotFound
 
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,

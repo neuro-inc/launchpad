@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Self
-from typing import TypeVar
+from typing import Any, Generic, Self, TypeVar
 
 from starlette.requests import Request
 

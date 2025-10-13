@@ -7,32 +7,31 @@ from apolo_app_types import LLMInputs, TextEmbeddingsInferenceAppInputs
 from apolo_app_types.app_types import AppType
 from apolo_app_types.helm.apps.base import BaseChartValueProcessor
 from apolo_app_types.helm.apps.common import gen_extra_values
-from apolo_app_types.helm.apps.ingress import (
-    _get_ingress_name_template,
-)
+from apolo_app_types.helm.apps.ingress import _get_ingress_name_template
 from apolo_app_types.helm.utils.dictionaries import get_nested_values
 from apolo_app_types.protocols.common.hugging_face import (
     HuggingFaceCache,
     HuggingFaceModel,
 )
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
-from .types import (
-    CustomLLMModel,
-    HuggingFaceEmbeddingsModel,
-    HuggingFaceLLMModel,
-    LaunchpadAppInputs,
-    PreConfiguredEmbeddingsModels,
-    PreConfiguredHuggingFaceLLMModel,
-    PreConfiguredLLMModels,
-    OpenWebUIConfig,
-    NoQuickStartConfig,
-)
 from apolo_app_types.protocols.postgres import (
     PGBackupConfig,
     PGBouncer,
     PostgresConfig,
     PostgresDBUser,
     PostgresInputs,
+)
+
+from .types import (
+    CustomLLMModel,
+    HuggingFaceEmbeddingsModel,
+    HuggingFaceLLMModel,
+    LaunchpadAppInputs,
+    NoQuickStartConfig,
+    OpenWebUIConfig,
+    PreConfiguredEmbeddingsModels,
+    PreConfiguredHuggingFaceLLMModel,
+    PreConfiguredLLMModels,
 )
 
 

@@ -1,26 +1,16 @@
 import enum
-
 from typing import Literal
-from pydantic import ConfigDict, Field
 
-from apolo_app_types import (
-    AppInputs,
-    AppOutputs,
-    HuggingFaceModel,
-)
+from apolo_app_types import AppInputs, AppOutputs, HuggingFaceModel
 from apolo_app_types.protocols.apps import AppInstance
 from apolo_app_types.protocols.common.abc_ import AbstractAppFieldType
-from apolo_app_types.protocols.common.networking import (
-    HttpApi,
-    ServiceAPI,
-)
+from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
+from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI
 from apolo_app_types.protocols.common.preset import Preset
-from apolo_app_types.protocols.common.schema_extra import (
-    SchemaExtraMetadata,
-)
+from apolo_app_types.protocols.common.schema_extra import SchemaExtraMetadata
 from apolo_app_types.protocols.common.secrets_ import OptionalSecret
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
-from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
+from pydantic import ConfigDict, Field
 
 
 class PreConfiguredLLMModels(enum.StrEnum):

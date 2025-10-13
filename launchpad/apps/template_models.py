@@ -1,7 +1,8 @@
 from typing import Any
+
 from sqlalchemy import UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.orm import Mapped, mapped_column
 
 from launchpad.db.base import Base
 

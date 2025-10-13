@@ -6,7 +6,8 @@ from launchpad.apps.registry.internal.context import InternalAppContext
 from launchpad.apps.registry.internal.embeddings import EmbeddingsApp
 from launchpad.apps.registry.internal.llm_inference import LlmInferenceApp
 from launchpad.apps.registry.internal.postgres import PostgresApp
-from launchpad.apps.service import AppService, AppNotInstalledError, AppUnhealthyError
+from launchpad.apps.service import AppNotInstalledError, AppService, AppUnhealthyError
+
 
 logger = logging.getLogger(__name__)
 

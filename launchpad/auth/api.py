@@ -3,19 +3,20 @@ import logging
 from fastapi import APIRouter
 from pydantic import BaseModel
 from starlette.requests import Request
-from starlette.responses import Response, PlainTextResponse, JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse, Response
 
 from launchpad.apps.storage import select_app
 from launchpad.auth import (
-    HEADER_X_FORWARDED_HOST,
     HEADER_X_AUTH_REQUEST_EMAIL,
-    HEADER_X_AUTH_REQUEST_USERNAME,
     HEADER_X_AUTH_REQUEST_GROUPS,
+    HEADER_X_AUTH_REQUEST_USERNAME,
+    HEADER_X_FORWARDED_HOST,
 )
 from launchpad.auth.dependencies import token_from_string
 from launchpad.auth.oauth import DepOauth, OauthError
 from launchpad.db.dependencies import Db
 from launchpad.errors import Forbidden, Unauthorized
+
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any, Annotated, cast
+from typing import Annotated, Any, Any as AnyType, cast
 from uuid import UUID
 
 import backoff
@@ -9,24 +9,26 @@ from starlette.requests import Request
 
 from launchpad.app import Launchpad
 from launchpad.apps.models import InstalledApp
-from launchpad.apps.template_models import AppTemplate
 from launchpad.apps.registry import (
     APPS_CONTEXT,
-    T_App,
-    USER_FACING_APPS,
     HANDLER_CLASSES,
+    USER_FACING_APPS,
+    T_App,
 )
 from launchpad.apps.registry.base import GenericApp
+from launchpad.apps.registry.internal.context import InternalAppContext
 from launchpad.apps.resources import ImportAppRequest, ImportTemplateRequest
 from launchpad.apps.storage import (
-    select_app,
-    insert_app,
     delete_app,
-    update_app_url,
+    insert_app,
     list_apps,
+    select_app,
+    update_app_url,
 )
+from launchpad.apps.template_models import AppTemplate
+from launchpad.apps.template_storage import insert_template, select_template
 from launchpad.errors import BadRequest
-from launchpad.ext.apps_api import NotFound, AppsApiError
+from launchpad.ext.apps_api import AppsApiError, NotFound
 
 
 logger = logging.getLogger(__name__)
@@ -71,7 +73,6 @@ class AppService:
         Returns None if the app doesn't exist, otherwise returns the InstalledApp.
         Does NOT check health status or fetch URLs.
         """
-        from launchpad.apps.template_storage import select_template
 
         logger.info(
             f"get_existing_app called: app_name={launchpad_app_name}, user_id={user_id}"
@@ -112,8 +113,6 @@ class AppService:
         *,
         with_url: bool = True,
     ) -> InstalledApp:
-        from launchpad.apps.template_storage import select_template
-
         logger.info(
             f"get_installed_app called: app_name={launchpad_app_name}, "
             f"user_id={user_id}, with_url={with_url}"
@@ -215,8 +214,6 @@ class AppService:
             AppTemplateNotFound: If template doesn't exist in database
             AppServiceError: If there's an error during installation
         """
-        from launchpad.apps.template_storage import select_template
-        from launchpad.apps.registry import HANDLER_CLASSES, APPS_CONTEXT
 
         # Get template from database
         async with self._db() as db:
@@ -240,7 +237,6 @@ class AppService:
         app: T_App
         if template.handler_class and template.handler_class in HANDLER_CLASSES:
             # Use specific handler class
-            from typing import cast, Any as AnyType
 
             app_class = cast(AnyType, HANDLER_CLASSES[template.handler_class])
             logger.info(f"App class selected: {app_class}")
@@ -273,7 +269,6 @@ class AppService:
                     app = app_class(context=ctx)
             else:
                 # Handler without special context - use InternalAppContext
-                from launchpad.apps.registry.internal.context import InternalAppContext
 
                 internal_ctx = InternalAppContext(config=inputs)
                 app = app_class(context=internal_ctx)
@@ -523,7 +518,6 @@ class AppService:
 
         Example:
             ```python
-            # Minimal import - uses template metadata
             installed_app = await app_service.import_app(
                 ImportAppRequest(app_id=UUID("..."))
             )
@@ -694,7 +688,6 @@ class AppService:
         resolved_tags = tags or template_tags
 
         # Create or update the template
-        from launchpad.apps.template_storage import insert_template
 
         async with self._db() as db:
             async with db.begin():

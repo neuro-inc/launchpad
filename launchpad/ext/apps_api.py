@@ -3,7 +3,8 @@ import typing
 from typing import Any
 from uuid import UUID
 
-from aiohttp import ClientSession, ClientResponseError
+from aiohttp import ClientResponseError, ClientSession
+
 
 logger = logging.getLogger(__name__)
 

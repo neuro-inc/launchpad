@@ -1,10 +1,11 @@
-from dataclasses import dataclass
-from launchpad.apps.registry.base import BaseContext, GenericApp
-from apolo_app_types.helm.utils.deep_merging import merge_list_of_dicts
 from copy import deepcopy
+from dataclasses import dataclass
+from typing import Any, Self, cast
 
+from apolo_app_types.helm.utils.deep_merging import merge_list_of_dicts
 from starlette.requests import Request
-from typing import Self, Any, cast
+
+from launchpad.apps.registry.base import BaseContext, GenericApp
 
 
 @dataclass

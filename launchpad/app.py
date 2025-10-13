@@ -2,10 +2,11 @@ from typing import TYPE_CHECKING
 
 import aiohttp
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from launchpad.config import Config
 from launchpad.ext.apps_api import AppsApiClient
+
 
 if TYPE_CHECKING:
     from launchpad.apps.service import AppService

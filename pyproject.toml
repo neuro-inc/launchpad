@@ -1,6 +1,9 @@
 [tool.ruff]
 target-version = "py313"
 
+[tool.ruff.lint]
+select = ["I"]  # Enable isort rules
+
 [tool.ruff.lint.isort]
 combine-as-imports = true
 lines-after-imports = 2

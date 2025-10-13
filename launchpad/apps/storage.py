@@ -2,14 +2,15 @@ import logging
 import typing
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, and_, delete
+from sqlalchemy import and_, delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from launchpad.apps.models import (
-    InstalledApp,
     UNIQUE__INSTALLED_APPS__LAUNCHPAD_APP_NAME__USER_ID,
+    InstalledApp,
 )
+
 
 logger = logging.getLogger(__name__)
 

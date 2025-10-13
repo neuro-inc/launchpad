@@ -1,13 +1,13 @@
 import uuid
 from typing import Any
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from launchpad.apps.models import InstalledApp
-from launchpad.apps.storage import select_app, insert_app, delete_app
+from launchpad.apps.storage import delete_app, insert_app, select_app
 
 
 @pytest.fixture

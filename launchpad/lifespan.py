@@ -2,9 +2,10 @@ import asyncio
 import logging
 import os
 import typing as t
-from contextlib import asynccontextmanager, AsyncExitStack
+from contextlib import AsyncExitStack, asynccontextmanager
 
 import aiohttp
+
 from launchpad.app import Launchpad
 from launchpad.apps.lifespan import init_internal_apps
 from launchpad.apps.service import AppService
@@ -12,6 +13,7 @@ from launchpad.apps.template_storage import seed_templates
 from launchpad.auth.oauth import Oauth
 from launchpad.db.lifespan import create_db
 from launchpad.ext.apps_api import AppsApiClient
+
 
 logger = logging.getLogger(__name__)
 

@@ -1,16 +1,18 @@
-from apolo_app_types.outputs.base import BaseAppOutputsProcessor
+import typing as t
+
 from apolo_app_types.clients.kube import get_service_host_port
+from apolo_app_types.outputs.base import BaseAppOutputsProcessor
 from apolo_app_types.outputs.common import INSTANCE_LABEL
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
-from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
 from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
+from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
+
 from .types import (
     KeycloakConfig,
+    LaunchpadAdminApi,
     LaunchpadAppOutputs,
     LaunchpadDefaultAdminUser,
-    LaunchpadAdminApi,
 )
-import typing as t
 
 
 def get_launchpad_name(apolo_app_id: str) -> str:

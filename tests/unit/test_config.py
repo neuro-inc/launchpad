@@ -8,12 +8,12 @@ import pytest
 from yarl import URL
 
 from launchpad.config import (
-    Config,
-    ServerConfig,
-    KeycloakConfig,
     ApoloConfig,
     AppsConfig,
+    Config,
     EnvironConfigFactory,
+    KeycloakConfig,
+    ServerConfig,
 )
 
 
