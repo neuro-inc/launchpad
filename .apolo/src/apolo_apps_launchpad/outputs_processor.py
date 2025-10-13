@@ -144,8 +144,8 @@ async def get_launchpad_outputs(
         installed_apps=None,
         auth_middleware=AuthIngressMiddleware(name=middleware_name),
         admin_user=LaunchpadDefaultAdminUser(
-            username="admin",
-            email="admin@launchpad.com",
+            username=helm_values["LAUNCHPAD_ADMIN_USER"],
+            email=helm_values["LAUNCHPAD_ADMIN_EMAIL"],
             password=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],
         ),
         admin_api=LaunchpadAdminApi(

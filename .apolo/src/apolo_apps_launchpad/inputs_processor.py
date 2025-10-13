@@ -294,6 +294,8 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             "domain": domain,
             "keycloak": keycloak_values,  # keeping this for backwards compatibility
             "mlops-keycloak": keycloak_values,
+            "LAUNCHPAD_ADMIN_USER": "admin",
+            "LAUNCHPAD_ADMIN_EMAIL": "admin@launchpad.com",
             "LAUNCHPAD_ADMIN_PASSWORD": _generate_password(),
             "LAUNCHPAD_INITIAL_CONFIG": LAUNCHPAD_INITIAL_CONFIG,
         }
