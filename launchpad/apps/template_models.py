@@ -20,6 +20,11 @@ class AppTemplate(Base):
             "name",
             name="unique__app_templates__name",
         ),
+        UniqueConstraint(
+            "template_name",
+            "template_version",
+            name="unique__app_templates__template_name_version",
+        ),
     )
 
     name: Mapped[str] = mapped_column(index=True, unique=True)

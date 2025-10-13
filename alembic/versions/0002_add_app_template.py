@@ -63,6 +63,11 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name", name="unique__app_templates__name"),
+        sa.UniqueConstraint(
+            "template_name",
+            "template_version",
+            name="unique__app_templates__template_name_version",
+        ),
     )
     op.create_index(
         op.f("ix_app_templates_name"),
