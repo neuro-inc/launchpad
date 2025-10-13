@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.postgres import PostgresContainer
 from yarl import URL
 
@@ -43,8 +44,26 @@ def postgres_container() -> Any:
     container.stop()
 
 
+@pytest.fixture(scope="session")
+def setup_database(postgres_container: PostgresContainer) -> str:
+    """Create database tables once for all tests (session-scoped)"""
+    sync_dsn = postgres_container.get_connection_url(driver=None).replace(
+        "postgresql://", "postgresql+psycopg2://"
+    )
+    sync_engine = create_engine(sync_dsn)
+
+    # Create all tables once
+    Base.metadata.create_all(sync_engine)
+
+    yield sync_dsn
+
+    # Cleanup: drop all tables at end of session
+    Base.metadata.drop_all(sync_engine)
+    sync_engine.dispose()
+
+
 @pytest.fixture
-def config(postgres_container: PostgresContainer) -> Config:
+def config(postgres_container: PostgresContainer, setup_database: str) -> Config:
     kc_config = KeycloakConfig(
         url=URL("http://mock-keycloak.com"), realm="mock-realm", client_id="frontend"
     )
@@ -164,34 +183,47 @@ def mock_apps_api_client() -> AsyncMock:
 
 @pytest.fixture(scope="function")
 def app_client(
-    config: Config, mock_auth_dependency: Any, mock_apps_api_client: AsyncMock
+    config: Config,
+    mock_auth_dependency: Any,
+    mock_apps_api_client: AsyncMock,
 ) -> Iterator[TestClient]:
-    """Create test client with mocked dependencies and real PostgreSQL"""
-    # Create tables before app starts using a temporary engine
+    """
+    Create test client with transactional database isolation.
+    Each test runs in a transaction that is rolled back after completion.
 
-    # Create sync engine for table setup/teardown
-    sync_dsn = config.postgres.dsn.replace("+asyncpg", "+psycopg2")
-    sync_engine = create_engine(sync_dsn)
-    Base.metadata.create_all(sync_engine)
+    This approach creates tables once (session-scoped) and uses TRUNCATE
+    to clean data between tests, which is much faster than CREATE/DROP.
+    """
+    from launchpad.db.dependencies import get_db
 
-    try:
-        # Patch sync_db to skip alembic migrations (tables already exist)
-        with patch("launchpad.app_factory.sync_db"):
-            # Patch AppsApiClient to return our mock
-            with patch("launchpad.lifespan.AppsApiClient") as mock_api_client_class:
-                mock_api_client_class.return_value = mock_apps_api_client
+    # Patch sync_db to skip alembic migrations (tables already exist)
+    with patch("launchpad.app_factory.sync_db"):
+        # Patch AppsApiClient to return our mock
+        with patch("launchpad.lifespan.AppsApiClient") as mock_api_client_class:
+            mock_api_client_class.return_value = mock_apps_api_client
 
-                # Create the app (uses real PostgreSQL from config)
-                app = create_app(config)
+            # Create the app (uses real PostgreSQL from config)
+            app = create_app(config)
 
-                # Override auth dependencies
+            # Override auth dependencies
+            app.dependency_overrides[auth_required] = mock_auth_dependency
+            app.dependency_overrides[admin_role_required] = mock_auth_dependency
 
-                app.dependency_overrides[auth_required] = mock_auth_dependency
-                app.dependency_overrides[admin_role_required] = mock_auth_dependency
+            with TestClient(app) as client:
+                yield client
 
-                with TestClient(app) as client:
-                    yield client
-    finally:
-        # Cleanup - drop all tables
-        Base.metadata.drop_all(sync_engine)
-        sync_engine.dispose()
+            # Cleanup: truncate all tables for next test
+            # This is much faster than DROP/CREATE and provides isolation
+            sync_dsn = config.postgres.dsn.replace("+asyncpg", "+psycopg2")
+            sync_engine = create_engine(sync_dsn)
+            with sync_engine.connect() as connection:
+                # Use a transaction to truncate all tables
+                trans = connection.begin()
+                try:
+                    for table in reversed(Base.metadata.sorted_tables):
+                        connection.execute(table.delete())
+                    trans.commit()
+                except Exception:
+                    trans.rollback()
+                    raise
+            sync_engine.dispose()
