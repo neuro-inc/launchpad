@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 class TestOutputsWorker:
     """Tests for the output buffer and periodic worker"""
 
-    @pytest.mark.asyncio
     async def test_app_added_to_buffer_on_install(
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
@@ -37,7 +36,6 @@ class TestOutputsWorker:
         # Verify the buffer is not empty
         assert not app_service._output_buffer.empty()
 
-    @pytest.mark.asyncio
     async def test_process_output_buffer_updates_outputs(
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
@@ -88,7 +86,6 @@ class TestOutputsWorker:
         app_names = [app["app_name"] for app in app_list]
         assert installed_data["launchpad_app_name"] in app_names
 
-    @pytest.mark.asyncio
     async def test_process_output_buffer_batch_processes_multiple_apps(
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
@@ -139,7 +136,6 @@ class TestOutputsWorker:
         assert "test-template-1" in app_names
         assert "test-template-2" in app_names
 
-    @pytest.mark.asyncio
     async def test_process_output_buffer_retries_on_failure(
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
@@ -178,7 +174,6 @@ class TestOutputsWorker:
         # Verify apps are back in buffer for retry
         assert app_service._output_buffer.qsize() == initial_size
 
-    @pytest.mark.asyncio
     async def test_process_output_buffer_skips_duplicates(
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
@@ -245,7 +240,6 @@ class TestOutputsWorker:
         )
         assert test_app_count == 1
 
-    @pytest.mark.asyncio
     async def test_process_output_buffer_empty_buffer(
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
@@ -265,7 +259,6 @@ class TestOutputsWorker:
         # Verify update_outputs was NOT called
         assert not mock_apps_api_client.update_outputs.called
 
-    @pytest.mark.asyncio
     async def test_process_output_buffer_preserves_existing_apps(
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
