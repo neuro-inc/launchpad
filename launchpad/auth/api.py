@@ -1,6 +1,7 @@
 import logging
 
-from fastapi import APIRouter
+import aiohttp
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response
@@ -59,12 +60,66 @@ async def get_token(
 
     try:
         async with request.app.http.post(token_url, data=data, ssl=False) as response:
+            # Handle authentication errors (wrong credentials)
+            if response.status == 401:
+                error_data = await response.json()
+                error_description = error_data.get(
+                    "error_description", "Invalid credentials"
+                )
+                logger.warning(
+                    f"Authentication failed for user '{token_request.username}': {error_description}"
+                )
+                raise Unauthorized("Invalid username or password")
+
+            # Handle client errors (bad request, forbidden, etc.)
+            elif 400 <= response.status < 500:
+                error_data = await response.json()
+                error_description = error_data.get("error_description", "Client error")
+                logger.warning(
+                    f"Client error during token request (status {response.status}): {error_description}"
+                )
+                raise HTTPException(
+                    status_code=response.status,
+                    detail=f"Authentication error: {error_description}",
+                )
+
+            # Handle server errors (Keycloak issues)
+            elif response.status >= 500:
+                error_text = await response.text()
+                logger.error(
+                    f"Keycloak server error (status {response.status}): {error_text}"
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail="Authentication service is temporarily unavailable. Please try again later.",
+                )
+
+            # Success case
             response.raise_for_status()
             token_data = await response.json()
             return JSONResponse(content=token_data)
+
+    except (Unauthorized, HTTPException):
+        # Re-raise our custom exceptions
+        raise
+    except aiohttp.ClientConnectionError as e:
+        logger.error(f"Failed to connect to Keycloak at {token_url}: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Cannot connect to authentication service. Please try again later.",
+        )
+    except aiohttp.ClientError as e:
+        logger.error(f"HTTP client error during token request: {e}")
+        raise HTTPException(
+            status_code=502, detail="Error communicating with authentication service."
+        )
     except Exception as e:
-        logger.error(f"Failed to obtain token from Keycloak: {e}")
-        raise Unauthorized("Failed to authenticate with provided credentials")
+        # Catch-all for unexpected errors
+        logger.error(f"Unexpected error during token request: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred during authentication.",
+        )
 
 
 @auth_router.get("/authorize", status_code=200)
