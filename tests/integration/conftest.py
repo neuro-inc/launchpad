@@ -45,7 +45,7 @@ def postgres_container() -> Any:
 
 
 @pytest.fixture(scope="session")
-def setup_database(postgres_container: PostgresContainer) -> str:
+def setup_database(postgres_container: PostgresContainer) -> Iterator[str]:
     """Create database tables once for all tests (session-scoped)"""
     sync_dsn = postgres_container.get_connection_url(driver=None).replace(
         "postgresql://", "postgresql+psycopg2://"
