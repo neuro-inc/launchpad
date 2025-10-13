@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import string
 import typing as t
@@ -282,6 +283,9 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         return {
             **values,
+            "image": {
+                "tag": os.getenv("APP_IMAGE_TAG", "latest")
+            },
             "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": realm_import_config_map_name,
             "postgresql": {

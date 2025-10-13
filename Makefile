@@ -1,7 +1,8 @@
 .PHONY: all test clean
 all test clean:
 
-HOOK_IMAGE_NAME ?= launchpad
+IMAGE_NAME ?= launchpad
+HOOK_IMAGE_NAME ?= launchpad-hook
 
 SHELL := /bin/sh -e
 
@@ -38,9 +39,22 @@ test-unit:
 test-integration:
 	poetry run pytest -vv --cov=launchpad --cov-report xml:.coverage.integration.xml tests/integration
 
+.PHONY: build-image
+build-image:
+	docker build \
+		-t $(IMAGE_NAME):latest \
+		-f Dockerfile \
+		.;
+
+.PHONY: push-image
+push-image:
+	docker tag $(IMAGE_NAME):latest ghcr.io/neuro-inc/$(IMAGE_NAME):$(IMAGE_TAG)
+	docker push ghcr.io/neuro-inc/$(IMAGE_NAME):$(IMAGE_TAG)
+
 .PHONY: build-hook-image
 build-hook-image:
 	docker build \
+		--build-arg APP_IMAGE_TAG=$(APP_IMAGE_TAG) \
 		-t $(HOOK_IMAGE_NAME):latest \
 		-f ./hooks/hooks.Dockerfile \
 		.;

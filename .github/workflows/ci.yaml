@@ -26,10 +26,6 @@ jobs:
           token: ${{ github.token }}
           expire-in: 30mins
 
-      - name: Set image tag
-        run: |
-          echo IMAGE_TAG=${GITHUB_REF#refs/tags/v} >> $GITHUB_ENV
-
       - name: Login to ghcr.io
         uses: docker/login-action@v3.4.0
         with:
@@ -39,12 +35,12 @@ jobs:
 
       - name: Build image
         run: |
-          docker build -t ${{ env.IMAGE_NAME }}:latest -f Dockerfile .
+          make build-image
 
       - name: Push image
         run: |
-          docker tag ${{ env.IMAGE_NAME }}:latest ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker push ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          export IMAGE_TAG=${GITHUB_REF#refs/tags/v}
+          make push-image
 
   release-pr-image:
     name: Release PR image
@@ -54,11 +50,6 @@ jobs:
       - name: Checkout commit
         uses: actions/checkout@v4
 
-      - name: Set image tag from PR
-        run: |
-          # Use PR number as tag
-          echo IMAGE_TAG=pr-${{ github.event.pull_request.number }} >> $GITHUB_ENV
-
       - name: Login to ghcr.io
         uses: docker/login-action@v3.4.0
         with:
@@ -68,18 +59,21 @@ jobs:
 
       - name: Build image
         run: |
-          docker build -t ${{ env.IMAGE_NAME }}:latest -f Dockerfile .
+          make build-image
 
       - name: Push PR image
         run: |
-          docker tag ${{ env.IMAGE_NAME }}:latest ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker push ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          BRANCH_NAME=${{ github.head_ref }}
+          # Convert to lowercase, replace anything not a-z0-9_.- with '-'
+          export IMAGE_TAG=$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+          make push-image
 
       - name: Comment on PR
         uses: actions/github-script@v7
         with:
           script: |
-            const imageTag = '${{ env.IMAGE_TAG }}';
+            const branchName = '${{ github.head_ref }}';
+            const imageTag = branchName.toLowerCase().replace(/[^a-z0-9_.-]/g, '-');
             const commentBody = `🐳 Docker image for this PR has been built and pushed:\n\n\`ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${imageTag}\``;
 
             // Get all comments on the PR
@@ -120,6 +114,17 @@ jobs:
         with:
           token: ${{ github.token }}
           expire-in: 30mins
+      - name: Set APP_IMAGE_TAG
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH_NAME=${{ github.head_ref }}
+            export APP_IMAGE_TAG=$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
+          elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            export APP_IMAGE_TAG=master
+          else
+            export APP_IMAGE_TAG=${GITHUB_REF#refs/tags/}
+          fi
+          echo "APP_IMAGE_TAG=${APP_IMAGE_TAG}" >> $GITHUB_ENV
       - name: Login to ghcr.io
         uses: docker/login-action@v3.5.0
         with:
@@ -128,6 +133,7 @@ jobs:
           password: ${{ github.token }}
       - name: Build image
         run: |
+          export APP_IMAGE_TAG=${{ env.APP_IMAGE_TAG }}
           make build-hook-image
       - name: Release branch image
         if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
