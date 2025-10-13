@@ -73,6 +73,9 @@ def config(postgres_container: PostgresContainer) -> Config:
     mock_cfg.apps = mock_apps_config
     mock_cfg.postgres = mock_pg_config
     mock_cfg.server = mock_server_config
+    mock_cfg.skip_seed_templates = False
+    # Set a mock instance_id for output processing tests
+    mock_cfg.instance_id = uuid4()
     return mock_cfg
 
 
@@ -152,7 +155,8 @@ def mock_apps_api_client() -> AsyncMock:
     mock_client.get_template.side_effect = get_template_side_effect
     mock_client.install_app.side_effect = install_app_side_effect
     mock_client.get_inputs.side_effect = get_inputs_side_effect
-    mock_client.get_outputs.return_value = {}
+    # Return proper structure for outputs with installed_apps list
+    mock_client.get_outputs.return_value = {"installed_apps": {"app_list": []}}
     mock_client.update_outputs.return_value = None
 
     return mock_client
