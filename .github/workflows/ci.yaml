@@ -148,7 +148,7 @@ jobs:
 
       - name: Push image
         run: |
-          export IMAGE_TAG=${GITHUB_REF#refs/tags/v}
+          export IMAGE_TAG=${GITHUB_REF#refs/tags/}
           make push-image
 
   release-pr-image:
