@@ -1,12 +1,12 @@
 from typing import Any
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from starlette.requests import Request
 
 from launchpad.app import Launchpad
-from launchpad.db.base import DSN, POSTGRES_DSN_SCHEMA, POSTGRES_ASYNCPG_DSN_SCHEMA
+from launchpad.db.base import DSN, POSTGRES_ASYNCPG_DSN_SCHEMA, POSTGRES_DSN_SCHEMA
 from launchpad.db.dependencies import get_db
 
 

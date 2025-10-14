@@ -124,6 +124,15 @@ data:
             "attributes": {}
           },
           {
+            "id": "b1c2d3e4-f5g6-7h8i-9j0k-1l2m3n4o5p6q",
+            "name": "user",
+            "description": "Standard user role",
+            "composite": false,
+            "clientRole": false,
+            "containerId": "f3806410-a4e6-476a-b806-b2722de95259",
+            "attributes": {}
+          },
+          {
             "id": "06f7d60e-180b-41a7-b86c-dd52f640671e",
             "name": "default-roles-master",
             "description": "${role_default-roles}",
@@ -131,7 +140,8 @@ data:
             "composites": {
               "realm": [
                 "offline_access",
-                "uma_authorization"
+                "uma_authorization",
+                "user"
               ],
               "client": {
                 "account": [
@@ -427,10 +437,41 @@ data:
               "attributes": {}
             }
           ],
-          "frontend": []
+          "frontend": [
+            {
+              "id": "f1a2b3c4-d5e6-7f8g-9h0i-1j2k3l4m5n6o",
+              "name": "admin",
+              "description": "Administrator role for frontend",
+              "composite": false,
+              "clientRole": true,
+              "containerId": "a0151d56-41f6-4722-af35-0159c9bfffeb",
+              "attributes": {}
+            }
+          ]
         }
       },
       "groups": [],
+      "users": [
+        {
+          "username": "admin",
+          "email": "admin@launchpad.com",
+          "firstName": "Admin",
+          "lastName": "User",
+          "enabled": true,
+          "emailVerified": true,
+          "credentials": [
+            {
+              "type": "password",
+              "value": "{{ .Values.LAUNCHPAD_ADMIN_PASSWORD }}",
+              "temporary": false
+            }
+          ],
+          "realmRoles": ["default-roles-master", "admin"],
+          "clientRoles": {
+            "frontend": ["admin"]
+          }
+        }
+      ],
       "defaultRole": {
         "id": "06f7d60e-180b-41a7-b86c-dd52f640671e",
         "name": "default-roles-master",
@@ -717,7 +758,7 @@ data:
           "consentRequired": false,
           "standardFlowEnabled": true,
           "implicitFlowEnabled": false,
-          "directAccessGrantsEnabled": false,
+          "directAccessGrantsEnabled": true,
           "serviceAccountsEnabled": false,
           "publicClient": true,
           "frontchannelLogout": true,
@@ -744,14 +785,14 @@ data:
             "roles",
             "profile",
             "basic",
-            "email"
+            "email",
+            "microprofile-jwt"
           ],
           "optionalClientScopes": [
             "address",
             "phone",
             "offline_access",
-            "organization",
-            "microprofile-jwt"
+            "organization"
           ]
         },
         {
@@ -1469,16 +1510,15 @@ data:
               "id": "6bb7738b-a9fc-49f4-ab66-39d0d6408806",
               "name": "groups",
               "protocol": "openid-connect",
-              "protocolMapper": "oidc-usermodel-realm-role-mapper",
+              "protocolMapper": "oidc-group-membership-mapper",
               "consentRequired": false,
               "config": {
                 "introspection.token.claim": "true",
-                "multivalued": "true",
-                "user.attribute": "foo",
+                "full.path": "false",
                 "id.token.claim": "true",
                 "access.token.claim": "true",
                 "claim.name": "groups",
-                "jsonType.label": "String"
+                "userinfo.token.claim": "true"
               }
             },
             {

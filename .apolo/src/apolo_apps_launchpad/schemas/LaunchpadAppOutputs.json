@@ -31,6 +31,29 @@
       "x-title": "App Instance",
       "x-type": "AppInstance"
     },
+    "AuthIngressMiddleware": {
+      "properties": {
+        "name": {
+          "pattern": "^platform",
+          "title": "Name",
+          "type": "string",
+          "x-description": "Name of the authentication middleware (with namespace) to apply to ingress traffic.",
+          "x-is-advanced-field": false,
+          "x-meta-type": "inline",
+          "x-title": "Middleware Name"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "AuthIngressMiddleware",
+      "type": "object",
+      "x-description": "Configure authentication middleware for ingress traffic.",
+      "x-is-advanced-field": false,
+      "x-meta-type": "integration",
+      "x-title": "Authentication Ingress Middleware",
+      "x-type": "AuthIngressMiddleware"
+    },
     "HttpApi": {
       "properties": {
         "host": {
@@ -139,7 +162,48 @@
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
       "x-title": "",
-      "x-type": "Image"
+      "x-type": "KeycloakConfig"
+    },
+    "LaunchpadAdminApi": {
+      "properties": {
+        "api_url": {
+          "$ref": "#/$defs/ServiceAPI_HttpApi_"
+        }
+      },
+      "required": [
+        "api_url"
+      ],
+      "title": "LaunchpadAdminApi",
+      "type": "object",
+      "x-type": "LaunchpadAdminApi"
+    },
+    "LaunchpadDefaultAdminUser": {
+      "properties": {
+        "username": {
+          "title": "Username",
+          "type": "string"
+        },
+        "email": {
+          "title": "Email",
+          "type": "string"
+        },
+        "password": {
+          "title": "Password",
+          "type": "string"
+        }
+      },
+      "required": [
+        "username",
+        "email",
+        "password"
+      ],
+      "title": "LaunchpadDefaultAdminUser",
+      "type": "object",
+      "x-description": "Default admin user created on installation that can be used to add new app templates and app instances to this Launchpad instance",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "Launchpad Default Admin User",
+      "x-type": "LaunchpadDefaultAdminUser"
     },
     "ServiceAPI_HttpApi_": {
       "properties": {
@@ -327,8 +391,47 @@
         }
       ],
       "default": null
+    },
+    "auth_middleware": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AuthIngressMiddleware"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "x-description": "Authentication middleware used to enable custom authentication for other applications.",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "Keycloak Auth Middleware"
+    },
+    "admin_user": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LaunchpadDefaultAdminUser"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "admin_api": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LaunchpadAdminApi"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
+  "required": [
+    "auth_middleware"
+  ],
   "title": "LaunchpadAppOutputs",
   "type": "object"
 }

@@ -1,14 +1,14 @@
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aiohttp import ClientSession, ClientResponseError
+from aiohttp import ClientResponseError, ClientSession
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 from yarl import URL
 
 from launchpad.auth.dependencies import auth_required
 from launchpad.auth.models import User
-from launchpad.auth.oauth import Oauth, OauthError, COOKIE_CODE_VERIFIER
+from launchpad.auth.oauth import COOKIE_CODE_VERIFIER, Oauth, OauthError
 from launchpad.config import KeycloakConfig
 from launchpad.errors import Unauthorized
 

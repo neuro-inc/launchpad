@@ -9,8 +9,10 @@ Create Date: 2025-07-25 12:16:58.678455
 """
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
+
 
 # revision identifiers, used by Alembic.
 revision = "0001"
@@ -29,6 +31,7 @@ def upgrade() -> None:
         sa.Column("is_shared", sa.Boolean(), nullable=False),
         sa.Column("user_id", sa.String(), nullable=True),
         sa.Column("url", sa.String(), nullable=True),
+        sa.Column("template_name", sa.String(), nullable=False, server_default=""),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column(
             "created_at",

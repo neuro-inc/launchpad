@@ -15,6 +15,7 @@ import sys
 
 import requests
 
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,

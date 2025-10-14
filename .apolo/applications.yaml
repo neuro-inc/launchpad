@@ -8,12 +8,12 @@
     schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppInputs.json
     types_name: LaunchpadAppInputs
     processor: LaunchpadInputsProcessor
-    image: ghcr.io/neuro-inc/launchpad
+    image: ghcr.io/neuro-inc/launchpad-hook
   outputs:
     schema_path: .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppOutputs.json
     types_name: LaunchpadAppOutputs
     processor: LaunchpadOutputProcessor
-    image: ghcr.io/neuro-inc/launchpad
+    image: ghcr.io/neuro-inc/launchpad-hook
   short_description: "Preconfigured applications for the Apolo platform"
   description: |
     Launchpad is a suit of applications preconfigured for the Apolo platform,

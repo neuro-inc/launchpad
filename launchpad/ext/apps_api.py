@@ -3,7 +3,8 @@ import typing
 from typing import Any
 from uuid import UUID
 
-from aiohttp import ClientSession, ClientResponseError
+from aiohttp import ClientResponseError, ClientSession
+
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +64,24 @@ class AppsApiClient:
             url=f"{self.v2_url}/instances/{app_id}",
         )
 
+    async def get_template(
+        self, template_name: str, template_version: str
+    ) -> dict[str, Any]:
+        """Get template details by name and version"""
+        return await self._request(
+            method="GET",
+            url=f"{self.v2_url}/templates/{template_name}/{template_version}",
+        )
+
     async def get_outputs(self, app_id: UUID) -> dict[str, Any]:
         return await self._request(
             method="GET", url=f"{self.v1_url}/instances/{app_id}/output"
+        )
+
+    async def get_inputs(self, app_id: UUID) -> dict[str, Any]:
+        """Get the input parameters that were used when installing the app"""
+        return await self._request(
+            method="GET", url=f"{self.v1_url}/instances/{app_id}/input"
         )
 
     async def install_app(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -88,12 +104,12 @@ class AppsApiClient:
         headers = kwargs.pop("headers", {})
         headers.update(self.default_headers)
         try:
-            response = await self._http.request(  # type: ignore[call-arg]
+            response = await self._http.request(
                 method,
                 url,
                 *args,
                 headers=headers,
-                verify_ssl=False,  # todo: check why requests are failing with SSL error
+                ssl=False,  # todo: check why requests are failing with SSL error
                 **kwargs,
             )
         except TimeoutError as e:

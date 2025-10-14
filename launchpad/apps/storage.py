@@ -1,14 +1,18 @@
+import logging
 import typing
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, and_, delete
+from sqlalchemy import and_, delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from launchpad.apps.models import (
-    InstalledApp,
     UNIQUE__INSTALLED_APPS__LAUNCHPAD_APP_NAME__USER_ID,
+    InstalledApp,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 async def select_app(
@@ -48,6 +52,7 @@ async def insert_app(
     is_shared: bool,
     user_id: str | None,
     url: str | None,
+    template_name: str,
 ) -> InstalledApp:
     query = (
         insert(InstalledApp)
@@ -61,6 +66,7 @@ async def insert_app(
                 is_shared=is_shared,
                 user_id=user_id,
                 url=url,
+                template_name=template_name,
             )
         )
         # possible update a URL of an app
@@ -85,7 +91,6 @@ async def update_app_url(
     url: str,
 ) -> InstalledApp | None:
     """Update the URL of an installed app"""
-    from sqlalchemy import update
 
     query = (
         update(InstalledApp)
@@ -110,6 +115,11 @@ async def list_apps(
     is_internal: bool | None = None,
     is_shared: bool | None = None,
 ) -> typing.Sequence[InstalledApp]:
+    logger.debug(
+        f"list_apps called with filters: user_id={user_id}, "
+        f"is_internal={is_internal}, is_shared={is_shared}"
+    )
+
     where = []
     if user_id is not None:
         where.append(InstalledApp.user_id == user_id)
@@ -121,5 +131,10 @@ async def list_apps(
     query = select(InstalledApp)
     if where:
         query = query.where(and_(*where))
+
+    logger.debug(f"Executing query: {query}")
     cursor = await db.execute(query)
-    return cursor.scalars().all()
+    results = cursor.scalars().all()
+    logger.debug(f"Query returned {len(results)} results")
+
+    return results

@@ -1,0 +1,41 @@
+from copy import deepcopy
+from dataclasses import dataclass
+from typing import Any, Self, cast
+
+from apolo_app_types.helm.utils.deep_merging import merge_list_of_dicts
+from starlette.requests import Request
+
+from launchpad.apps.registry.base import BaseContext, GenericApp
+
+
+@dataclass
+class ServiceDeploymentContext(BaseContext):
+    auth_middleware_name: str
+
+    @classmethod
+    async def from_request(
+        cls,
+        request: Request,
+    ) -> Self:
+        params = {
+            "auth_middleware_name": request.app.config.apolo.auth_middleware_name,
+        }
+        return cls(**params)
+
+
+class ServiceDeploymentApp(GenericApp):
+    def __init__(self, context: ServiceDeploymentContext, **kwargs: Any) -> None:
+        super().__init__(context=context, **kwargs)
+
+    async def _generate_inputs(self) -> dict[str, Any]:
+        context = cast(ServiceDeploymentContext, self._context)
+        inputs = deepcopy(self._inputs)
+        middleware_config = {
+            "networking_config": {
+                "advanced_networking": {
+                    "ingress_middleware": {"name": context.auth_middleware_name}
+                },
+            }
+        }
+        inputs = merge_list_of_dicts([inputs, middleware_config])
+        return inputs

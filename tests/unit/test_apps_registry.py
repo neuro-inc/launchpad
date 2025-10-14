@@ -1,23 +1,24 @@
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from starlette.requests import Request
 
 from launchpad.app import Launchpad
-from launchpad.apps.registry.internal.llm_inference import LlmInferenceApp
-from launchpad.apps.registry.internal.postgres import PostgresApp
-from launchpad.apps.registry.base import BaseContext, App
+from launchpad.apps.registry.base import App, BaseContext
 from launchpad.apps.registry.internal.context import InternalAppContext
 from launchpad.apps.registry.internal.embeddings import (
-    EmbeddingsApp,
     APP_NAME_EMBEDDINGS,
+    EmbeddingsApp,
 )
-from launchpad.apps.registry.internal.llm_inference import APP_NAME_LLM_INFERENCE
-from launchpad.apps.registry.internal.postgres import APP_NAME_POSTGRES
+from launchpad.apps.registry.internal.llm_inference import (
+    APP_NAME_LLM_INFERENCE,
+    LlmInferenceApp,
+)
+from launchpad.apps.registry.internal.postgres import APP_NAME_POSTGRES, PostgresApp
 from launchpad.apps.registry.shared.openwebui import (
+    APP_NAME_OPEN_WEB_UI,
     OpenWebUIApp,
     OpenWebUIAppContext,
-    APP_NAME_OPEN_WEB_UI,
 )
 
 
@@ -153,8 +154,8 @@ def test_llm_inference_app_attributes(mock_internal_app_context: MagicMock) -> N
     app = LlmInferenceApp(context=mock_internal_app_context)
 
     assert app.name == APP_NAME_LLM_INFERENCE
-    assert app.template_name == "llm-inference-argocd"
-    assert app.template_version == "latest"
+    assert app.template_name == "llm-inference"
+    assert app.template_version == "v25.10.0"
     assert app.is_internal is True
     assert app.is_shared is True
     assert app.verbose_name == "LLM Inference"

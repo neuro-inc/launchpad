@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
@@ -70,6 +70,16 @@ async def test_app_service_install_app_success(
     mock_app_instance.name = "test-app-name"
     mock_app_instance.is_internal = False
     mock_app_instance.is_shared = False
+    mock_app_instance.template_name = "test-template"
+    mock_app_instance.template_version = "1.0.0"
+    mock_app_instance.verbose_name = "Test App"
+    mock_app_instance.description_short = "Short description"
+    mock_app_instance.description_long = "Long description"
+    mock_app_instance.logo = "http://example.com/logo.png"
+    mock_app_instance.documentation_urls = []
+    mock_app_instance.external_urls = []
+    mock_app_instance.tags = []
+    mock_app_instance.user_id = None
 
     mock_apps_api_client.install_app.return_value = {
         "id": "123",
@@ -87,6 +97,7 @@ async def test_app_service_install_app_success(
             is_shared=False,
             user_id=None,
             url=None,
+            template_name="test-template",
         )
 
         result = await app_service.install(

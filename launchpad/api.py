@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from fastapi import APIRouter
@@ -10,7 +11,10 @@ from launchpad.apps.api import apps_router
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.service import DepAppService
 from launchpad.auth.api import auth_router
-from launchpad.auth.dependencies import auth_required, admin_auth_required
+from launchpad.auth.dependencies import admin_auth_required, auth_required
+
+
+logger = logging.getLogger(__name__)
 
 root_router = APIRouter()
 

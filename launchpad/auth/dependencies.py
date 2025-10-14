@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Annotated
+from typing import Annotated, Any
 
 import aiohttp
 import backoff
@@ -9,11 +9,15 @@ from aiohttp import ClientSession
 from asyncache import cached
 from cachetools import LRUCache
 from fastapi import Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from starlette.exceptions import HTTPException
 from starlette.requests import Request
+from starlette.status import HTTP_401_UNAUTHORIZED
 
 from launchpad.auth.models import User
 from launchpad.config import KeycloakConfig
 from launchpad.errors import Unauthorized
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +35,14 @@ async def auth_required(
         logger.error("Unable to extract `email` from the token")
         raise Unauthorized("Unable to authorize a user without an email")
     name = decoded_token.get("name") or ""
-    return User(id=email, email=email, name=name)
+
+    # Extract roles from resource_access.frontend.roles
+    groups = []
+    resource_access = decoded_token.get("resource_access", {})
+    frontend_access = resource_access.get("frontend", {})
+    groups = frontend_access.get("roles", [])
+
+    return User(id=email, email=email, name=name, groups=groups)
 
 
 async def _token_from_request(request: Request) -> dict[str, Any]:
@@ -117,14 +128,28 @@ async def _get_jwks(
     Therefore, we cache the response by a token `kid`.
     """
     url = f"{keycloak_config.url}/realms/{keycloak_config.realm}/protocol/openid-connect/certs"
-    response = await http.get(  # type: ignore[call-arg]
-        url, verify_ssl=False
-    )  # todo: see what we can do here with cert
+    response = await http.get(url, ssl=False)  # todo: see what we can do here with cert
     response.raise_for_status()
     return await response.json()
 
 
+async def admin_role_required(
+    request: Request,
+) -> User:
+    """
+    JWT authentication with admin role check
+    """
+    user = await auth_required(request)
+    if "admin" not in user.groups:
+        logger.warning(
+            f"User {user.email} attempted to access admin endpoint without admin role"
+        )
+        raise Unauthorized("Admin role required")
+    return user
+
+
 Auth = Annotated[User, Depends(auth_required)]
+AdminAuth = Annotated[User, Depends(admin_role_required)]
 
 
 async def admin_auth_required(
@@ -132,9 +157,6 @@ async def admin_auth_required(
 ) -> User:
     # use basic auth for admin endpoints
     # get admin password from env variable LAUNCHPAD_ADMIN_PASSWORD
-    from fastapi.security import HTTPBasic, HTTPBasicCredentials
-    from starlette.status import HTTP_401_UNAUTHORIZED
-    from starlette.exceptions import HTTPException
 
     security = HTTPBasic()
     credentials: HTTPBasicCredentials | None = await security(request)

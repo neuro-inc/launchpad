@@ -1,6 +1,9 @@
 [tool.ruff]
 target-version = "py313"
 
+[tool.ruff.lint]
+select = ["I"]  # Enable isort rules
+
 [tool.ruff.lint.isort]
 combine-as-imports = true
 lines-after-imports = 2
@@ -9,9 +12,14 @@ known-first-party = ["launchpad", "tests"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-log_level = "DEBUG"
+log_cli_level = "INFO"
+log_cli_format = "%(levelname)s %(name)s:%(filename)s:%(lineno)s %(message)s"
 testpaths = ["tests"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:testcontainers",
+    "ignore::ResourceWarning",
+]
 
 [tool.coverage.run]
 branch = true
@@ -39,6 +47,10 @@ ignore_missing_imports = true
 module = "asyncache.*"
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = "testcontainers.*"
+ignore_missing_imports = true
+
 [tool.poetry]
 name = "launchpad"
 version = "0.1.0"
@@ -51,7 +63,7 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = "^3.12"
 fastapi = "^0.116.1"
 uvicorn = "^0.35.0"
 neuro-logging = "^25.6.1"
@@ -68,8 +80,8 @@ backoff = "^2.2.1"
 pyjwt = "^2.10.1"
 asyncache = "^0.3.1"
 asyncpg = "^0.30.0"
-apolo-app-types = "v25.9.23"
-apolo-sdk = "v25.9.0"
+apolo-app-types = "v25.10.13"
+apolo-sdk = "v25.9.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
@@ -79,6 +91,8 @@ mypy = "^1.18.1"
 pytest-cov = "^6.2.1"
 pytest-asyncio = "1.1.0"
 types-cachetools = "^6.2.0.20250827"
+testcontainers = {extras = ["postgres"], version = "^4.10.0"}
+psycopg2-binary = "^2.9.10"
 
 [build-system]
 requires = ["poetry-core"]

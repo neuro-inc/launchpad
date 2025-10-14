@@ -4,13 +4,18 @@ from uuid import UUID
 
 from starlette.requests import Request
 
-from launchpad.apps.registry.base import App
-from launchpad.apps.registry.base import BaseContext
+from launchpad.apps.exceptions import AppNotInstalledError, AppUnhealthyError
+from launchpad.apps.registry.base import App, BaseContext
 from launchpad.apps.registry.internal.embeddings import APP_NAME_EMBEDDINGS
 from launchpad.apps.registry.internal.llm_inference import APP_NAME_LLM_INFERENCE
 from launchpad.apps.registry.internal.postgres import APP_NAME_POSTGRES
-from launchpad.auth import HEADER_X_AUTH_REQUEST_EMAIL, HEADER_X_AUTH_REQUEST_USERNAME
+from launchpad.auth import (
+    HEADER_X_AUTH_REQUEST_EMAIL,
+    HEADER_X_AUTH_REQUEST_GROUPS,
+    HEADER_X_AUTH_REQUEST_USERNAME,
+)
 from launchpad.errors import BadRequest
+
 
 APP_NAME_OPEN_WEB_UI = "openwebui"
 
@@ -28,7 +33,6 @@ class OpenWebUIAppContext(BaseContext):
         request: Request,
     ) -> Self:
         # todo: fix this circular import
-        from launchpad.apps.service import AppNotInstalledError, AppUnhealthyError
 
         app_service = request.app.app_service
         params = {
@@ -90,9 +94,11 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
     async def _generate_inputs(self) -> dict[str, Any]:
         return {
             "networking_config": {
-                "ingress_http": {"auth": False},
-                "advanced_networking": {
-                    "ingress_middleware": {"name": self._context.auth_middleware_name}
+                "ingress_http": {
+                    "auth": {
+                        "middleware": {"name": self._context.auth_middleware_name},
+                        "type": "custom_auth",
+                    }
                 },
             },
             "embeddings_api": {
@@ -120,6 +126,10 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
             "openwebui_specific": {
                 "env": [
                     {
+                        "name": "DEFAULT_USER_ROLE",
+                        "value": "user",
+                    },
+                    {
                         "name": "ENABLE_OAUTH_SIGNUP",
                         "value": "true",
                     },
@@ -141,7 +151,7 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                     },
                     {
                         "name": "OAUTH_ALLOWED_ROLES",
-                        "value": "admin,editor,viewer",
+                        "value": "admin,user",
                     },
                     {
                         "name": "OAUTH_ADMIN_ROLES",
@@ -159,6 +169,15 @@ class OpenWebUIApp(App[OpenWebUIAppContext]):
                         "name": "WEBUI_AUTH_TRUSTED_NAME_HEADER",
                         "value": HEADER_X_AUTH_REQUEST_USERNAME,
                     },
+                    {
+                        "name": "WEBUI_AUTH_TRUSTED_GROUPS_HEADER",
+                        "value": HEADER_X_AUTH_REQUEST_GROUPS,
+                    },
+                    {
+                        "name": "ENABLE_SIGNUP",
+                        "value": "true",
+                    },
+                    {"name": "GLOBAL_LOG_LEVEL", "value": "DEBUG"},
                 ]
             },
         }

@@ -42,27 +42,27 @@
     },
     "AppsConfig": {
       "properties": {
-        "llm_config": {
-          "$ref": "#/$defs/LLMConfig"
-        },
-        "postgres_config": {
-          "$ref": "#/$defs/PostgresConfig"
-        },
-        "embeddings_config": {
-          "$ref": "#/$defs/TextEmbeddingsConfig"
+        "quick_start_config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NoQuickStartConfig"
+            },
+            {
+              "$ref": "#/$defs/OpenWebUIConfig"
+            }
+          ],
+          "title": "Quick Start Config"
         }
       },
       "required": [
-        "llm_config",
-        "postgres_config",
-        "embeddings_config"
+        "quick_start_config"
       ],
       "title": "AppsConfig",
       "type": "object",
-      "x-description": "Configuration for the applications to be launched in the Launchpad.",
+      "x-description": "Choose some available configuration to jump start this Launchpad instance with some preinstalled applications",
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
-      "x-title": "Apps Configuration",
+      "x-title": "Quickstart Apps",
       "x-type": "AppsConfig"
     },
     "CustomLLMModel": {
@@ -250,7 +250,7 @@
       "x-title": "LLM Configuration",
       "x-type": "LLMConfig"
     },
-    "LaunchpadConfig": {
+    "LaunchpadWebAppConfig": {
       "properties": {
         "preset": {
           "$ref": "#/$defs/Preset",
@@ -261,13 +261,63 @@
       "required": [
         "preset"
       ],
-      "title": "LaunchpadConfig",
+      "title": "LaunchpadWebAppConfig",
       "type": "object",
       "x-description": "Configuration for the Launchpad application.",
       "x-is-advanced-field": false,
       "x-meta-type": "inline",
       "x-title": "Launchpad Configuration",
-      "x-type": "LaunchpadConfig"
+      "x-type": "LaunchpadWebAppConfig"
+    },
+    "NoQuickStartConfig": {
+      "properties": {
+        "no_quickstart": {
+          "const": true,
+          "title": "No Quickstart",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "no_quickstart"
+      ],
+      "title": "NoQuickStartConfig",
+      "type": "object",
+      "x-description": "Install only Launchpad. You can add new apps to Launchpad later",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "No Startup Apps",
+      "x-type": "NoQuickStartConfig"
+    },
+    "OpenWebUIConfig": {
+      "properties": {
+        "openweb_quickstart": {
+          "const": true,
+          "title": "Openweb Quickstart",
+          "type": "boolean"
+        },
+        "llm_config": {
+          "$ref": "#/$defs/LLMConfig"
+        },
+        "postgres_config": {
+          "$ref": "#/$defs/PostgresConfig"
+        },
+        "embeddings_config": {
+          "$ref": "#/$defs/TextEmbeddingsConfig"
+        }
+      },
+      "required": [
+        "openweb_quickstart",
+        "llm_config",
+        "postgres_config",
+        "embeddings_config"
+      ],
+      "title": "OpenWebUIConfig",
+      "type": "object",
+      "x-description": "Install OpenWebUI and its dependencies on Launchpad startup",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "OpenWebUI",
+      "x-type": "OpenWebUIConfig"
     },
     "PostgresConfig": {
       "properties": {
@@ -417,15 +467,15 @@
     }
   },
   "properties": {
-    "launchpad_config": {
-      "$ref": "#/$defs/LaunchpadConfig"
+    "launchpad_web_app_config": {
+      "$ref": "#/$defs/LaunchpadWebAppConfig"
     },
     "apps_config": {
       "$ref": "#/$defs/AppsConfig"
     }
   },
   "required": [
-    "launchpad_config",
+    "launchpad_web_app_config",
     "apps_config"
   ],
   "title": "LaunchpadAppInputs",

@@ -1,13 +1,13 @@
 import uuid
 from typing import Any
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from launchpad.apps.models import InstalledApp
-from launchpad.apps.storage import select_app, insert_app, delete_app
+from launchpad.apps.storage import delete_app, insert_app, select_app
 
 
 @pytest.fixture
@@ -57,6 +57,7 @@ async def test_insert_app_success(mock_db_session: MagicMock, app_id: UUID) -> N
         "is_shared": False,
         "user_id": "test-user",
         "url": "http://test.com",
+        "template_name": "test-template",
     }
     mock_db_session.add.return_value = None
     mock_db_session.flush.return_value = None
@@ -71,6 +72,7 @@ async def test_insert_app_success(mock_db_session: MagicMock, app_id: UUID) -> N
         is_shared=app_data["is_shared"],
         user_id=app_data["user_id"],
         url=app_data["url"],
+        template_name=app_data["template_name"],
     )
 
     result = await insert_app(mock_db_session, **app_data)

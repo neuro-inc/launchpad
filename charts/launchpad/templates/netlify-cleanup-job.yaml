@@ -24,6 +24,7 @@ spec:
       containers:
       - name: netlify-domain-remover
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: Always
         command: ["python3", "/app/scripts/netlify-cleanup.py"]
         args:
           - "delete"

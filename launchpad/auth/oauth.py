@@ -3,16 +3,17 @@ import hashlib
 import logging
 import os
 import typing
-from typing import Annotated, TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 from urllib.parse import urlencode
 
 import backoff
-from aiohttp import ClientSession, ClientConnectionError, ClientResponseError
+from aiohttp import ClientConnectionError, ClientResponseError, ClientSession
 from fastapi import Depends
 from starlette.requests import Request
-from starlette.responses import Response, RedirectResponse
+from starlette.responses import RedirectResponse, Response
 
 from launchpad.config import KeycloakConfig
+
 
 if TYPE_CHECKING:
     from launchpad.app import Launchpad
