@@ -42,20 +42,17 @@ test-integration:
 .PHONY: test-hooks
 test-hooks:
 	cd hooks && \
-	. .venv/bin/activate && \
-	pytest -vv --cov=apolo_apps_launchpad --cov-report xml:.coverage.hooks.xml tests/unit
+	poetry run pytest -vv --cov=apolo_apps_launchpad --cov-report xml:.coverage.hooks.xml tests/unit
 
 .PHONY: test-hooks-lint
 test-hooks-lint:
 	cd hooks && \
-	. .venv/bin/activate && \
-	ruff check .
+	poetry run ruff check .
 
 .PHONY: test-hooks-format
 test-hooks-format:
 	cd hooks && \
-	. .venv/bin/activate && \
-	ruff format --check .
+	poetry run ruff format --check .
 
 .PHONY: hooks-install
 hooks-install:
