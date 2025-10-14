@@ -39,6 +39,33 @@ test-unit:
 test-integration:
 	poetry run pytest -vv --cov=launchpad --cov-report xml:.coverage.integration.xml tests/integration
 
+.PHONY: test-hooks
+test-hooks:
+	cd hooks && \
+	. .venv/bin/activate && \
+	pytest -vv --cov=apolo_apps_launchpad --cov-report xml:.coverage.hooks.xml tests/unit
+
+.PHONY: test-hooks-lint
+test-hooks-lint:
+	cd hooks && \
+	. .venv/bin/activate && \
+	ruff check .
+
+.PHONY: test-hooks-format
+test-hooks-format:
+	cd hooks && \
+	. .venv/bin/activate && \
+	ruff format --check .
+
+.PHONY: hooks-install
+hooks-install:
+	cd hooks && \
+	poetry config virtualenvs.in-project true && \
+	poetry install
+
+.PHONY: test-all
+test-all: test-unit test-integration test-hooks
+
 .PHONY: build-image
 build-image:
 	docker build \

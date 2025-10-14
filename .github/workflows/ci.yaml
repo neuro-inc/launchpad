@@ -50,6 +50,25 @@ jobs:
       - name: Install project
         run: poetry install --no-interaction
 
+      - name: Load cached hooks venv
+        id: cached-hooks-dependencies
+        uses: actions/cache@v4
+        with:
+          path: hooks/.venv
+          key: hooks-venv-${{ runner.os }}-${{ hashFiles('hooks/poetry.lock') }}
+
+      - name: Install hooks dependencies
+        if: steps.cached-hooks-dependencies.outputs.cache-hit != 'true'
+        run: |
+          cd hooks
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction --no-root
+
+      - name: Install hooks project
+        run: |
+          cd hooks
+          poetry install --no-interaction
+
       - name: Run format checks
         run: make format
         env:
@@ -68,6 +87,9 @@ jobs:
           TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
           TESTCONTAINERS_RYUK_DISABLED: false
 
+      - name: Run hooks tests
+        run: make test-hooks
+
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v5
         if: always()
@@ -85,6 +107,16 @@ jobs:
           files: .coverage.integration.xml
           flags: integration
           name: integration-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload hooks test coverage
+        uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          files: hooks/.coverage.hooks.xml
+          flags: hooks
+          name: hooks-tests
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
