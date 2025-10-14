@@ -1,9 +1,7 @@
 import json
 
 import pytest
-from dirty_equals import IsStr
 
-from apolo_app_types.app_types import AppType
 from apolo_app_types.protocols.common import Preset
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
@@ -14,7 +12,6 @@ from apolo_apps_launchpad.types import (
     LaunchpadAppInputs,
     LaunchpadWebAppConfig,
     LLMConfig,
-    NoQuickStartConfig,
     OpenWebUIConfig,
     PostgresConfig,
     PreConfiguredEmbeddingsModels,
@@ -28,7 +25,6 @@ from apolo_app_types_fixtures.constants import (
     APP_SECRETS_NAME,
 )
 
-from apolo_app_types_fixtures.apolo_clients import (setup_clients, presets_available)
 
 @pytest.mark.asyncio
 async def test_launchpad_values_generation_with_preconfigured_model(setup_clients):

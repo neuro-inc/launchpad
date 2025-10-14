@@ -1,12 +1,6 @@
 import pytest
 
 from apolo_apps_launchpad.outputs_processor import get_launchpad_outputs
-from apolo_app_types_fixtures.apolo_clients import (
-    setup_clients,
-    mock_kubernetes_client,
-    app_instance_id,
-    presets_available,
-)
 
 
 KEYCLOAK_HELM_VALUES = {
