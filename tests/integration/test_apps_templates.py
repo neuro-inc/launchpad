@@ -1,3 +1,4 @@
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -326,7 +327,7 @@ class TestUnimportedInstances:
     """Integration tests for listing unimported app instances"""
 
     def test_get_unimported_instances_empty(
-        self, app_client: TestClient, mock_apps_api_client
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
         """Test getting unimported instances when Apps API returns empty list"""
         # Mock Apps API to return empty list
@@ -348,7 +349,7 @@ class TestUnimportedInstances:
         assert data["page"] == 1
 
     def test_get_unimported_instances_all_unimported(
-        self, app_client: TestClient, mock_apps_api_client
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
         """Test getting unimported instances when no apps are imported"""
         # Mock Apps API to return some instances
@@ -390,7 +391,7 @@ class TestUnimportedInstances:
         assert data["items"][1]["name"] == "app-2"
 
     def test_get_unimported_instances_filtered(
-        self, app_client: TestClient, mock_apps_api_client
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
         """Test that imported instances are filtered out"""
         app_id_1 = "123e4567-e89b-12d3-a456-426614174000"
@@ -455,7 +456,7 @@ class TestUnimportedInstances:
         assert app_id_2 not in returned_ids  # Imported app should be filtered out
 
     def test_get_unimported_instances_pagination(
-        self, app_client: TestClient, mock_apps_api_client
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
         """Test pagination parameters are passed to Apps API"""
         mock_apps_api_client.list_instances.return_value = {

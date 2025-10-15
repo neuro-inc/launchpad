@@ -97,7 +97,9 @@ class TestTemplatesEndpoint:
         data = response.json()
 
         # Should include the imported template
-        test_template = next((t for t in data["items"] if t["name"] == "test-template"), None)
+        test_template = next(
+            (t for t in data["items"] if t["name"] == "test-template"), None
+        )
         assert test_template is not None
         assert test_template["verbose_name"] == "Test Template"
         assert test_template["template_name"] == "test-template"
