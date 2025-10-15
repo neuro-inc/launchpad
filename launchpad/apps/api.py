@@ -303,6 +303,8 @@ async def view_get_templates(
         from launchpad.apps.template_storage import list_templates
 
         templates = await list_templates(db, is_internal=is_internal)
+        print("TEMPLATES FETCHED:")
+        print(templates)
         return [
             LaunchpadTemplateRead.model_validate(template) for template in templates
         ]
