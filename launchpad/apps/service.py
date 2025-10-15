@@ -41,6 +41,7 @@ from launchpad.apps.storage import (
 )
 from launchpad.apps.template_models import AppTemplate
 from launchpad.apps.template_storage import (
+    delete_template,
     insert_template,
     list_templates,
     select_template,
@@ -853,6 +854,70 @@ class AppService:
         async with self._db() as db:
             async with db.begin():
                 await delete_app(db, app_id)
+
+    async def delete_template_by_id(self, template_id: UUID) -> None:
+        """
+        Delete a template by its ID.
+
+        This method:
+        1. Finds the template by ID
+        2. Gets all app instances that use this template
+        3. Uninstalls each app instance via Apps API
+        4. Deletes the template from the database
+
+        Args:
+            template_id: The UUID of the template to delete
+
+        Raises:
+            AppServiceError: If the template cannot be deleted
+            NotFound: If the template doesn't exist
+        """
+        # Get the template to find its name
+        async with self._db() as db:
+            template = await select_template(db, id=template_id)
+
+        if not template:
+            raise NotFound(f"Template with id {template_id} not found")
+
+        logger.info(
+            f"Deleting template {template.name} (id={template_id}) "
+            f"and all its instances"
+        )
+
+        # Get all app instances that use this template
+        async with self._db() as db:
+            installed_apps = await list_apps(db, template_name=template.name)
+
+        logger.info(
+            f"Found {len(installed_apps)} app instances to uninstall "
+            f"for template {template.name}"
+        )
+
+        # Uninstall each app instance via Apps API and delete from DB
+        for app in installed_apps:
+            logger.info(
+                f"Uninstalling app instance {app.app_id} "
+                f"(launchpad_app_name={app.launchpad_app_name})"
+            )
+            try:
+                await self._apps_api_client.delete_app(app.app_id)
+            except AppsApiError as e:
+                logger.warning(
+                    f"Failed to uninstall app {app.app_id} from Apps API: {e}. "
+                    "Continuing with deletion from database."
+                )
+
+            # Delete from database
+            async with self._db() as db:
+                async with db.begin():
+                    await delete_app(db, app.app_id)
+
+        # Finally, delete the template
+        async with self._db() as db:
+            async with db.begin():
+                await delete_template(db, template_id)
+
+        logger.info(f"Successfully deleted template {template.name} and all instances")
 
     async def is_healthy(
         self,

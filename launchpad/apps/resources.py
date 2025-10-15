@@ -94,6 +94,7 @@ class LaunchpadTemplateRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    id: UUID
     name: str
     template_name: str
     template_version: str

@@ -1,10 +1,11 @@
 import logging
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter
 from fastapi_pagination import Page, paginate
 from starlette.requests import Request
-from starlette.status import HTTP_200_OK
+from starlette.status import HTTP_200_OK, HTTP_204_NO_CONTENT
 
 from launchpad.app import Launchpad
 from launchpad.apps.exceptions import (
@@ -13,6 +14,7 @@ from launchpad.apps.exceptions import (
     AppTemplateNotFound,
     AppUnhealthyError,
 )
+from launchpad.apps.models import InstalledApp
 from launchpad.apps.resources import (
     GenericAppInstallRequest,
     ImportAppRequest,
@@ -279,3 +281,47 @@ async def view_post_run_app(
             f"App {app_name} already installed, returning existing installation"
         )
         return installed_app
+
+
+@apps_router.get("/instances")
+async def view_get_instances(
+    app_service: DepAppService,
+    user: AdminAuth,
+) -> list[InstalledApp]:
+    """
+    Get all installed app instances.
+
+    This endpoint requires admin authentication.
+    Returns a list of all installed apps across all users.
+    """
+    return await app_service.list_installed_apps()
+
+
+@apps_router.delete("/templates/{template_id}", status_code=HTTP_204_NO_CONTENT)
+async def view_delete_template(
+    template_id: UUID,
+    app_service: DepAppService,
+    user: AdminAuth,
+) -> None:
+    """
+    Delete a template by its ID.
+
+    This endpoint requires admin authentication.
+    Deletes the template from the AppTemplate table.
+    """
+    await app_service.delete_template_by_id(template_id)
+
+
+@apps_router.delete("/instances/{app_id}", status_code=HTTP_204_NO_CONTENT)
+async def view_delete_instance(
+    app_id: UUID,
+    app_service: DepAppService,
+    user: AdminAuth,
+) -> None:
+    """
+    Delete an app instance by its ID.
+
+    This endpoint requires admin authentication.
+    Uninstalls the app from Apps API and removes it from the database.
+    """
+    await app_service.delete(app_id)
