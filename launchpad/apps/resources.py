@@ -107,6 +107,7 @@ class LaunchpadTemplateRead(BaseModel):
     tags: list[str]
     is_internal: bool
     is_shared: bool
+    default_inputs: dict[str, Any]
 
 
 class LaunchpadInstalledAppRead(BaseModel):

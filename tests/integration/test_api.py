@@ -23,6 +23,86 @@ def test_config_endpoint(app_client: TestClient, config: Config) -> None:
     }
 
 
+class TestTemplatesEndpoint:
+    """Integration tests for the /templates endpoint"""
+
+    def test_get_templates_all(self, app_client: TestClient) -> None:
+        """Test getting all templates (internal and non-internal)"""
+        response = app_client.get("/api/v1/apps/templates")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        # Should have seeded templates: openwebui, vllm, postgres, embeddings
+        assert len(data) >= 4
+
+        # Verify all templates have required fields
+        for template in data:
+            assert "id" in template
+            assert "name" in template
+            assert "template_name" in template
+            assert "template_version" in template
+            assert "verbose_name" in template
+            assert "is_internal" in template
+            assert "is_shared" in template
+
+    def test_get_templates_internal_only(self, app_client: TestClient) -> None:
+        """Test filtering only internal templates"""
+        response = app_client.get("/api/v1/apps/templates?is_internal=true")
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should have 3 internal templates: vllm, postgres, embeddings
+        assert len(data) == 3
+        for template in data:
+            assert template["is_internal"] is True
+
+        internal_names = {t["name"] for t in data}
+        assert "vllm-llama-3.1-8b" in internal_names
+        assert "postgres" in internal_names
+        assert "embeddings" in internal_names
+
+    def test_get_templates_non_internal_only(self, app_client: TestClient) -> None:
+        """Test filtering only non-internal templates"""
+        response = app_client.get("/api/v1/apps/templates?is_internal=false")
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should have at least openwebui (seeded)
+        assert len(data) >= 1
+        for template in data:
+            assert template["is_internal"] is False
+
+        # OpenWebUI should be present
+        openwebui = next((t for t in data if t["name"] == "openwebui"), None)
+        assert openwebui is not None
+        assert openwebui["verbose_name"] == "OpenWebUI"
+
+    def test_get_templates_with_imported(self, app_client: TestClient) -> None:
+        """Test templates list includes imported templates"""
+        # Import a new template
+        import_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "test-template",
+                "template_version": "1.0.0",
+                "verbose_name": "Test Template",
+            },
+        )
+        assert import_response.status_code == 200
+
+        # Get all templates
+        response = app_client.get("/api/v1/apps/templates")
+        assert response.status_code == 200
+        data = response.json()
+
+        # Should include the imported template
+        test_template = next((t for t in data if t["name"] == "test-template"), None)
+        assert test_template is not None
+        assert test_template["verbose_name"] == "Test Template"
+        assert test_template["template_name"] == "test-template"
+        assert test_template["template_version"] == "1.0.0"
+
+
 class TestInstancesEndpoint:
     """Integration tests for the /instances endpoint"""
 

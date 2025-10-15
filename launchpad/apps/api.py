@@ -283,6 +283,31 @@ async def view_post_run_app(
         return installed_app
 
 
+@apps_router.get("/templates")
+async def view_get_templates(
+    request: Request,
+    user: AdminAuth,
+    is_internal: bool | None = None,
+) -> list[LaunchpadTemplateRead]:
+    """
+    Get all app templates.
+
+    This endpoint requires admin authentication.
+    Returns a list of all templates in the system.
+
+    Query parameters:
+    - is_internal: Optional filter to get only internal or non-internal templates
+    """
+    app: Launchpad = request.app
+    async with app.db() as db:
+        from launchpad.apps.template_storage import list_templates
+
+        templates = await list_templates(db, is_internal=is_internal)
+        return [
+            LaunchpadTemplateRead.model_validate(template) for template in templates
+        ]
+
+
 @apps_router.get("/instances")
 async def view_get_instances(
     app_service: DepAppService,
