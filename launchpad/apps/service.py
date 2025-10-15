@@ -200,7 +200,7 @@ class AppService:
         1. Fetches the template from the AppTemplate table
         2. Checks if the template has a handler_class
         3. If yes, uses that handler class; if no, uses GenericApp
-        4. Merges default_inputs from template with user_inputs
+        4. Merges input from template with user_inputs
         5. Installs the app
 
         Args:
@@ -231,7 +231,7 @@ class AppService:
             )
 
         # Merge inputs: user inputs override template defaults
-        inputs = template.default_inputs.copy()
+        inputs = template.input.copy()
         if user_inputs:
             inputs.update(user_inputs)
 
@@ -545,7 +545,7 @@ class AppService:
             )
 
         # Fetch the actual inputs that were used when the app was installed
-        # This provides accurate default_inputs for the template
+        # This provides accurate input for the template
         app_inputs = {}
         try:
             app_inputs = await self._apps_api_client.get_inputs(import_request.app_id)
@@ -555,7 +555,7 @@ class AppService:
         except AppsApiError:
             logger.warning(
                 f"Failed to fetch inputs for app {import_request.app_id}, "
-                "will use empty dict for default_inputs"
+                "will use empty dict for input"
             )
 
         # Extract template information from Apps API response
@@ -579,7 +579,7 @@ class AppService:
             is_internal=import_request.is_internal,
             is_shared=True,  # Imported installed apps are always shared
             fallback_verbose_name=display_name,  # Use display_name as fallback
-            default_inputs=app_inputs,  # Use actual inputs from the running app
+            input=app_inputs,  # Use actual inputs from the running app
         )
 
         # Link the app installation
@@ -615,7 +615,7 @@ class AppService:
         is_internal: bool = False,
         is_shared: bool = True,
         fallback_verbose_name: str | None = None,
-        default_inputs: dict[str, Any] | None = None,
+        input: dict[str, Any] | None = None,
     ) -> AppTemplate:
         """
         Fetch template metadata from Apps API and create/update AppTemplate.
@@ -639,7 +639,7 @@ class AppService:
             is_internal: Whether template is internal
             is_shared: Whether apps from this template can be shared
             fallback_verbose_name: Fallback for verbose_name (used by import_app for display_name)
-            default_inputs: Default inputs to merge when installing
+            input: Default inputs to merge when installing
 
         Returns:
             The created/updated AppTemplate record
@@ -708,7 +708,7 @@ class AppService:
                     is_internal=is_internal,
                     is_shared=is_shared,
                     handler_class=None,
-                    default_inputs=default_inputs,
+                    input=input,
                 )
 
         return template
@@ -728,7 +728,7 @@ class AppService:
         is_internal: bool = False,
         is_shared: bool = True,
         handler_class: str | None = None,
-        default_inputs: dict[str, Any] | None = None,
+        input: dict[str, Any] | None = None,
     ) -> AppTemplate:
         """
         Create or update an AppTemplate record.
@@ -750,7 +750,7 @@ class AppService:
             is_internal: Whether template is internal
             is_shared: Whether apps from this template can be shared
             handler_class: Optional handler class for custom behavior
-            default_inputs: Default inputs to merge when installing
+            input: Default inputs to merge when installing
 
         Returns:
             The created/updated AppTemplate record
@@ -766,7 +766,7 @@ class AppService:
                 template_version="1.0.0",
                 verbose_name="My App",
                 description_short="A custom application",
-                default_inputs={"preset": {"name": "cpu-small"}}
+                input={"preset": {"name": "cpu-small"}}
             )
             ```
         """
@@ -787,7 +787,7 @@ class AppService:
                     is_internal=is_internal,
                     is_shared=is_shared,
                     handler_class=handler_class,
-                    default_inputs=default_inputs,
+                    input=input,
                 )
 
     async def import_template(
@@ -846,7 +846,7 @@ class AppService:
             tags=import_request.tags,
             is_internal=import_request.is_internal,
             is_shared=import_request.is_shared,
-            default_inputs=import_request.default_inputs,
+            input=import_request.input,
         )
 
     async def delete(self, app_id: UUID) -> None:
@@ -1022,15 +1022,16 @@ class AppService:
         1. Fetches all app instances from Apps API
         2. Gets list of imported app_ids from database
         3. Filters out instances that are already imported
+        4. Filters to only include instances in healthy status
 
         Args:
             page: Page number (default: 1)
             size: Page size (default: 50, max: 100)
 
         Returns:
-            Dict with paginated list of unimported instances, including:
-            - items: List of app instances not yet imported
-            - total: Total count of unimported instances
+            Dict with paginated list of unimported healthy instances, including:
+            - items: List of healthy app instances not yet imported
+            - total: Total count of unimported healthy instances
             - page: Current page number
             - size: Page size
             - pages: Total number of pages
@@ -1042,19 +1043,19 @@ class AppService:
                 print(f"Unimported: {instance['name']} ({instance['id']})")
             ```
         """
-        logger.info(f"Fetching unimported instances (page={page}, size={size})")
+        logger.info(f"Fetching unimported healthy instances (page={page}, size={size})")
 
-        # Fetch all instances from Apps API
+        # Fetch only healthy instances from Apps API using states filter
         try:
             apps_api_response = await self._apps_api_client.list_instances(
-                page=page, size=size
+                page=page, size=size, states=["healthy"]
             )
         except AppsApiError as e:
             logger.error(f"Failed to fetch instances from Apps API: {e}")
             raise AppServiceError("Unable to fetch instances from Apps API") from e
 
-        all_instances = apps_api_response.get("items", [])
-        logger.info(f"Fetched {len(all_instances)} instances from Apps API")
+        healthy_instances = apps_api_response.get("items", [])
+        logger.info(f"Fetched {len(healthy_instances)} healthy instances from Apps API")
 
         # Get all imported app_ids from database
         async with self._db() as db:
@@ -1063,14 +1064,14 @@ class AppService:
         imported_app_ids = {str(app.app_id) for app in imported_apps}
         logger.info(f"Found {len(imported_app_ids)} imported apps in database")
 
-        # Filter out imported instances
+        # Filter out imported instances (filtering for healthy is now done by Apps API)
         unimported_instances = [
             instance
-            for instance in all_instances
+            for instance in healthy_instances
             if instance.get("id") not in imported_app_ids
         ]
 
-        logger.info(f"Found {len(unimported_instances)} unimported instances")
+        logger.info(f"Found {len(unimported_instances)} unimported healthy instances")
 
         # Return paginated result matching the Apps API response structure
         return {

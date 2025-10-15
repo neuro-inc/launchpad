@@ -106,17 +106,17 @@ async def insert_template(
     is_internal: bool,
     is_shared: bool,
     handler_class: str | None = None,
-    default_inputs: dict[str, Any] | None = None,
+    input: dict[str, Any] | None = None,
 ) -> AppTemplate:
     """
     Insert or update a template.
 
-    Note: default_inputs is currently optional for backwards compatibility,
+    Note: input is currently optional for backwards compatibility,
     but will be converted to an empty dict if None.
     """
-    # Ensure default_inputs is never None
-    if default_inputs is None:
-        default_inputs = {}
+    # Ensure input is never None
+    if input is None:
+        input = {}
     query = (
         insert(AppTemplate)
         .values(
@@ -135,7 +135,7 @@ async def insert_template(
                 is_internal=is_internal,
                 is_shared=is_shared,
                 handler_class=handler_class,
-                default_inputs=default_inputs,
+                input=input,
             )
         )
         .on_conflict_do_update(
@@ -153,7 +153,7 @@ async def insert_template(
                 is_internal=is_internal,
                 is_shared=is_shared,
                 handler_class=handler_class,
-                default_inputs=default_inputs,
+                input=input,
             ),
         )
         .returning(AppTemplate)

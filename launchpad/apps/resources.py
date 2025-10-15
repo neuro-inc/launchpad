@@ -27,7 +27,7 @@ class ImportTemplateRequest(BaseModel):
     is_shared: bool = Field(
         default=True, description="Whether apps from this template can be shared"
     )
-    default_inputs: dict[str, Any] = Field(
+    input: dict[str, Any] = Field(
         default_factory=dict,
         description="Default inputs to merge with user-provided inputs when installing",
     )
@@ -107,7 +107,7 @@ class LaunchpadTemplateRead(BaseModel):
     tags: list[str]
     is_internal: bool
     is_shared: bool
-    default_inputs: dict[str, Any]
+    input: dict[str, Any]
 
 
 class LaunchpadInstalledAppRead(BaseModel):

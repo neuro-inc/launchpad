@@ -92,8 +92,8 @@ class TestTemplateImport:
         assert data2["verbose_name"] == "Second Import"
         assert data2["template_version"] == "2.0.0"  # Updated
 
-    def test_import_template_with_default_inputs(self, app_client: TestClient) -> None:
-        """Test importing a template with default_inputs"""
+    def test_import_template_with_input(self, app_client: TestClient) -> None:
+        """Test importing a template with input"""
         response = app_client.post(
             "/api/v1/apps/templates/import",
             json={
@@ -101,7 +101,7 @@ class TestTemplateImport:
                 "template_version": "1.0.0",
                 "name": "custom-service",
                 "verbose_name": "Custom Service Deployment",
-                "default_inputs": {
+                "input": {
                     "displayName": "My Service",
                     "preset": {"name": "cpu-small"},
                 },
@@ -352,7 +352,7 @@ class TestUnimportedInstances:
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
         """Test getting unimported instances when no apps are imported"""
-        # Mock Apps API to return some instances
+        # Mock Apps API to return only healthy instances (API filters by states=["healthy"])
         mock_instances = [
             {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -362,18 +362,10 @@ class TestUnimportedInstances:
                 "display_name": "Jupyter Notebook",
                 "state": "healthy",
             },
-            {
-                "id": "223e4567-e89b-12d3-a456-426614174000",
-                "name": "app-2",
-                "template_name": "vscode",
-                "template_version": "2.0.0",
-                "display_name": "VSCode",
-                "state": "progressing",
-            },
         ]
         mock_apps_api_client.list_instances.return_value = {
             "items": mock_instances,
-            "total": 2,
+            "total": 1,
             "page": 1,
             "size": 50,
             "pages": 1,
@@ -384,19 +376,23 @@ class TestUnimportedInstances:
         assert response.status_code == 200
         data = response.json()
 
-        # All instances should be unimported since we haven't imported any
-        assert len(data["items"]) == 2
-        assert data["total"] == 2
+        # Verify API was called with states filter
+        mock_apps_api_client.list_instances.assert_called_once_with(
+            page=1, size=50, states=["healthy"]
+        )
+
+        # All healthy instances should be returned since none are imported
+        assert len(data["items"]) == 1
+        assert data["total"] == 1
         assert data["items"][0]["name"] == "app-1"
-        assert data["items"][1]["name"] == "app-2"
+        assert data["items"][0]["state"] == "healthy"
 
     def test_get_unimported_instances_filtered(
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
     ) -> None:
-        """Test that imported instances are filtered out"""
+        """Test that imported instances are filtered out (API filters non-healthy)"""
         app_id_1 = "123e4567-e89b-12d3-a456-426614174000"
         app_id_2 = "223e4567-e89b-12d3-a456-426614174000"
-        app_id_3 = "323e4567-e89b-12d3-a456-426614174000"
 
         # Import one app
         import_response = app_client.post(
@@ -405,7 +401,8 @@ class TestUnimportedInstances:
         )
         assert import_response.status_code == 200
 
-        # Mock Apps API to return 3 instances (one imported, two not)
+        # Mock Apps API to return only healthy instances (API filters by states=["healthy"])
+        # Degraded instances won't be returned by the API anymore
         mock_instances = [
             {
                 "id": app_id_1,
@@ -423,18 +420,10 @@ class TestUnimportedInstances:
                 "display_name": "Test App",
                 "state": "healthy",
             },
-            {
-                "id": app_id_3,
-                "name": "app-3",
-                "template_name": "mlflow",
-                "template_version": "1.5.0",
-                "display_name": "MLflow",
-                "state": "degraded",
-            },
         ]
         mock_apps_api_client.list_instances.return_value = {
             "items": mock_instances,
-            "total": 3,
+            "total": 2,
             "page": 1,
             "size": 50,
             "pages": 1,
@@ -445,14 +434,20 @@ class TestUnimportedInstances:
         assert response.status_code == 200
         data = response.json()
 
-        # Only 2 instances should be returned (app-1 and app-3, excluding imported app-2)
-        assert len(data["items"]) == 2
-        assert data["total"] == 2
+        # Verify API was called with states filter
+        mock_apps_api_client.list_instances.assert_called_once_with(
+            page=1, size=50, states=["healthy"]
+        )
 
-        # Verify the unimported instances
+        # Only 1 instance should be returned (app-1: healthy and unimported)
+        # app-2 is excluded (imported)
+        # app-3 would have been excluded by the API (degraded, filtered by states=["healthy"])
+        assert len(data["items"]) == 1
+        assert data["total"] == 1
+
+        # Verify only the healthy, unimported instance is returned
         returned_ids = [item["id"] for item in data["items"]]
         assert app_id_1 in returned_ids
-        assert app_id_3 in returned_ids
         assert app_id_2 not in returned_ids  # Imported app should be filtered out
 
     def test_get_unimported_instances_pagination(
@@ -470,5 +465,7 @@ class TestUnimportedInstances:
         response = app_client.get("/api/v1/apps/instances/unimported?page=2&size=10")
 
         assert response.status_code == 200
-        # Verify that pagination parameters were passed to Apps API
-        mock_apps_api_client.list_instances.assert_called_once_with(page=2, size=10)
+        # Verify that pagination parameters and states filter were passed to Apps API
+        mock_apps_api_client.list_instances.assert_called_once_with(
+            page=2, size=10, states=["healthy"]
+        )

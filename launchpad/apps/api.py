@@ -107,7 +107,7 @@ async def view_post_install_generic_app(
         is_internal=generic_app_request.is_internal,
         is_shared=generic_app_request.is_shared,
         handler_class=None,  # No handler for generic apps
-        default_inputs=generic_app_request.inputs,
+        input=generic_app_request.inputs,
     )
 
     # Install from the template
@@ -116,7 +116,7 @@ async def view_post_install_generic_app(
         return await app_service.install_from_template(
             request=request,
             template_name=template_name,
-            user_inputs=None,  # Already in default_inputs
+            user_inputs=None,  # Already in input
             user_id=user.id,
         )
     except AppServiceError as e:
@@ -334,19 +334,21 @@ async def view_get_unimported_instances(
     size: int = 50,
 ) -> dict[str, Any]:
     """
-    Get app instances from Apolo that haven't been imported into Launchpad yet.
+    Get healthy app instances from Apolo that haven't been imported into Launchpad yet.
 
     This endpoint requires admin authentication.
-    Returns a paginated list of app instances that exist in Apps API
+    Returns a paginated list of healthy app instances that exist in Apps API
     but are not yet tracked in Launchpad's database.
+
+    Only instances with state="healthy" are returned.
 
     Query parameters:
     - page: Page number (default: 1)
     - size: Page size (default: 50, max: 100)
 
     Returns:
-    - items: List of unimported app instances
-    - total: Total count of unimported instances
+    - items: List of unimported healthy app instances
+    - total: Total count of unimported healthy instances
     - page: Current page number
     - size: Page size
     - pages: Total number of pages
