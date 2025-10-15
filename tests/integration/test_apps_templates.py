@@ -320,3 +320,154 @@ class TestAppPool:
         assert "public-template" in template_names
         # Internal template should NOT be in the pool
         assert "internal-template" not in template_names
+
+
+class TestUnimportedInstances:
+    """Integration tests for listing unimported app instances"""
+
+    def test_get_unimported_instances_empty(
+        self, app_client: TestClient, mock_apps_api_client
+    ) -> None:
+        """Test getting unimported instances when Apps API returns empty list"""
+        # Mock Apps API to return empty list
+        mock_apps_api_client.list_instances.return_value = {
+            "items": [],
+            "total": 0,
+            "page": 1,
+            "size": 50,
+            "pages": 0,
+        }
+
+        response = app_client.get("/api/v1/apps/instances/unimported")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["items"] == []
+        assert data["total"] == 0
+        assert data["page"] == 1
+
+    def test_get_unimported_instances_all_unimported(
+        self, app_client: TestClient, mock_apps_api_client
+    ) -> None:
+        """Test getting unimported instances when no apps are imported"""
+        # Mock Apps API to return some instances
+        mock_instances = [
+            {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "name": "app-1",
+                "template_name": "jupyter",
+                "template_version": "1.0.0",
+                "display_name": "Jupyter Notebook",
+                "state": "healthy",
+            },
+            {
+                "id": "223e4567-e89b-12d3-a456-426614174000",
+                "name": "app-2",
+                "template_name": "vscode",
+                "template_version": "2.0.0",
+                "display_name": "VSCode",
+                "state": "progressing",
+            },
+        ]
+        mock_apps_api_client.list_instances.return_value = {
+            "items": mock_instances,
+            "total": 2,
+            "page": 1,
+            "size": 50,
+            "pages": 1,
+        }
+
+        response = app_client.get("/api/v1/apps/instances/unimported")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # All instances should be unimported since we haven't imported any
+        assert len(data["items"]) == 2
+        assert data["total"] == 2
+        assert data["items"][0]["name"] == "app-1"
+        assert data["items"][1]["name"] == "app-2"
+
+    def test_get_unimported_instances_filtered(
+        self, app_client: TestClient, mock_apps_api_client
+    ) -> None:
+        """Test that imported instances are filtered out"""
+        app_id_1 = "123e4567-e89b-12d3-a456-426614174000"
+        app_id_2 = "223e4567-e89b-12d3-a456-426614174000"
+        app_id_3 = "323e4567-e89b-12d3-a456-426614174000"
+
+        # Import one app
+        import_response = app_client.post(
+            "/api/v1/apps/import",
+            json={"app_id": app_id_2},
+        )
+        assert import_response.status_code == 200
+
+        # Mock Apps API to return 3 instances (one imported, two not)
+        mock_instances = [
+            {
+                "id": app_id_1,
+                "name": "app-1",
+                "template_name": "jupyter",
+                "template_version": "1.0.0",
+                "display_name": "Jupyter Notebook",
+                "state": "healthy",
+            },
+            {
+                "id": app_id_2,  # This one is imported
+                "name": "app-2",
+                "template_name": "test-template",
+                "template_version": "1.0.0",
+                "display_name": "Test App",
+                "state": "healthy",
+            },
+            {
+                "id": app_id_3,
+                "name": "app-3",
+                "template_name": "mlflow",
+                "template_version": "1.5.0",
+                "display_name": "MLflow",
+                "state": "degraded",
+            },
+        ]
+        mock_apps_api_client.list_instances.return_value = {
+            "items": mock_instances,
+            "total": 3,
+            "page": 1,
+            "size": 50,
+            "pages": 1,
+        }
+
+        response = app_client.get("/api/v1/apps/instances/unimported")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Only 2 instances should be returned (app-1 and app-3, excluding imported app-2)
+        assert len(data["items"]) == 2
+        assert data["total"] == 2
+
+        # Verify the unimported instances
+        returned_ids = [item["id"] for item in data["items"]]
+        assert app_id_1 in returned_ids
+        assert app_id_3 in returned_ids
+        assert app_id_2 not in returned_ids  # Imported app should be filtered out
+
+    def test_get_unimported_instances_pagination(
+        self, app_client: TestClient, mock_apps_api_client
+    ) -> None:
+        """Test pagination parameters are passed to Apps API"""
+        mock_apps_api_client.list_instances.return_value = {
+            "items": [],
+            "total": 0,
+            "page": 2,
+            "size": 10,
+            "pages": 0,
+        }
+
+        response = app_client.get("/api/v1/apps/instances/unimported?page=2&size=10")
+
+        assert response.status_code == 200
+        # Verify that pagination parameters were passed to Apps API
+        mock_apps_api_client.list_instances.assert_called_once_with(page=2, size=10)

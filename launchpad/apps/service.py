@@ -1010,6 +1010,77 @@ class AppService:
                 )
             return apps
 
+    async def list_unimported_instances(
+        self,
+        page: int = 1,
+        size: int = 50,
+    ) -> dict[str, Any]:
+        """
+        List app instances that exist in Apps API but haven't been imported into Launchpad.
+
+        This method:
+        1. Fetches all app instances from Apps API
+        2. Gets list of imported app_ids from database
+        3. Filters out instances that are already imported
+
+        Args:
+            page: Page number (default: 1)
+            size: Page size (default: 50, max: 100)
+
+        Returns:
+            Dict with paginated list of unimported instances, including:
+            - items: List of app instances not yet imported
+            - total: Total count of unimported instances
+            - page: Current page number
+            - size: Page size
+            - pages: Total number of pages
+
+        Example:
+            ```python
+            result = await app_service.list_unimported_instances(page=1, size=50)
+            for instance in result['items']:
+                print(f"Unimported: {instance['name']} ({instance['id']})")
+            ```
+        """
+        logger.info(f"Fetching unimported instances (page={page}, size={size})")
+
+        # Fetch all instances from Apps API
+        try:
+            apps_api_response = await self._apps_api_client.list_instances(
+                page=page, size=size
+            )
+        except AppsApiError as e:
+            logger.error(f"Failed to fetch instances from Apps API: {e}")
+            raise AppServiceError("Unable to fetch instances from Apps API") from e
+
+        all_instances = apps_api_response.get("items", [])
+        logger.info(f"Fetched {len(all_instances)} instances from Apps API")
+
+        # Get all imported app_ids from database
+        async with self._db() as db:
+            imported_apps = await list_apps(db)
+
+        imported_app_ids = {str(app.app_id) for app in imported_apps}
+        logger.info(f"Found {len(imported_app_ids)} imported apps in database")
+
+        # Filter out imported instances
+        unimported_instances = [
+            instance
+            for instance in all_instances
+            if instance.get("id") not in imported_app_ids
+        ]
+
+        logger.info(f"Found {len(unimported_instances)} unimported instances")
+
+        # Return paginated result matching the Apps API response structure
+        return {
+            "items": unimported_instances,
+            "total": len(unimported_instances),
+            "page": page,
+            "size": size,
+            "pages": (len(unimported_instances) + size - 1) // size,
+        }
+
 
 async def dep_app_service(request: Request) -> AppService:
     app: "Launchpad" = request.app

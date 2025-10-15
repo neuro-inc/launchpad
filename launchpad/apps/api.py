@@ -283,17 +283,17 @@ async def view_post_run_app(
         return installed_app
 
 
-@apps_router.get("/templates")
+@apps_router.get("/templates", response_model=Page[LaunchpadTemplateRead])
 async def view_get_templates(
     request: Request,
     user: AdminAuth,
     is_internal: bool | None = None,
-) -> list[LaunchpadTemplateRead]:
+) -> Any:
     """
     Get all app templates.
 
     This endpoint requires admin authentication.
-    Returns a list of all templates in the system.
+    Returns a paginated list of all templates in the system.
 
     Query parameters:
     - is_internal: Optional filter to get only internal or non-internal templates
@@ -305,23 +305,78 @@ async def view_get_templates(
         templates = await list_templates(db, is_internal=is_internal)
         print("TEMPLATES FETCHED:")
         print(templates)
-        return [
+        template_reads = [
             LaunchpadTemplateRead.model_validate(template) for template in templates
         ]
+        return paginate(template_reads)
 
 
-@apps_router.get("/instances")
+@apps_router.get("/instances", response_model=Page[InstalledApp])
 async def view_get_instances(
     app_service: DepAppService,
     user: AdminAuth,
-) -> list[InstalledApp]:
+) -> Any:
     """
     Get all installed app instances.
 
     This endpoint requires admin authentication.
-    Returns a list of all installed apps across all users.
+    Returns a paginated list of all installed apps across all users.
     """
-    return await app_service.list_installed_apps()
+    installed_apps = await app_service.list_installed_apps()
+    return paginate(installed_apps)
+
+
+@apps_router.get("/instances/unimported")
+async def view_get_unimported_instances(
+    app_service: DepAppService,
+    user: AdminAuth,
+    page: int = 1,
+    size: int = 50,
+) -> dict[str, Any]:
+    """
+    Get app instances from Apolo that haven't been imported into Launchpad yet.
+
+    This endpoint requires admin authentication.
+    Returns a paginated list of app instances that exist in Apps API
+    but are not yet tracked in Launchpad's database.
+
+    Query parameters:
+    - page: Page number (default: 1)
+    - size: Page size (default: 50, max: 100)
+
+    Returns:
+    - items: List of unimported app instances
+    - total: Total count of unimported instances
+    - page: Current page number
+    - size: Page size
+    - pages: Total number of pages
+
+    Example response:
+    ```json
+    {
+        "items": [
+            {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "name": "my-app-abc123",
+                "template_name": "jupyter",
+                "template_version": "1.0.0",
+                "display_name": "My Jupyter Notebook",
+                "state": "healthy",
+                "created_at": "2025-01-15T10:30:00Z",
+                ...
+            }
+        ],
+        "total": 5,
+        "page": 1,
+        "size": 50,
+        "pages": 1
+    }
+    ```
+    """
+    try:
+        return await app_service.list_unimported_instances(page=page, size=size)
+    except AppServiceError as e:
+        raise BadRequest(str(e))
 
 
 @apps_router.delete("/templates/{template_id}", status_code=HTTP_204_NO_CONTENT)

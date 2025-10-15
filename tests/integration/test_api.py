@@ -31,12 +31,13 @@ class TestTemplatesEndpoint:
         response = app_client.get("/api/v1/apps/templates")
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
+        assert "items" in data
+        assert isinstance(data["items"], list)
         # Should have seeded templates: openwebui, vllm, postgres, embeddings
-        assert len(data) >= 4
+        assert len(data["items"]) >= 4
 
         # Verify all templates have required fields
-        for template in data:
+        for template in data["items"]:
             assert "id" in template
             assert "name" in template
             assert "template_name" in template
@@ -52,11 +53,11 @@ class TestTemplatesEndpoint:
         data = response.json()
 
         # Should have 3 internal templates: vllm, postgres, embeddings
-        assert len(data) == 3
-        for template in data:
+        assert len(data["items"]) == 3
+        for template in data["items"]:
             assert template["is_internal"] is True
 
-        internal_names = {t["name"] for t in data}
+        internal_names = {t["name"] for t in data["items"]}
         assert "vllm-llama-3.1-8b" in internal_names
         assert "postgres" in internal_names
         assert "embeddings" in internal_names
@@ -68,12 +69,12 @@ class TestTemplatesEndpoint:
         data = response.json()
 
         # Should have at least openwebui (seeded)
-        assert len(data) >= 1
-        for template in data:
+        assert len(data["items"]) >= 1
+        for template in data["items"]:
             assert template["is_internal"] is False
 
         # OpenWebUI should be present
-        openwebui = next((t for t in data if t["name"] == "openwebui"), None)
+        openwebui = next((t for t in data["items"] if t["name"] == "openwebui"), None)
         assert openwebui is not None
         assert openwebui["verbose_name"] == "OpenWebUI"
 
@@ -96,7 +97,7 @@ class TestTemplatesEndpoint:
         data = response.json()
 
         # Should include the imported template
-        test_template = next((t for t in data if t["name"] == "test-template"), None)
+        test_template = next((t for t in data["items"] if t["name"] == "test-template"), None)
         assert test_template is not None
         assert test_template["verbose_name"] == "Test Template"
         assert test_template["template_name"] == "test-template"
@@ -111,8 +112,9 @@ class TestInstancesEndpoint:
         response = app_client.get("/api/v1/apps/instances")
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
-        assert len(data) == 0
+        assert "items" in data
+        assert isinstance(data["items"], list)
+        assert len(data["items"]) == 0
 
     def test_get_instances_with_apps(self, app_client: TestClient) -> None:
         """Test getting instances after installing apps"""
@@ -137,7 +139,7 @@ class TestInstancesEndpoint:
         data = response.json()
 
         # Filter non-internal instances (internal apps like vllm are installed on startup)
-        non_internal = [item for item in data if not item["is_internal"]]
+        non_internal = [item for item in data["items"] if not item["is_internal"]]
 
         # Should have 1 non-internal instance
         assert len(non_internal) == 1
@@ -167,7 +169,7 @@ class TestInstancesEndpoint:
         data = response.json()
 
         # Filter non-internal instances
-        non_internal = [item for item in data if not item["is_internal"]]
+        non_internal = [item for item in data["items"] if not item["is_internal"]]
 
         # Should have 3 non-internal instances
         assert len(non_internal) == 3
@@ -198,7 +200,7 @@ class TestDeleteInstance:
 
         # Get the actual app_id from the database
         instances_response = app_client.get("/api/v1/apps/instances")
-        instances = instances_response.json()
+        instances = instances_response.json()["items"]
         actual_app_id = next(
             item["app_id"] for item in instances if item["launchpad_app_name"] == app_id
         )
@@ -212,7 +214,7 @@ class TestDeleteInstance:
 
         # Verify it's no longer in the database
         instances_response = app_client.get("/api/v1/apps/instances")
-        instances = instances_response.json()
+        instances = instances_response.json()["items"]
         remaining_apps = [
             item for item in instances if item["launchpad_app_name"] == app_id
         ]
@@ -295,7 +297,7 @@ class TestDeleteTemplate:
 
         # Verify instance exists
         instances_response = app_client.get("/api/v1/apps/instances")
-        instances = instances_response.json()
+        instances = instances_response.json()["items"]
         non_internal = [item for item in instances if not item["is_internal"]]
         assert len(non_internal) == 1
         assert non_internal[0]["launchpad_app_name"] == "cascade-test"
@@ -315,7 +317,7 @@ class TestDeleteTemplate:
         assert "cascade-test" not in pool_apps
 
         instances_response = app_client.get("/api/v1/apps/instances")
-        instances = instances_response.json()
+        instances = instances_response.json()["items"]
         non_internal = [item for item in instances if not item["is_internal"]]
         assert len(non_internal) == 0
 
@@ -343,7 +345,7 @@ class TestDeleteTemplate:
 
         # Verify we have 1 shared instance
         instances_response = app_client.get("/api/v1/apps/instances")
-        instances = instances_response.json()
+        instances = instances_response.json()["items"]
         non_internal = [item for item in instances if not item["is_internal"]]
         multi_instances = [
             item
