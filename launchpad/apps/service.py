@@ -1064,11 +1064,13 @@ class AppService:
         imported_app_ids = {str(app.app_id) for app in imported_apps}
         logger.info(f"Found {len(imported_app_ids)} imported apps in database")
 
-        # Filter out imported instances (filtering for healthy is now done by Apps API)
+        # Filter out imported instances and launchpad templates
+        # (filtering for healthy is now done by Apps API)
         unimported_instances = [
             instance
             for instance in healthy_instances
             if instance.get("id") not in imported_app_ids
+            and instance.get("template_name") != "launchpad"
         ]
 
         logger.info(f"Found {len(unimported_instances)} unimported healthy instances")
