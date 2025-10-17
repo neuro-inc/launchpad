@@ -571,7 +571,7 @@ class AppService:
         template = await self._fetch_and_create_template(
             template_name=template_name,
             template_version=template_version,
-            name=None,  # Always use template_name as the identifier for imported apps
+            name=import_request.name,
             verbose_name=import_request.verbose_name,
             description_short=import_request.description_short,
             description_long=import_request.description_long,

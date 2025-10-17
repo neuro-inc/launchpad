@@ -289,7 +289,7 @@ class TestAppImport:
             "/api/v1/apps/import",
             json={
                 "app_id": str(app_id),
-                "name": "my-imported-app",  # This is ignored - template_name from API is used
+                "name": "my-imported-app",
                 "verbose_name": "My Imported App",
                 "description_short": "Custom imported app",
             },
@@ -301,7 +301,7 @@ class TestAppImport:
         # The 'name' parameter is ignored for app imports to prevent bugs
         # The template is always identified by template_name from Apps API
         assert (
-            data["launchpad_app_name"] == "test-template"
+            data["launchpad_app_name"] == "my-imported-app"
         )  # From Apps API, not "my-imported-app"
         assert data["is_shared"] is True  # Always true for imported apps
 
