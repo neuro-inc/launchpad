@@ -110,13 +110,16 @@ class TestInstancesEndpoint:
     """Integration tests for the /instances endpoint"""
 
     def test_get_instances_empty(self, app_client: TestClient) -> None:
-        """Test getting instances when none exist"""
+        """Test getting instances when none exist (excluding internal apps)"""
         response = app_client.get("/api/v1/apps/instances")
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
         assert isinstance(data["items"], list)
-        assert len(data["items"]) == 0
+
+        # Filter out internal apps (they are installed on startup)
+        non_internal = [item for item in data["items"] if not item["is_internal"]]
+        assert len(non_internal) == 0
 
     def test_get_instances_with_apps(self, app_client: TestClient) -> None:
         """Test getting instances after installing apps"""
