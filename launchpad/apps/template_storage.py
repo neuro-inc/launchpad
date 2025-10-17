@@ -113,10 +113,40 @@ async def insert_template(
 
     Note: input is currently optional for backwards compatibility,
     but will be converted to an empty dict if None.
+
+    Safety: When updating an existing template that has instances,
+    is_internal and is_shared cannot be modified.
     """
     # Ensure input is never None
     if input is None:
         input = {}
+
+    # Check if template exists and has instances
+    existing_template = await select_template(db, name=name)
+    if existing_template:
+        # Check if there are any instances using this template
+        from launchpad.apps.storage import list_apps
+        instances = await list_apps(db, template_name=name)
+
+        if instances:
+            # Validate that is_internal and is_shared are not being changed
+            if existing_template.is_internal != is_internal:
+                from launchpad.apps.exceptions import AppServiceError
+                raise AppServiceError(
+                    f"Cannot modify is_internal for template '{name}' because it has "
+                    f"{len(instances)} existing instance(s). Delete all instances first."
+                )
+            if existing_template.is_shared != is_shared:
+                from launchpad.apps.exceptions import AppServiceError
+                raise AppServiceError(
+                    f"Cannot modify is_shared for template '{name}' because it has "
+                    f"{len(instances)} existing instance(s). Delete all instances first."
+                )
+
+        # Expire the existing template from the session cache to ensure
+        # the RETURNING clause gets the updated row, not the cached one
+        db.expire(existing_template)
+
     query = (
         insert(AppTemplate)
         .values(

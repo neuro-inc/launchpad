@@ -559,16 +559,19 @@ class AppService:
             )
 
         # Extract template information from Apps API response
-        template_name = app_info.get("template_name", "unknown")
-        template_version = app_info.get("template_version", "unknown")
-        app_name = app_info.get("name", str(import_request.app_id))
-        display_name = app_info.get("display_name", "")
+        template_name = app_info["template_name"]
+        template_version = app_info["template_version"]
+        app_name = app_info["name"]
+        display_name = app_info["display_name"]
 
         # Create/update template using helper method
+        # NOTE: We ignore import_request.name for app imports because the template
+        # should always be identified by the template_name from Apps API, not a custom name.
+        # The 'name' parameter is only meaningful for template imports (ImportTemplateRequest).
         template = await self._fetch_and_create_template(
             template_name=template_name,
             template_version=template_version,
-            name=import_request.name,
+            name=None,  # Always use template_name as the identifier for imported apps
             verbose_name=import_request.verbose_name,
             description_short=import_request.description_short,
             description_long=import_request.description_long,

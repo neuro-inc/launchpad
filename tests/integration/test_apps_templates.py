@@ -92,6 +92,92 @@ class TestTemplateImport:
         assert data2["verbose_name"] == "Second Import"
         assert data2["template_version"] == "2.0.0"  # Updated
 
+    def test_import_template_cannot_modify_is_internal_with_instances(
+        self, app_client: TestClient
+    ) -> None:
+        """Test that is_internal cannot be modified when template has instances"""
+        # First, import a template
+        response1 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "safety-test",
+                "template_version": "1.0.0",
+                "name": "safety-test-app",
+                "is_internal": False,
+            },
+        )
+        assert response1.status_code == 200
+
+        # Install an instance from this template
+        install_response = app_client.post(
+            "/api/v1/apps/install",
+            json={
+                "template_name": "safety-test",
+                "template_version": "1.0.0",
+                "inputs": {"displayName": "Safety Test"},
+                "name": "safety-test-app",
+            },
+        )
+        assert install_response.status_code == 200
+
+        # Try to update is_internal - should fail
+        response2 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "safety-test",
+                "template_version": "1.0.0",
+                "name": "safety-test-app",
+                "is_internal": True,  # Trying to change this
+            },
+        )
+        assert response2.status_code == 400
+        error_response = response2.json()
+        # The error detail is nested: {'detail': {'message': '...'}}
+        assert "Cannot modify is_internal" in error_response["detail"]["message"]
+
+    def test_import_template_cannot_modify_is_shared_with_instances(
+        self, app_client: TestClient
+    ) -> None:
+        """Test that is_shared cannot be modified when template has instances"""
+        # First, import a template
+        response1 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "shared-test",
+                "template_version": "1.0.0",
+                "name": "shared-test-app",
+                "is_shared": True,
+            },
+        )
+        assert response1.status_code == 200
+
+        # Install an instance from this template
+        install_response = app_client.post(
+            "/api/v1/apps/install",
+            json={
+                "template_name": "shared-test",
+                "template_version": "1.0.0",
+                "inputs": {"displayName": "Shared Test"},
+                "name": "shared-test-app",
+            },
+        )
+        assert install_response.status_code == 200
+
+        # Try to update is_shared - should fail
+        response2 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "shared-test",
+                "template_version": "1.0.0",
+                "name": "shared-test-app",
+                "is_shared": False,  # Trying to change this
+            },
+        )
+        assert response2.status_code == 400
+        error_response = response2.json()
+        # The error detail is nested: {'detail': {'message': '...'}}
+        assert "Cannot modify is_shared" in error_response["detail"]["message"]
+
     def test_import_template_with_input(self, app_client: TestClient) -> None:
         """Test importing a template with input"""
         response = app_client.post(
@@ -166,7 +252,7 @@ class TestAppImport:
             "/api/v1/apps/import",
             json={
                 "app_id": str(app_id),
-                "name": "my-imported-app",
+                "name": "my-imported-app",  # This is ignored - template_name from API is used
                 "verbose_name": "My Imported App",
                 "description_short": "Custom imported app",
             },
@@ -175,8 +261,9 @@ class TestAppImport:
         assert response.status_code == 200
         data = response.json()
 
-        # Verify custom name was used
-        assert data["launchpad_app_name"] == "my-imported-app"
+        # The 'name' parameter is ignored for app imports to prevent bugs
+        # The template is always identified by template_name from Apps API
+        assert data["launchpad_app_name"] == "test-template"  # From Apps API, not "my-imported-app"
         assert data["is_shared"] is True  # Always true for imported apps
 
 
