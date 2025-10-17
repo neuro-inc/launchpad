@@ -172,7 +172,7 @@ async def insert_template(
             )
         )
         .on_conflict_do_update(
-            constraint="unique__app_templates__name",
+            constraint="unique__app_templates__name_template_name_version",
             set_=dict(
                 template_name=template_name,
                 template_version=template_version,

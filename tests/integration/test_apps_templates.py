@@ -64,7 +64,7 @@ class TestTemplateImport:
         assert "custom" in data["tags"]
 
     def test_import_template_upsert(self, app_client: TestClient) -> None:
-        """Test that importing same template twice updates it"""
+        """Test that importing same template twice (same name, template_name, version) updates it"""
         # First import
         response1 = app_client.post(
             "/api/v1/apps/templates/import",
@@ -78,19 +78,56 @@ class TestTemplateImport:
         data1 = response1.json()
         assert data1["verbose_name"] == "First Import"
 
-        # Second import with same name
+        # Second import with same name, template_name, and version (should update)
         response2 = app_client.post(
             "/api/v1/apps/templates/import",
             json={
                 "template_name": "upsert-test",
-                "template_version": "2.0.0",  # Different version
+                "template_version": "1.0.0",  # Same version
                 "verbose_name": "Second Import",
             },
         )
         assert response2.status_code == 200
         data2 = response2.json()
         assert data2["verbose_name"] == "Second Import"
-        assert data2["template_version"] == "2.0.0"  # Updated
+        assert data2["template_version"] == "1.0.0"  # Same version
+
+    def test_import_template_different_versions_creates_separate_templates(
+        self, app_client: TestClient
+    ) -> None:
+        """Test that same name with different versions creates separate templates"""
+        # First import with v1.0.0
+        response1 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "versioned-test",
+                "template_version": "1.0.0",
+                "name": "versioned-app",
+                "verbose_name": "Version 1.0.0",
+            },
+        )
+        assert response1.status_code == 200
+        data1 = response1.json()
+        assert data1["verbose_name"] == "Version 1.0.0"
+        assert data1["template_version"] == "1.0.0"
+
+        # Second import with v2.0.0 and same name (should create separate template)
+        response2 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "versioned-test",
+                "template_version": "2.0.0",
+                "name": "versioned-app",
+                "verbose_name": "Version 2.0.0",
+            },
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2["verbose_name"] == "Version 2.0.0"
+        assert data2["template_version"] == "2.0.0"
+
+        # Both should exist as separate templates
+        # Note: This behavior allows multiple versions of the same template to coexist
 
     def test_import_template_cannot_modify_is_internal_with_instances(
         self, app_client: TestClient
