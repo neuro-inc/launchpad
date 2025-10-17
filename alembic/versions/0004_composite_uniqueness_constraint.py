@@ -23,30 +23,21 @@ def upgrade() -> None:
     op.drop_index("ix_app_templates_name", table_name="app_templates")
 
     # Drop the old unique constraints
+    op.drop_constraint("unique__app_templates__name", "app_templates", type_="unique")
     op.drop_constraint(
-        "unique__app_templates__name",
-        "app_templates",
-        type_="unique"
-    )
-    op.drop_constraint(
-        "unique__app_templates__template_name_version",
-        "app_templates",
-        type_="unique"
+        "unique__app_templates__template_name_version", "app_templates", type_="unique"
     )
 
     # Create new composite unique constraint
     op.create_unique_constraint(
         "unique__app_templates__name_template_name_version",
         "app_templates",
-        ["name", "template_name", "template_version"]
+        ["name", "template_name", "template_version"],
     )
 
     # Recreate the index on name (non-unique)
     op.create_index(
-        op.f("ix_app_templates_name"),
-        "app_templates",
-        ["name"],
-        unique=False
+        op.f("ix_app_templates_name"), "app_templates", ["name"], unique=False
     )
 
 
@@ -58,25 +49,20 @@ def downgrade() -> None:
     op.drop_constraint(
         "unique__app_templates__name_template_name_version",
         "app_templates",
-        type_="unique"
+        type_="unique",
     )
 
     # Restore the old unique constraints
     op.create_unique_constraint(
-        "unique__app_templates__name",
-        "app_templates",
-        ["name"]
+        "unique__app_templates__name", "app_templates", ["name"]
     )
     op.create_unique_constraint(
         "unique__app_templates__template_name_version",
         "app_templates",
-        ["template_name", "template_version"]
+        ["template_name", "template_version"],
     )
 
     # Restore the unique index on name
     op.create_index(
-        op.f("ix_app_templates_name"),
-        "app_templates",
-        ["name"],
-        unique=True
+        op.f("ix_app_templates_name"), "app_templates", ["name"], unique=True
     )
