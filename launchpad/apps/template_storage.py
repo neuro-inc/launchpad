@@ -126,18 +126,21 @@ async def insert_template(
     if existing_template:
         # Check if there are any instances using this template
         from launchpad.apps.storage import list_apps
+
         instances = await list_apps(db, template_name=name)
 
         if instances:
             # Validate that is_internal and is_shared are not being changed
             if existing_template.is_internal != is_internal:
                 from launchpad.apps.exceptions import AppServiceError
+
                 raise AppServiceError(
                     f"Cannot modify is_internal for template '{name}' because it has "
                     f"{len(instances)} existing instance(s). Delete all instances first."
                 )
             if existing_template.is_shared != is_shared:
                 from launchpad.apps.exceptions import AppServiceError
+
                 raise AppServiceError(
                     f"Cannot modify is_shared for template '{name}' because it has "
                     f"{len(instances)} existing instance(s). Delete all instances first."

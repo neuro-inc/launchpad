@@ -263,7 +263,9 @@ class TestAppImport:
 
         # The 'name' parameter is ignored for app imports to prevent bugs
         # The template is always identified by template_name from Apps API
-        assert data["launchpad_app_name"] == "test-template"  # From Apps API, not "my-imported-app"
+        assert (
+            data["launchpad_app_name"] == "test-template"
+        )  # From Apps API, not "my-imported-app"
         assert data["is_shared"] is True  # Always true for imported apps
 
 
