@@ -11,9 +11,6 @@ export async function getAuthConfig(): Promise<AuthConfig> {
   try {
     const serverApiUrl = await getServerApiUrl();
 
-    // eslint-disable-next-line no-console
-    console.log('getAuthConfig serverApiUrl:', serverApiUrl);
-
     const response = await fetch(`${serverApiUrl}/config?t=${Date.now()}`, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -53,9 +50,6 @@ export async function getAuthConfig(): Promise<AuthConfig> {
       keycloak: KeycloakConfig;
     };
 
-    // eslint-disable-next-line no-console
-    console.log('Config:', responseJson);
-
     if (!responseJson.keycloak) {
       throw new Error('Invalid response structure: keycloak config not found');
     }
@@ -92,6 +86,37 @@ export const refreshAccessToken = async (token: any) => {
       throw refreshed;
     }
 
+    // Decode the new access token to extract roles
+    let realmRoles = token.realm_roles || [];
+    let clientRoles = token.client_roles || [];
+    let groups = token.groups || [];
+
+    if (refreshed.access_token) {
+      try {
+        const base64Url = refreshed.access_token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+          Buffer.from(base64, 'base64')
+            .toString('ascii')
+            .split('')
+            .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+            .join(''),
+        );
+        const decodedToken = JSON.parse(jsonPayload);
+
+        realmRoles = decodedToken.realm_access?.roles || [];
+
+        // Extract client roles from resource_access.frontend.roles
+        const resourceAccess = decodedToken.resource_access || {};
+        const frontendAccess = resourceAccess.frontend || {};
+        clientRoles = frontendAccess.roles || [];
+
+        groups = decodedToken.groups || [];
+      } catch (error) {
+        console.error('Error decoding refreshed access token:', error);
+      }
+    }
+
     return {
       ...token,
       accessToken: refreshed.access_token,
@@ -101,6 +126,9 @@ export const refreshAccessToken = async (token: any) => {
        */
       refreshToken: refreshed.refresh_token ?? token.refreshToken,
       idToken: refreshed.id_token ?? token.idToken,
+      realm_roles: realmRoles,
+      client_roles: clientRoles,
+      groups,
     };
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -158,17 +186,9 @@ export async function getAuthOptions(): Promise<AuthOptions> {
         const siteUrl = await getSiteUrl();
 
         /**
-         * Log redirect parameters for debugging
-         */
-        // eslint-disable-next-line no-console
-        console.log('Redirect callback:', { url, siteUrl });
-
-        /**
          * If url starts with /, it's a relative path - make it absolute
          */
         if (url.startsWith('/')) {
-          // eslint-disable-next-line no-console
-          console.log('Callbacks return startsWith:', `${siteUrl}${url}`);
           return `${siteUrl}${url}`;
         }
 
@@ -176,37 +196,17 @@ export async function getAuthOptions(): Promise<AuthOptions> {
          * If url is from the same origin as our site, allow it
          */
         if (new URL(url).origin === siteUrl) {
-          // eslint-disable-next-line no-console
-          console.log('Callbacks return URL:', url);
           return url;
         }
 
-        // eslint-disable-next-line no-console
-        console.log('Callbacks return default:', `${siteUrl}/apps`);
         /**
          * Default fallback - return to the apps page instead of auth page
          */
         return `${siteUrl}/apps`;
       },
-      async signIn({ user, account, profile }) {
-        /**
-         * Add debugging for sign-in attempts
-         */
-        // eslint-disable-next-line no-console
-        console.log('SignIn attempt:', {
-          user: user?.email,
-          account: account?.provider,
-          profile: profile?.email,
-          error: account?.error,
-        });
-
+      async signIn({ account }) {
         if (account?.error) {
-          // eslint-disable-next-line no-console
           console.error('Account error during sign in:', account.error);
-
-          /**
-           * Reject sign in if there's an account error
-           */
           return false;
         }
 
@@ -214,11 +214,6 @@ export async function getAuthOptions(): Promise<AuthOptions> {
       },
       async jwt({ token, account, profile }) {
         const now = Date.now();
-
-        // eslint-disable-next-line no-console
-        console.log('account', account);
-        // eslint-disable-next-line no-console
-        console.log('profile', profile);
 
         if (account) {
           token.accessToken = account.access_token;
@@ -228,6 +223,51 @@ export async function getAuthOptions(): Promise<AuthOptions> {
 
           token.name = profile?.name ?? undefined;
           token.email = profile?.email ?? undefined;
+
+          // Decode the access token to get realm_access.roles
+          // The profile object from userinfo endpoint doesn't contain roles
+          // We need to decode the JWT access token directly
+          if (account.access_token) {
+            try {
+              // Decode JWT (base64 decode the payload part)
+              const base64Url = account.access_token.split('.')[1];
+              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+              const jsonPayload = decodeURIComponent(
+                Buffer.from(base64, 'base64')
+                  .toString('ascii')
+                  .split('')
+                  .map(
+                    (c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`,
+                  )
+                  .join(''),
+              );
+              const decodedToken = JSON.parse(jsonPayload);
+
+              // Extract roles from realm_access.roles
+              const realmAccessRoles = decodedToken.realm_access?.roles || [];
+              token.realm_roles = Array.isArray(realmAccessRoles)
+                ? realmAccessRoles
+                : [];
+
+              // Extract client roles from resource_access.frontend.roles
+              // The backend expects roles in resource_access.frontend.roles
+              const resourceAccess = decodedToken.resource_access || {};
+              const frontendAccess = resourceAccess.frontend || {};
+              const clientRoles = frontendAccess.roles || [];
+              token.client_roles = Array.isArray(clientRoles)
+                ? clientRoles
+                : [];
+
+              // Also try to get groups if they exist (backend uses this as roles)
+              const groups = decodedToken.groups || [];
+              token.groups = Array.isArray(groups) ? groups : [];
+            } catch (error) {
+              console.error('Error decoding access token:', error);
+              token.realm_roles = [];
+              token.client_roles = [];
+              token.groups = [];
+            }
+          }
         }
 
         if (token.accessTokenExpires && now < token.accessTokenExpires) {
@@ -241,6 +281,9 @@ export async function getAuthOptions(): Promise<AuthOptions> {
         session.refreshToken = token.refreshToken;
         session.idToken = token.idToken;
         session.error = token.error;
+        session.groups = token.groups;
+        session.realm_roles = token.realm_roles;
+        session.client_roles = token.client_roles;
 
         return session;
       },

@@ -34,11 +34,11 @@ export const middleware = async (request: NextRequest) => {
   }
 
   const isProtected = pathname !== PATH.AUTH;
+  const isAdminRoute = pathname.startsWith(PATH.ADMIN);
 
   const token = await getToken({
     req: request,
     secret: NEXTAUTH_SECRET,
-    raw: true,
     cookieName: getTokenCookieName(),
   });
 
@@ -52,6 +52,21 @@ export const middleware = async (request: NextRequest) => {
     const url = new URL(PATH.APPS, request.url);
 
     return NextResponse.redirect(url);
+  }
+
+  // Check admin access for admin routes
+  if (token && isAdminRoute) {
+    // Check client_roles first (what backend uses), then fall back to realm_roles
+    const clientRoles = (token.client_roles as string[]) || [];
+    const realmRoles = (token.realm_roles as string[]) || [];
+    const roles = clientRoles.length > 0 ? clientRoles : realmRoles;
+    const isAdmin = roles.includes('admin');
+
+    if (!isAdmin) {
+      const url = new URL(PATH.APPS, request.url);
+
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next({

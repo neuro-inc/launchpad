@@ -2,6 +2,8 @@ export * from './checkIsComponentWithIconChild';
 export * from './getNameInitials';
 export * from './getSiteUrl';
 export * from './getTokenCookieName';
+export * from './isAdmin';
 export * from './keycloak';
 export * from './metadata';
 export * from './request';
+export * from './tags';
