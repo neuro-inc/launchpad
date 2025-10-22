@@ -41,6 +41,7 @@ from launchpad.apps.storage import (
 )
 from launchpad.apps.template_models import AppTemplate
 from launchpad.apps.template_storage import (
+    delete_template,
     insert_template,
     list_templates,
     select_template,
@@ -199,7 +200,7 @@ class AppService:
         1. Fetches the template from the AppTemplate table
         2. Checks if the template has a handler_class
         3. If yes, uses that handler class; if no, uses GenericApp
-        4. Merges default_inputs from template with user_inputs
+        4. Merges input from template with user_inputs
         5. Installs the app
 
         Args:
@@ -230,7 +231,7 @@ class AppService:
             )
 
         # Merge inputs: user inputs override template defaults
-        inputs = template.default_inputs.copy()
+        inputs = template.input.copy()
         if user_inputs:
             inputs.update(user_inputs)
 
@@ -544,7 +545,7 @@ class AppService:
             )
 
         # Fetch the actual inputs that were used when the app was installed
-        # This provides accurate default_inputs for the template
+        # This provides accurate input for the template
         app_inputs = {}
         try:
             app_inputs = await self._apps_api_client.get_inputs(import_request.app_id)
@@ -554,16 +555,19 @@ class AppService:
         except AppsApiError:
             logger.warning(
                 f"Failed to fetch inputs for app {import_request.app_id}, "
-                "will use empty dict for default_inputs"
+                "will use empty dict for input"
             )
 
         # Extract template information from Apps API response
-        template_name = app_info.get("template_name", "unknown")
-        template_version = app_info.get("template_version", "unknown")
-        app_name = app_info.get("name", str(import_request.app_id))
-        display_name = app_info.get("display_name", "")
+        template_name = app_info["template_name"]
+        template_version = app_info["template_version"]
+        app_name = app_info["name"]
+        display_name = app_info["display_name"]
 
         # Create/update template using helper method
+        # NOTE: We ignore import_request.name for app imports because the template
+        # should always be identified by the template_name from Apps API, not a custom name.
+        # The 'name' parameter is only meaningful for template imports (ImportTemplateRequest).
         template = await self._fetch_and_create_template(
             template_name=template_name,
             template_version=template_version,
@@ -578,7 +582,7 @@ class AppService:
             is_internal=import_request.is_internal,
             is_shared=True,  # Imported installed apps are always shared
             fallback_verbose_name=display_name,  # Use display_name as fallback
-            default_inputs=app_inputs,  # Use actual inputs from the running app
+            input=app_inputs,  # Use actual inputs from the running app
         )
 
         # Link the app installation
@@ -614,7 +618,7 @@ class AppService:
         is_internal: bool = False,
         is_shared: bool = True,
         fallback_verbose_name: str | None = None,
-        default_inputs: dict[str, Any] | None = None,
+        input: dict[str, Any] | None = None,
     ) -> AppTemplate:
         """
         Fetch template metadata from Apps API and create/update AppTemplate.
@@ -638,7 +642,7 @@ class AppService:
             is_internal: Whether template is internal
             is_shared: Whether apps from this template can be shared
             fallback_verbose_name: Fallback for verbose_name (used by import_app for display_name)
-            default_inputs: Default inputs to merge when installing
+            input: Default inputs to merge when installing
 
         Returns:
             The created/updated AppTemplate record
@@ -707,7 +711,7 @@ class AppService:
                     is_internal=is_internal,
                     is_shared=is_shared,
                     handler_class=None,
-                    default_inputs=default_inputs,
+                    input=input,
                 )
 
         return template
@@ -727,7 +731,7 @@ class AppService:
         is_internal: bool = False,
         is_shared: bool = True,
         handler_class: str | None = None,
-        default_inputs: dict[str, Any] | None = None,
+        input: dict[str, Any] | None = None,
     ) -> AppTemplate:
         """
         Create or update an AppTemplate record.
@@ -749,7 +753,7 @@ class AppService:
             is_internal: Whether template is internal
             is_shared: Whether apps from this template can be shared
             handler_class: Optional handler class for custom behavior
-            default_inputs: Default inputs to merge when installing
+            input: Default inputs to merge when installing
 
         Returns:
             The created/updated AppTemplate record
@@ -765,7 +769,7 @@ class AppService:
                 template_version="1.0.0",
                 verbose_name="My App",
                 description_short="A custom application",
-                default_inputs={"preset": {"name": "cpu-small"}}
+                input={"preset": {"name": "cpu-small"}}
             )
             ```
         """
@@ -786,7 +790,7 @@ class AppService:
                     is_internal=is_internal,
                     is_shared=is_shared,
                     handler_class=handler_class,
-                    default_inputs=default_inputs,
+                    input=input,
                 )
 
     async def import_template(
@@ -845,7 +849,7 @@ class AppService:
             tags=import_request.tags,
             is_internal=import_request.is_internal,
             is_shared=import_request.is_shared,
-            default_inputs=import_request.default_inputs,
+            input=import_request.input,
         )
 
     async def delete(self, app_id: UUID) -> None:
@@ -853,6 +857,70 @@ class AppService:
         async with self._db() as db:
             async with db.begin():
                 await delete_app(db, app_id)
+
+    async def delete_template_by_id(self, template_id: UUID) -> None:
+        """
+        Delete a template by its ID.
+
+        This method:
+        1. Finds the template by ID
+        2. Gets all app instances that use this template
+        3. Uninstalls each app instance via Apps API
+        4. Deletes the template from the database
+
+        Args:
+            template_id: The UUID of the template to delete
+
+        Raises:
+            AppServiceError: If the template cannot be deleted
+            NotFound: If the template doesn't exist
+        """
+        # Get the template to find its name
+        async with self._db() as db:
+            template = await select_template(db, id=template_id)
+
+        if not template:
+            raise NotFound(f"Template with id {template_id} not found")
+
+        logger.info(
+            f"Deleting template {template.name} (id={template_id}) "
+            f"and all its instances"
+        )
+
+        # Get all app instances that use this template
+        async with self._db() as db:
+            installed_apps = await list_apps(db, template_name=template.name)
+
+        logger.info(
+            f"Found {len(installed_apps)} app instances to uninstall "
+            f"for template {template.name}"
+        )
+
+        # Uninstall each app instance via Apps API and delete from DB
+        for app in installed_apps:
+            logger.info(
+                f"Uninstalling app instance {app.app_id} "
+                f"(launchpad_app_name={app.launchpad_app_name})"
+            )
+            try:
+                await self._apps_api_client.delete_app(app.app_id)
+            except AppsApiError as e:
+                logger.warning(
+                    f"Failed to uninstall app {app.app_id} from Apps API: {e}. "
+                    "Continuing with deletion from database."
+                )
+
+            # Delete from database
+            async with self._db() as db:
+                async with db.begin():
+                    await delete_app(db, app.app_id)
+
+        # Finally, delete the template
+        async with self._db() as db:
+            async with db.begin():
+                await delete_template(db, template_id)
+
+        logger.info(f"Successfully deleted template {template.name} and all instances")
 
     async def is_healthy(
         self,
@@ -944,6 +1012,80 @@ class AppService:
                     f"is_internal={app.is_internal}, is_shared={app.is_shared})"
                 )
             return apps
+
+    async def list_unimported_instances(
+        self,
+        page: int = 1,
+        size: int = 50,
+    ) -> dict[str, Any]:
+        """
+        List app instances that exist in Apps API but haven't been imported into Launchpad.
+
+        This method:
+        1. Fetches all app instances from Apps API
+        2. Gets list of imported app_ids from database
+        3. Filters out instances that are already imported
+        4. Filters to only include instances in healthy status
+
+        Args:
+            page: Page number (default: 1)
+            size: Page size (default: 50, max: 100)
+
+        Returns:
+            Dict with paginated list of unimported healthy instances, including:
+            - items: List of healthy app instances not yet imported
+            - total: Total count of unimported healthy instances
+            - page: Current page number
+            - size: Page size
+            - pages: Total number of pages
+
+        Example:
+            ```python
+            result = await app_service.list_unimported_instances(page=1, size=50)
+            for instance in result['items']:
+                print(f"Unimported: {instance['name']} ({instance['id']})")
+            ```
+        """
+        logger.info(f"Fetching unimported healthy instances (page={page}, size={size})")
+
+        # Fetch only healthy instances from Apps API using states filter
+        try:
+            apps_api_response = await self._apps_api_client.list_instances(
+                page=page, size=size, states=["healthy"]
+            )
+        except AppsApiError as e:
+            logger.error(f"Failed to fetch instances from Apps API: {e}")
+            raise AppServiceError("Unable to fetch instances from Apps API") from e
+
+        healthy_instances = apps_api_response.get("items", [])
+        logger.info(f"Fetched {len(healthy_instances)} healthy instances from Apps API")
+
+        # Get all imported app_ids from database
+        async with self._db() as db:
+            imported_apps = await list_apps(db)
+
+        imported_app_ids = {str(app.app_id) for app in imported_apps}
+        logger.info(f"Found {len(imported_app_ids)} imported apps in database")
+
+        # Filter out imported instances and launchpad templates
+        # (filtering for healthy is now done by Apps API)
+        unimported_instances = [
+            instance
+            for instance in healthy_instances
+            if instance.get("id") not in imported_app_ids
+            and instance.get("template_name") != "launchpad"
+        ]
+
+        logger.info(f"Found {len(unimported_instances)} unimported healthy instances")
+
+        # Return paginated result matching the Apps API response structure
+        return {
+            "items": unimported_instances,
+            "total": len(unimported_instances),
+            "page": page,
+            "size": size,
+            "pages": (len(unimported_instances) + size - 1) // size,
+        }
 
 
 async def dep_app_service(request: Request) -> AppService:

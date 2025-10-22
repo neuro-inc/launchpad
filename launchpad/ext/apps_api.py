@@ -146,3 +146,30 @@ class AppsApiClient:
             url=f"{self.v1_url}/instances/{app_id}/output",
             json={"output": outputs},
         )
+
+    async def list_instances(
+        self,
+        page: int = 1,
+        size: int = 50,
+        states: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """List all app instances in the cluster/org/project
+
+        Args:
+            page: Page number
+            size: Page size
+            states: Optional list of app states to filter by (e.g., ["healthy"])
+        """
+        params: dict[str, Any] = {
+            **self.default_params,
+            "page": page,
+            "size": size,
+        }
+        if states:
+            params["states"] = states
+
+        return await self._request(
+            method="GET",
+            url=f"{self.v2_url}/instances",
+            params=params,
+        )
