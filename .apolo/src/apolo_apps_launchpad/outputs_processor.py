@@ -1,3 +1,4 @@
+import os
 import typing as t
 
 import apolo_sdk
@@ -26,10 +27,11 @@ def get_launchpad_name(apolo_app_id: str) -> str:
 
 
 async def create_apolo_secret(
-    app_instance_id: str, key: str, value: str
+    app_instance_id: str, apolo_token: str, key: str, value: str
 ) -> ApoloSecret:
     secret_key = f"{key}-{app_instance_id}"
     try:
+        os.environ["APOLO_PASSED_CONFIG"] = apolo_token
         async with apolo_sdk.get() as client:
             bytes_value = value.encode("utf-8")
             await client.secrets.add(key=secret_key, value=bytes_value)
@@ -156,7 +158,10 @@ async def get_launchpad_outputs(
                 external_url=keycloak_external_web_app_url,
             ),
             auth_admin_password=await create_apolo_secret(
-                app_instance_id=app_instance_id, key="keycloak", value=keycloak_password
+                app_instance_id=app_instance_id,
+                apolo_token=helm_values["APOLO_PASSED_CONFIG"],
+                key="keycloak",
+                value=keycloak_password,
             ),
         ),
         installed_apps=None,
@@ -166,6 +171,7 @@ async def get_launchpad_outputs(
             email=helm_values["LAUNCHPAD_ADMIN_EMAIL"],
             password=await create_apolo_secret(
                 app_instance_id=app_instance_id,
+                apolo_token=helm_values["APOLO_PASSED_CONFIG"],
                 key="launchpad-admin",
                 value=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],
             ),
