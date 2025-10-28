@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import sys
 from uuid import UUID
 
 from apolo_app_types.outputs.utils.apolo_secrets import delete_apolo_secret
@@ -17,6 +18,10 @@ logger = logging.getLogger(__name__)
 
 async def cleanup_secrets():
     launchpad_app_id_str = os.environ.get("LAUNCHPAD_APP_ID")
+    if not launchpad_app_id_str:
+        err = "LAUNCHPAD_APP_ID must be provided"
+        raise Exception(err)
+
     for secret_key in APP_SECRET_KEYS.values():
         try:
             await delete_apolo_secret(
