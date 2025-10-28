@@ -155,7 +155,7 @@ async def get_launchpad_outputs(
                 internal_url=keycloak_internal_web_app_url,
                 external_url=keycloak_external_web_app_url,
             ),
-            auth_admin_password=create_apolo_secret(
+            auth_admin_password=await create_apolo_secret(
                 app_instance_id=app_instance_id, key="keycloak", value=keycloak_password
             ),
         ),
@@ -164,7 +164,7 @@ async def get_launchpad_outputs(
         admin_user=LaunchpadDefaultAdminUser(
             username=helm_values["LAUNCHPAD_ADMIN_USER"],
             email=helm_values["LAUNCHPAD_ADMIN_EMAIL"],
-            password=create_apolo_secret(
+            password=await create_apolo_secret(
                 app_instance_id=app_instance_id,
                 key="launchpad-admin",
                 value=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],

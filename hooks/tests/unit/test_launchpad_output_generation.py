@@ -1,3 +1,4 @@
+from apolo_app_types import ApoloSecret
 import pytest
 
 from apolo_apps_launchpad.outputs_processor import get_launchpad_outputs
@@ -16,10 +17,18 @@ KEYCLOAK_HELM_VALUES = {
 }
 
 
+async def create_apolo_secret(*args, **kwargs):
+    return ApoloSecret(key="secret=key")
+
+
 @pytest.mark.asyncio
 async def test_launchpad_output_generation(
-    setup_clients, mock_kubernetes_client, app_instance_id
+    setup_clients, mock_kubernetes_client, app_instance_id, monkeypatch
 ):
+    monkeypatch.setattr(
+        "apolo_apps_launchpad.outputs_processor.create_apolo_secret",
+        create_apolo_secret,
+    )
     """Test launchpad output generation for app_url."""
     res = await get_launchpad_outputs(
         helm_values={
@@ -73,6 +82,10 @@ async def test_launchpad_output_generation_no_external_url(
         return None
 
     monkeypatch.setattr(
+        "apolo_apps_launchpad.outputs_processor.create_apolo_secret",
+        create_apolo_secret,
+    )
+    monkeypatch.setattr(
         "apolo_apps_launchpad.outputs_processor.get_service_host_port",
         mock_get_service_host_port,
     )
@@ -125,6 +138,10 @@ async def test_launchpad_output_generation_no_service(
         return None
 
     monkeypatch.setattr(
+        "apolo_apps_launchpad.outputs_processor.create_apolo_secret",
+        create_apolo_secret,
+    )
+    monkeypatch.setattr(
         "apolo_apps_launchpad.outputs_processor.get_service_host_port",
         mock_get_service_host_port,
     )
@@ -154,7 +171,7 @@ async def test_launchpad_output_generation_no_service(
     app_url = res["app_url"]
     assert app_url["internal_url"] is None
     assert app_url["external_url"] is None
-    assert res["keycloak_config"]["auth_admin_password"] == "test-admin-password"
+    assert res["keycloak_config"]["auth_admin_password"]["__type__"] == "ApoloSecret"
 
 
 @pytest.mark.asyncio
@@ -169,6 +186,10 @@ async def test_launchpad_output_generation_custom_ports(
     async def mock_get_ingress_host_port(*args, **kwargs):
         return ("launchpad.custom.domain", 443)
 
+    monkeypatch.setattr(
+        "apolo_apps_launchpad.outputs_processor.create_apolo_secret",
+        create_apolo_secret,
+    )
     monkeypatch.setattr(
         "apolo_apps_launchpad.outputs_processor.get_service_host_port",
         mock_get_service_host_port,
