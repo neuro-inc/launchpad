@@ -27,6 +27,7 @@ async def cleanup_secrets():
             await delete_apolo_secret(
                 app_instance_id=launchpad_app_id_str, key=secret_key
             )
+            logger.info(f'Deleted secret "{secret_key}-{launchpad_app_id_str}"')
         except Exception as e:
             logger.debug(e)
 
