@@ -1,14 +1,13 @@
 import os
 import typing as t
 
-import apolo_sdk
 from apolo_app_types.clients.kube import get_service_host_port
 from apolo_app_types.outputs.base import BaseAppOutputsProcessor
 from apolo_app_types.outputs.common import INSTANCE_LABEL
+from apolo_app_types.outputs.utils.apolo_secrets import create_apolo_secret
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
 from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
-from apolo_app_types.protocols.common.secrets_ import ApoloSecret
 
 from .types import (
     KeycloakConfig,
@@ -26,25 +25,12 @@ def get_launchpad_name(apolo_app_id: str) -> str:
     return f"launchpad-{apolo_app_id}"[:63].rstrip("-")
 
 
-async def create_apolo_secret(
-    app_instance_id: str, apolo_token: str, key: str, value: str
-) -> ApoloSecret:
-    secret_key = f"{key}-{app_instance_id}"
-    try:
-        os.environ["APOLO_PASSED_CONFIG"] = apolo_token
-        async with apolo_sdk.get() as client:
-            bytes_value = value.encode("utf-8")
-            await client.secrets.add(key=secret_key, value=bytes_value)
-    except Exception as e:
-        print("Failed to create Apolo Secret")
-        raise (e)
-    return ApoloSecret(key=secret_key)
-
-
 async def get_launchpad_outputs(
     helm_values: dict[str, t.Any],
     app_instance_id: str,
 ) -> dict[str, t.Any]:
+    os.environ["APOLO_PASSED_CONFIG"] = helm_values["APOLO_PASSED_CONFIG"]
+
     labels = {
         "application": "launchpad",
         INSTANCE_LABEL: app_instance_id,
@@ -159,7 +145,6 @@ async def get_launchpad_outputs(
             ),
             auth_admin_password=await create_apolo_secret(
                 app_instance_id=app_instance_id,
-                apolo_token=helm_values["APOLO_PASSED_CONFIG"],
                 key="keycloak",
                 value=keycloak_password,
             ),
@@ -171,7 +156,6 @@ async def get_launchpad_outputs(
             email=helm_values["LAUNCHPAD_ADMIN_EMAIL"],
             password=await create_apolo_secret(
                 app_instance_id=app_instance_id,
-                apolo_token=helm_values["APOLO_PASSED_CONFIG"],
                 key="launchpad-admin",
                 value=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],
             ),
