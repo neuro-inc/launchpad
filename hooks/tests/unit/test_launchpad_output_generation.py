@@ -11,6 +11,7 @@ KEYCLOAK_HELM_VALUES = {
         }
     },
     "apolo_app_id": "test-app-id",
+    "APOLO_PASSED_CONFIG": "someconfig",
     "LAUNCHPAD_ADMIN_USER": "admin",
     "LAUNCHPAD_ADMIN_EMAIL": "admin@example.com",
     "LAUNCHPAD_ADMIN_PASSWORD": "admin-password",
