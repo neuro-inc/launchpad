@@ -14,7 +14,9 @@ RUN apt-get update && apt-get install -y git make && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --disable-pip-version-check --no-cache-dir poetry==2.1.3
 
-COPY poetry.lock pyproject.toml Makefile /app/
+COPY poetry.lock pyproject.toml Makefile README.md /app/
+COPY .apolo /app/.apolo
+COPY launchpad /app/launchpad
 
 RUN poetry install --only main && rm -rf /tmp/poetry-cache
 
@@ -46,5 +48,6 @@ COPY alembic /app/alembic
 
 COPY launchpad /app/launchpad
 COPY scripts /app/scripts
+COPY .apolo /app/.apolo
 
 ENTRYPOINT ["python", "-m", "launchpad"]
