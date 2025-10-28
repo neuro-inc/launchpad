@@ -36,7 +36,7 @@ async def get_launchpad_outputs(
     app_instance_id: str,
 ) -> dict[str, t.Any]:
     os.environ["APOLO_PASSED_CONFIG"] = helm_values["APOLO_PASSED_CONFIG"]
-
+    apolo_app_id = helm_values["apolo_app_id"]
     labels = {
         "application": "launchpad",
         INSTANCE_LABEL: app_instance_id,
@@ -150,7 +150,7 @@ async def get_launchpad_outputs(
                 external_url=keycloak_external_web_app_url,
             ),
             auth_admin_password=await create_apolo_secret(
-                app_instance_id=app_instance_id,
+                app_instance_id=apolo_app_id,
                 key=APP_SECRET_KEYS["KEYCLOAK"],
                 value=keycloak_password,
             ),
@@ -161,7 +161,7 @@ async def get_launchpad_outputs(
             username=helm_values["LAUNCHPAD_ADMIN_USER"],
             email=helm_values["LAUNCHPAD_ADMIN_EMAIL"],
             password=await create_apolo_secret(
-                app_instance_id=app_instance_id,
+                app_instance_id=apolo_app_id,
                 key=APP_SECRET_KEYS["LAUNCHPAD"],
                 value=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],
             ),
