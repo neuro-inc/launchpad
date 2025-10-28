@@ -17,6 +17,12 @@ from .types import (
 )
 
 
+APP_SECRET_KEYS = {
+    "LAUNCHPAD": "launchpad-admin-pswd",
+    "KEYCLOAK": "keycloak-admin-pswd",
+}
+
+
 def get_launchpad_name(apolo_app_id: str) -> str:
     """
     Construct launchpad name using helm chart logic.
@@ -145,7 +151,7 @@ async def get_launchpad_outputs(
             ),
             auth_admin_password=await create_apolo_secret(
                 app_instance_id=app_instance_id,
-                key="keycloak",
+                key=APP_SECRET_KEYS["KEYCLOAK"],
                 value=keycloak_password,
             ),
         ),
@@ -156,7 +162,7 @@ async def get_launchpad_outputs(
             email=helm_values["LAUNCHPAD_ADMIN_EMAIL"],
             password=await create_apolo_secret(
                 app_instance_id=app_instance_id,
-                key="launchpad-admin",
+                key=APP_SECRET_KEYS["LAUNCHPAD"],
                 value=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],
             ),
         ),

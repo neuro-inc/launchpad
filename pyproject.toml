@@ -57,8 +57,8 @@ version = "0.1.0"
 description = ""
 authors = ["apolo.us"]
 readme = "README.md"
-package-mode = false
 packages = [
+  { include = "launchpad" },
   { include = "apolo_apps_launchpad", from = ".apolo/src" },
 ]
 
