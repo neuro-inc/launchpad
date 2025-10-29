@@ -1,6 +1,8 @@
+import logging
 import os
 import typing as t
 
+import backoff
 from apolo_app_types.clients.kube import get_service_host_port
 from apolo_app_types.outputs.base import BaseAppOutputsProcessor
 from apolo_app_types.outputs.common import INSTANCE_LABEL
@@ -17,10 +19,39 @@ from .types import (
 )
 
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
+
 APP_SECRET_KEYS = {
     "LAUNCHPAD": "launchpad-admin-pswd",
     "KEYCLOAK": "keycloak-admin-pswd",
 }
+
+
+@backoff.on_exception(
+    backoff.expo,
+    Exception,
+    max_tries=5,
+    base=2,
+    factor=2,
+    logger=logger,
+)
+async def create_apolo_secret_with_retry(
+    app_instance_id: str, key: str, value: str
+) -> str:
+    """
+    Attempt to create an Apolo secret with retry logic using exponential backoff.
+    Retries up to 5 times with delays: 2s, 4s, 8s, 16s, 32s.
+    Returns the secret reference on success.
+    Raises exception if all retries fail.
+    """
+    logger.info(f'Creating secret "{key}-{app_instance_id}"')
+    result = await create_apolo_secret(
+        app_instance_id=app_instance_id, key=key, value=value
+    )
+    logger.info(f'Successfully created secret "{key}-{app_instance_id}"')
+    return result
 
 
 def get_launchpad_name(apolo_app_id: str) -> str:
@@ -149,7 +180,7 @@ async def get_launchpad_outputs(
                 internal_url=keycloak_internal_web_app_url,
                 external_url=keycloak_external_web_app_url,
             ),
-            auth_admin_password=await create_apolo_secret(
+            auth_admin_password=await create_apolo_secret_with_retry(
                 app_instance_id=apolo_app_id,
                 key=APP_SECRET_KEYS["KEYCLOAK"],
                 value=keycloak_password,
@@ -160,7 +191,7 @@ async def get_launchpad_outputs(
         admin_user=LaunchpadDefaultAdminUser(
             username=helm_values["LAUNCHPAD_ADMIN_USER"],
             email=helm_values["LAUNCHPAD_ADMIN_EMAIL"],
-            password=await create_apolo_secret(
+            password=await create_apolo_secret_with_retry(
                 app_instance_id=apolo_app_id,
                 key=APP_SECRET_KEYS["LAUNCHPAD"],
                 value=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],

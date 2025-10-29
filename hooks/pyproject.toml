@@ -39,6 +39,7 @@ pre-commit = "^4.2.0"
 multidict = "^6.6.4"
 apolo-app-types = "v25.10.18"
 apolo-sdk = "v25.9.1"
+backoff = "^2.2.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
