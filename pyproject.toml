@@ -57,8 +57,8 @@ version = "0.1.0"
 description = ""
 authors = ["apolo.us"]
 readme = "README.md"
-package-mode = false
 packages = [
+  { include = "launchpad" },
   { include = "apolo_apps_launchpad", from = ".apolo/src" },
 ]
 
@@ -80,7 +80,7 @@ backoff = "^2.2.1"
 pyjwt = "^2.10.1"
 asyncache = "^0.3.1"
 asyncpg = "^0.30.0"
-apolo-app-types = "v25.10.13"
+apolo-app-types = "v25.10.18"
 apolo-sdk = "v25.9.1"
 
 [tool.poetry.group.dev.dependencies]
