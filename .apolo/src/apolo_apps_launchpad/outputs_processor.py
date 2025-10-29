@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import os
 import typing as t
 
@@ -17,10 +19,55 @@ from .types import (
 )
 
 
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Retry configuration
+MAX_RETRIES = 5
+RETRY_DELAY = 2  # seconds
+RETRY_BACKOFF = 2  # exponential backoff multiplier
+
+
 APP_SECRET_KEYS = {
     "LAUNCHPAD": "launchpad-admin-pswd",
     "KEYCLOAK": "keycloak-admin-pswd",
 }
+
+
+async def create_apolo_secret_with_retry(
+    app_instance_id: str, key: str, value: str
+) -> str:
+    """
+    Attempt to create an Apolo secret with retry logic.
+    Returns the secret reference on success.
+    Raises exception if all retries fail.
+    """
+    delay = RETRY_DELAY
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            logger.info(
+                f'Attempting to create secret "{key}-{app_instance_id}" '
+                f"(attempt {attempt}/{MAX_RETRIES})"
+            )
+            result = await create_apolo_secret(
+                app_instance_id=app_instance_id, key=key, value=value
+            )
+            logger.info(f'Successfully created secret "{key}-{app_instance_id}"')
+            return result
+        except Exception as e:
+            if attempt < MAX_RETRIES:
+                logger.warning(
+                    f'Failed to create secret "{key}-{app_instance_id}": {e}. '
+                    f"Retrying in {delay}s..."
+                )
+                await asyncio.sleep(delay)
+                delay *= RETRY_BACKOFF
+            else:
+                logger.error(
+                    f'Failed to create secret "{key}-{app_instance_id}" '
+                    f"after {MAX_RETRIES} attempts: {e}"
+                )
+                raise
 
 
 def get_launchpad_name(apolo_app_id: str) -> str:
@@ -149,7 +196,7 @@ async def get_launchpad_outputs(
                 internal_url=keycloak_internal_web_app_url,
                 external_url=keycloak_external_web_app_url,
             ),
-            auth_admin_password=await create_apolo_secret(
+            auth_admin_password=await create_apolo_secret_with_retry(
                 app_instance_id=apolo_app_id,
                 key=APP_SECRET_KEYS["KEYCLOAK"],
                 value=keycloak_password,
@@ -160,7 +207,7 @@ async def get_launchpad_outputs(
         admin_user=LaunchpadDefaultAdminUser(
             username=helm_values["LAUNCHPAD_ADMIN_USER"],
             email=helm_values["LAUNCHPAD_ADMIN_EMAIL"],
-            password=await create_apolo_secret(
+            password=await create_apolo_secret_with_retry(
                 app_instance_id=apolo_app_id,
                 key=APP_SECRET_KEYS["LAUNCHPAD"],
                 value=helm_values["LAUNCHPAD_ADMIN_PASSWORD"],
