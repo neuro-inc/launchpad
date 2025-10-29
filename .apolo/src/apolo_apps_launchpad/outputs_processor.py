@@ -1,8 +1,8 @@
-import asyncio
 import logging
 import os
 import typing as t
 
+import backoff
 from apolo_app_types.clients.kube import get_service_host_port
 from apolo_app_types.outputs.base import BaseAppOutputsProcessor
 from apolo_app_types.outputs.common import INSTANCE_LABEL
@@ -22,11 +22,6 @@ from .types import (
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Retry configuration
-MAX_RETRIES = 5
-RETRY_DELAY = 2  # seconds
-RETRY_BACKOFF = 2  # exponential backoff multiplier
-
 
 APP_SECRET_KEYS = {
     "LAUNCHPAD": "launchpad-admin-pswd",
@@ -34,40 +29,29 @@ APP_SECRET_KEYS = {
 }
 
 
+@backoff.on_exception(
+    backoff.expo,
+    Exception,
+    max_tries=5,
+    base=2,
+    factor=2,
+    logger=logger,
+)
 async def create_apolo_secret_with_retry(
     app_instance_id: str, key: str, value: str
 ) -> str:
     """
-    Attempt to create an Apolo secret with retry logic.
+    Attempt to create an Apolo secret with retry logic using exponential backoff.
+    Retries up to 5 times with delays: 2s, 4s, 8s, 16s, 32s.
     Returns the secret reference on success.
     Raises exception if all retries fail.
     """
-    delay = RETRY_DELAY
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            logger.info(
-                f'Attempting to create secret "{key}-{app_instance_id}" '
-                f"(attempt {attempt}/{MAX_RETRIES})"
-            )
-            result = await create_apolo_secret(
-                app_instance_id=app_instance_id, key=key, value=value
-            )
-            logger.info(f'Successfully created secret "{key}-{app_instance_id}"')
-            return result
-        except Exception as e:
-            if attempt < MAX_RETRIES:
-                logger.warning(
-                    f'Failed to create secret "{key}-{app_instance_id}": {e}. '
-                    f"Retrying in {delay}s..."
-                )
-                await asyncio.sleep(delay)
-                delay *= RETRY_BACKOFF
-            else:
-                logger.error(
-                    f'Failed to create secret "{key}-{app_instance_id}" '
-                    f"after {MAX_RETRIES} attempts: {e}"
-                )
-                raise
+    logger.info(f'Creating secret "{key}-{app_instance_id}"')
+    result = await create_apolo_secret(
+        app_instance_id=app_instance_id, key=key, value=value
+    )
+    logger.info(f'Successfully created secret "{key}-{app_instance_id}"')
+    return result
 
 
 def get_launchpad_name(apolo_app_id: str) -> str:
