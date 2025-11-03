@@ -1,4 +1,7 @@
+import Link from 'next/link';
+
 import { User } from '@typings';
+import { PATH } from '@constants';
 import { getNameInitials } from '@utils/helpers';
 
 import { Popover } from '@components/Shared';
@@ -7,9 +10,10 @@ import { LogoutButton } from './LogoutButton';
 
 type Props = {
   user?: User;
+  isAdmin?: boolean;
 };
 
-export const UserPanel: React.FC<Props> = ({ user }) => {
+export const UserPanel: React.FC<Props> = ({ user, isAdmin = false }) => {
   if (!user) {
     return null;
   }
@@ -28,6 +32,14 @@ export const UserPanel: React.FC<Props> = ({ user }) => {
       <div className="min-w-64">
         <p>{email}</p>
         <p className="mt-0.5 text-body-small text-neural-04">{name}</p>
+        {isAdmin && (
+          <Link
+            href={PATH.ADMIN}
+            className="mt-4 block rounded-lg bg-primary px-4 py-2 text-center text-white transition-colors hover:bg-primary-dark"
+          >
+            Admin Panel
+          </Link>
+        )}
         <LogoutButton />
       </div>
     </Popover>

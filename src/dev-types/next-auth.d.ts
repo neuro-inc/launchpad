@@ -5,6 +5,9 @@ declare module 'next-auth' {
     accessTokenExpires?: number;
     refreshToken?: string;
     error?: string;
+    groups?: string[];
+    realm_roles?: string[];
+    client_roles?: string[];
   }
 }
 
@@ -15,6 +18,9 @@ declare module 'next-auth/jwt' {
     accessTokenExpires?: number;
     refreshToken?: string;
     error?: string;
+    groups?: string[];
+    realm_roles?: string[];
+    client_roles?: string[];
   }
 }
 

@@ -1,14 +1,17 @@
 import React, { InputHTMLAttributes, useId } from 'react';
+import { faCircleInfo } from '@fortawesome/pro-regular-svg-icons';
+import clsx from 'clsx';
 
 import { FieldProps } from '@typings';
 import { getSlots } from '@utils';
 import { fieldVariants } from '@utils/variants';
 
-import { Field, Render, Slot } from '@components';
+import { Field, Icon, Render, Slot, Tooltip } from '@components';
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> &
   FieldProps & {
     labelClassName?: string;
+    tooltip?: string;
   };
 
 export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
@@ -22,6 +25,7 @@ export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
       labelClassName,
       variant = 'floating',
       label,
+      tooltip,
       /**
        * `" "` placeholder is required for floating label
        */
@@ -67,7 +71,19 @@ export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
           required={required}
           className={labelClassName}
         >
-          {label}
+          <span className={clsx({ 'flex items-center gap-2': !!tooltip })}>
+            {label}
+            {tooltip && (
+              <Tooltip side="top">
+                <Icon
+                  slot="trigger"
+                  icon={faCircleInfo}
+                  className="text-neural-04 hover:text-neural-06"
+                />
+                <span className="text-caption">{tooltip}</span>
+              </Tooltip>
+            )}
+          </span>
         </Field.Label>
         <Render if={showError}>
           <Slot slot={slots.error}>
