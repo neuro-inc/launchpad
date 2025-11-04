@@ -1,3 +1,4 @@
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -63,7 +64,7 @@ class TestTemplateImport:
         assert "custom" in data["tags"]
 
     def test_import_template_upsert(self, app_client: TestClient) -> None:
-        """Test that importing same template twice updates it"""
+        """Test that importing same template twice (same name, template_name, version) updates it"""
         # First import
         response1 = app_client.post(
             "/api/v1/apps/templates/import",
@@ -77,22 +78,145 @@ class TestTemplateImport:
         data1 = response1.json()
         assert data1["verbose_name"] == "First Import"
 
-        # Second import with same name
+        # Second import with same name, template_name, and version (should update)
         response2 = app_client.post(
             "/api/v1/apps/templates/import",
             json={
                 "template_name": "upsert-test",
-                "template_version": "2.0.0",  # Different version
+                "template_version": "1.0.0",  # Same version
                 "verbose_name": "Second Import",
             },
         )
         assert response2.status_code == 200
         data2 = response2.json()
         assert data2["verbose_name"] == "Second Import"
-        assert data2["template_version"] == "2.0.0"  # Updated
+        assert data2["template_version"] == "1.0.0"  # Same version
 
-    def test_import_template_with_default_inputs(self, app_client: TestClient) -> None:
-        """Test importing a template with default_inputs"""
+    def test_import_template_different_versions_creates_separate_templates(
+        self, app_client: TestClient
+    ) -> None:
+        """Test that same name with different versions creates separate templates"""
+        # First import with v1.0.0
+        response1 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "versioned-test",
+                "template_version": "1.0.0",
+                "name": "versioned-app",
+                "verbose_name": "Version 1.0.0",
+            },
+        )
+        assert response1.status_code == 200
+        data1 = response1.json()
+        assert data1["verbose_name"] == "Version 1.0.0"
+        assert data1["template_version"] == "1.0.0"
+
+        # Second import with v2.0.0 and same name (should create separate template)
+        response2 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "versioned-test",
+                "template_version": "2.0.0",
+                "name": "versioned-app",
+                "verbose_name": "Version 2.0.0",
+            },
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()
+        assert data2["verbose_name"] == "Version 2.0.0"
+        assert data2["template_version"] == "2.0.0"
+
+        # Both should exist as separate templates
+        # Note: This behavior allows multiple versions of the same template to coexist
+
+    def test_import_template_cannot_modify_is_internal_with_instances(
+        self, app_client: TestClient
+    ) -> None:
+        """Test that is_internal cannot be modified when template has instances"""
+        # First, import a template
+        response1 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "safety-test",
+                "template_version": "1.0.0",
+                "name": "safety-test-app",
+                "is_internal": False,
+            },
+        )
+        assert response1.status_code == 200
+
+        # Install an instance from this template
+        install_response = app_client.post(
+            "/api/v1/apps/install",
+            json={
+                "template_name": "safety-test",
+                "template_version": "1.0.0",
+                "inputs": {"displayName": "Safety Test"},
+                "name": "safety-test-app",
+            },
+        )
+        assert install_response.status_code == 200
+
+        # Try to update is_internal - should fail
+        response2 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "safety-test",
+                "template_version": "1.0.0",
+                "name": "safety-test-app",
+                "is_internal": True,  # Trying to change this
+            },
+        )
+        assert response2.status_code == 400
+        error_response = response2.json()
+        # The error detail is nested: {'detail': {'message': '...'}}
+        assert "Cannot modify is_internal" in error_response["detail"]["message"]
+
+    def test_import_template_cannot_modify_is_shared_with_instances(
+        self, app_client: TestClient
+    ) -> None:
+        """Test that is_shared cannot be modified when template has instances"""
+        # First, import a template
+        response1 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "shared-test",
+                "template_version": "1.0.0",
+                "name": "shared-test-app",
+                "is_shared": True,
+            },
+        )
+        assert response1.status_code == 200
+
+        # Install an instance from this template
+        install_response = app_client.post(
+            "/api/v1/apps/install",
+            json={
+                "template_name": "shared-test",
+                "template_version": "1.0.0",
+                "inputs": {"displayName": "Shared Test"},
+                "name": "shared-test-app",
+            },
+        )
+        assert install_response.status_code == 200
+
+        # Try to update is_shared - should fail
+        response2 = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "shared-test",
+                "template_version": "1.0.0",
+                "name": "shared-test-app",
+                "is_shared": False,  # Trying to change this
+            },
+        )
+        assert response2.status_code == 400
+        error_response = response2.json()
+        # The error detail is nested: {'detail': {'message': '...'}}
+        assert "Cannot modify is_shared" in error_response["detail"]["message"]
+
+    def test_import_template_with_input(self, app_client: TestClient) -> None:
+        """Test importing a template with input"""
         response = app_client.post(
             "/api/v1/apps/templates/import",
             json={
@@ -100,7 +224,7 @@ class TestTemplateImport:
                 "template_version": "1.0.0",
                 "name": "custom-service",
                 "verbose_name": "Custom Service Deployment",
-                "default_inputs": {
+                "input": {
                     "displayName": "My Service",
                     "preset": {"name": "cpu-small"},
                 },
@@ -174,8 +298,11 @@ class TestAppImport:
         assert response.status_code == 200
         data = response.json()
 
-        # Verify custom name was used
-        assert data["launchpad_app_name"] == "my-imported-app"
+        # The 'name' parameter is ignored for app imports to prevent bugs
+        # The template is always identified by template_name from Apps API
+        assert (
+            data["launchpad_app_name"] == "my-imported-app"
+        )  # From Apps API, not "my-imported-app"
         assert data["is_shared"] is True  # Always true for imported apps
 
 
@@ -320,3 +447,151 @@ class TestAppPool:
         assert "public-template" in template_names
         # Internal template should NOT be in the pool
         assert "internal-template" not in template_names
+
+
+class TestUnimportedInstances:
+    """Integration tests for listing unimported app instances"""
+
+    def test_get_unimported_instances_empty(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        """Test getting unimported instances when Apps API returns empty list"""
+        # Mock Apps API to return empty list
+        mock_apps_api_client.list_instances.return_value = {
+            "items": [],
+            "total": 0,
+            "page": 1,
+            "size": 50,
+            "pages": 0,
+        }
+
+        response = app_client.get("/api/v1/apps/instances/unimported")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["items"] == []
+        assert data["total"] == 0
+        assert data["page"] == 1
+
+    def test_get_unimported_instances_all_unimported(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        """Test getting unimported instances when no apps are imported"""
+        # Mock Apps API to return only healthy instances (API filters by states=["healthy"])
+        mock_instances = [
+            {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "name": "app-1",
+                "template_name": "jupyter",
+                "template_version": "1.0.0",
+                "display_name": "Jupyter Notebook",
+                "state": "healthy",
+            },
+        ]
+        mock_apps_api_client.list_instances.return_value = {
+            "items": mock_instances,
+            "total": 1,
+            "page": 1,
+            "size": 50,
+            "pages": 1,
+        }
+
+        response = app_client.get("/api/v1/apps/instances/unimported")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify API was called with states filter
+        mock_apps_api_client.list_instances.assert_called_once_with(
+            page=1, size=50, states=["healthy"]
+        )
+
+        # All healthy instances should be returned since none are imported
+        assert len(data["items"]) == 1
+        assert data["total"] == 1
+        assert data["items"][0]["name"] == "app-1"
+        assert data["items"][0]["state"] == "healthy"
+
+    def test_get_unimported_instances_filtered(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        """Test that imported instances are filtered out (API filters non-healthy)"""
+        app_id_1 = "123e4567-e89b-12d3-a456-426614174000"
+        app_id_2 = "223e4567-e89b-12d3-a456-426614174000"
+
+        # Import one app
+        import_response = app_client.post(
+            "/api/v1/apps/import",
+            json={"app_id": app_id_2},
+        )
+        assert import_response.status_code == 200
+
+        # Mock Apps API to return only healthy instances (API filters by states=["healthy"])
+        # Degraded instances won't be returned by the API anymore
+        mock_instances = [
+            {
+                "id": app_id_1,
+                "name": "app-1",
+                "template_name": "jupyter",
+                "template_version": "1.0.0",
+                "display_name": "Jupyter Notebook",
+                "state": "healthy",
+            },
+            {
+                "id": app_id_2,  # This one is imported
+                "name": "app-2",
+                "template_name": "test-template",
+                "template_version": "1.0.0",
+                "display_name": "Test App",
+                "state": "healthy",
+            },
+        ]
+        mock_apps_api_client.list_instances.return_value = {
+            "items": mock_instances,
+            "total": 2,
+            "page": 1,
+            "size": 50,
+            "pages": 1,
+        }
+
+        response = app_client.get("/api/v1/apps/instances/unimported")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify API was called with states filter
+        mock_apps_api_client.list_instances.assert_called_once_with(
+            page=1, size=50, states=["healthy"]
+        )
+
+        # Only 1 instance should be returned (app-1: healthy and unimported)
+        # app-2 is excluded (imported)
+        # app-3 would have been excluded by the API (degraded, filtered by states=["healthy"])
+        assert len(data["items"]) == 1
+        assert data["total"] == 1
+
+        # Verify only the healthy, unimported instance is returned
+        returned_ids = [item["id"] for item in data["items"]]
+        assert app_id_1 in returned_ids
+        assert app_id_2 not in returned_ids  # Imported app should be filtered out
+
+    def test_get_unimported_instances_pagination(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        """Test pagination parameters are passed to Apps API"""
+        mock_apps_api_client.list_instances.return_value = {
+            "items": [],
+            "total": 0,
+            "page": 2,
+            "size": 10,
+            "pages": 0,
+        }
+
+        response = app_client.get("/api/v1/apps/instances/unimported?page=2&size=10")
+
+        assert response.status_code == 200
+        # Verify that pagination parameters and states filter were passed to Apps API
+        mock_apps_api_client.list_instances.assert_called_once_with(
+            page=2, size=10, states=["healthy"]
+        )
