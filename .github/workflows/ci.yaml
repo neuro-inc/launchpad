@@ -128,7 +128,7 @@ jobs:
       actions: write  # for artifact removal
       # contents: write  # for release creation
       packages: write  # for publishing on ghcr.io
-    if: github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master')
+    if: github.event_name == 'push' && (github.ref_type == 'tag' || github.ref_name == 'master')
     steps:
       - name: Checkout commit
         uses: actions/checkout@v4
