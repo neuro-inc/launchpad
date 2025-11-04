@@ -106,17 +106,50 @@ async def insert_template(
     is_internal: bool,
     is_shared: bool,
     handler_class: str | None = None,
-    default_inputs: dict[str, Any] | None = None,
+    input: dict[str, Any] | None = None,
 ) -> AppTemplate:
     """
     Insert or update a template.
 
-    Note: default_inputs is currently optional for backwards compatibility,
+    Note: input is currently optional for backwards compatibility,
     but will be converted to an empty dict if None.
+
+    Safety: When updating an existing template that has instances,
+    is_internal and is_shared cannot be modified.
     """
-    # Ensure default_inputs is never None
-    if default_inputs is None:
-        default_inputs = {}
+    # Ensure input is never None
+    if input is None:
+        input = {}
+
+    # Check if template exists and has instances
+    existing_template = await select_template(db, name=name)
+    if existing_template:
+        # Check if there are any instances using this template
+        from launchpad.apps.storage import list_apps
+
+        instances = await list_apps(db, template_name=name)
+
+        if instances:
+            # Validate that is_internal and is_shared are not being changed
+            if existing_template.is_internal != is_internal:
+                from launchpad.apps.exceptions import AppServiceError
+
+                raise AppServiceError(
+                    f"Cannot modify is_internal for template '{name}' because it has "
+                    f"{len(instances)} existing instance(s). Delete all instances first."
+                )
+            if existing_template.is_shared != is_shared:
+                from launchpad.apps.exceptions import AppServiceError
+
+                raise AppServiceError(
+                    f"Cannot modify is_shared for template '{name}' because it has "
+                    f"{len(instances)} existing instance(s). Delete all instances first."
+                )
+
+        # Expire the existing template from the session cache to ensure
+        # the RETURNING clause gets the updated row, not the cached one
+        db.expire(existing_template)
+
     query = (
         insert(AppTemplate)
         .values(
@@ -135,11 +168,11 @@ async def insert_template(
                 is_internal=is_internal,
                 is_shared=is_shared,
                 handler_class=handler_class,
-                default_inputs=default_inputs,
+                input=input,
             )
         )
         .on_conflict_do_update(
-            constraint="unique__app_templates__name",
+            constraint="unique__app_templates__name_template_name_version",
             set_=dict(
                 template_name=template_name,
                 template_version=template_version,
@@ -153,7 +186,7 @@ async def insert_template(
                 is_internal=is_internal,
                 is_shared=is_shared,
                 handler_class=handler_class,
-                default_inputs=default_inputs,
+                input=input,
             ),
         )
         .returning(AppTemplate)

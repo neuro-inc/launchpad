@@ -18,16 +18,13 @@ class AppTemplate(Base):
     __table_args__ = (
         UniqueConstraint(
             "name",
-            name="unique__app_templates__name",
-        ),
-        UniqueConstraint(
             "template_name",
             "template_version",
-            name="unique__app_templates__template_name_version",
+            name="unique__app_templates__name_template_name_version",
         ),
     )
 
-    name: Mapped[str] = mapped_column(index=True, unique=True)
+    name: Mapped[str] = mapped_column(index=True)
     """Unique template identifier/name"""
 
     template_name: Mapped[str]
@@ -66,5 +63,5 @@ class AppTemplate(Base):
     handler_class: Mapped[str | None]
     """Optional handler class name (e.g., 'OpenWebUIApp'). If None, uses GenericApp"""
 
-    default_inputs: Mapped[dict[str, Any]] = mapped_column(JSON)
+    input: Mapped[dict[str, Any]] = mapped_column(JSON)
     """Default inputs to merge with user-provided inputs"""

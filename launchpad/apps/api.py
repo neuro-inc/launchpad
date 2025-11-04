@@ -1,10 +1,11 @@
 import logging
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter
 from fastapi_pagination import Page, paginate
 from starlette.requests import Request
-from starlette.status import HTTP_200_OK
+from starlette.status import HTTP_200_OK, HTTP_204_NO_CONTENT
 
 from launchpad.app import Launchpad
 from launchpad.apps.exceptions import (
@@ -13,6 +14,7 @@ from launchpad.apps.exceptions import (
     AppTemplateNotFound,
     AppUnhealthyError,
 )
+from launchpad.apps.models import InstalledApp
 from launchpad.apps.resources import (
     GenericAppInstallRequest,
     ImportAppRequest,
@@ -105,7 +107,7 @@ async def view_post_install_generic_app(
         is_internal=generic_app_request.is_internal,
         is_shared=generic_app_request.is_shared,
         handler_class=None,  # No handler for generic apps
-        default_inputs=generic_app_request.inputs,
+        input=generic_app_request.inputs,
     )
 
     # Install from the template
@@ -114,7 +116,7 @@ async def view_post_install_generic_app(
         return await app_service.install_from_template(
             request=request,
             template_name=template_name,
-            user_inputs=None,  # Already in default_inputs
+            user_inputs=None,  # Already in input
             user_id=user.id,
         )
     except AppServiceError as e:
@@ -279,3 +281,131 @@ async def view_post_run_app(
             f"App {app_name} already installed, returning existing installation"
         )
         return installed_app
+
+
+@apps_router.get("/templates", response_model=Page[LaunchpadTemplateRead])
+async def view_get_templates(
+    request: Request,
+    user: AdminAuth,
+    is_internal: bool | None = None,
+) -> Any:
+    """
+    Get all app templates.
+
+    This endpoint requires admin authentication.
+    Returns a paginated list of all templates in the system.
+
+    Query parameters:
+    - is_internal: Optional filter to get only internal or non-internal templates
+    """
+    app: Launchpad = request.app
+    async with app.db() as db:
+        from launchpad.apps.template_storage import list_templates
+
+        templates = await list_templates(db, is_internal=is_internal)
+        print("TEMPLATES FETCHED:")
+        print(templates)
+        template_reads = [
+            LaunchpadTemplateRead.model_validate(template) for template in templates
+        ]
+        return paginate(template_reads)
+
+
+@apps_router.get("/instances", response_model=Page[InstalledApp])
+async def view_get_instances(
+    app_service: DepAppService,
+    user: AdminAuth,
+) -> Any:
+    """
+    Get all installed app instances.
+
+    This endpoint requires admin authentication.
+    Returns a paginated list of all installed apps across all users.
+    """
+    installed_apps = await app_service.list_installed_apps()
+    return paginate(installed_apps)
+
+
+@apps_router.get("/instances/unimported")
+async def view_get_unimported_instances(
+    app_service: DepAppService,
+    user: AdminAuth,
+    page: int = 1,
+    size: int = 50,
+) -> dict[str, Any]:
+    """
+    Get healthy app instances from Apolo that haven't been imported into Launchpad yet.
+
+    This endpoint requires admin authentication.
+    Returns a paginated list of healthy app instances that exist in Apps API
+    but are not yet tracked in Launchpad's database.
+
+    Only instances with state="healthy" are returned.
+
+    Query parameters:
+    - page: Page number (default: 1)
+    - size: Page size (default: 50, max: 100)
+
+    Returns:
+    - items: List of unimported healthy app instances
+    - total: Total count of unimported healthy instances
+    - page: Current page number
+    - size: Page size
+    - pages: Total number of pages
+
+    Example response:
+    ```json
+    {
+        "items": [
+            {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "name": "my-app-abc123",
+                "template_name": "jupyter",
+                "template_version": "1.0.0",
+                "display_name": "My Jupyter Notebook",
+                "state": "healthy",
+                "created_at": "2025-01-15T10:30:00Z",
+                ...
+            }
+        ],
+        "total": 5,
+        "page": 1,
+        "size": 50,
+        "pages": 1
+    }
+    ```
+    """
+    try:
+        return await app_service.list_unimported_instances(page=page, size=size)
+    except AppServiceError as e:
+        raise BadRequest(str(e))
+
+
+@apps_router.delete("/templates/{template_id}", status_code=HTTP_204_NO_CONTENT)
+async def view_delete_template(
+    template_id: UUID,
+    app_service: DepAppService,
+    user: AdminAuth,
+) -> None:
+    """
+    Delete a template by its ID.
+
+    This endpoint requires admin authentication.
+    Deletes the template from the AppTemplate table.
+    """
+    await app_service.delete_template_by_id(template_id)
+
+
+@apps_router.delete("/instances/{app_id}", status_code=HTTP_204_NO_CONTENT)
+async def view_delete_instance(
+    app_id: UUID,
+    app_service: DepAppService,
+    user: AdminAuth,
+) -> None:
+    """
+    Delete an app instance by its ID.
+
+    This endpoint requires admin authentication.
+    Uninstalls the app from Apps API and removes it from the database.
+    """
+    await app_service.delete(app_id)

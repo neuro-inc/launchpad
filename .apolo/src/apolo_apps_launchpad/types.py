@@ -8,7 +8,7 @@ from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI
 from apolo_app_types.protocols.common.preset import Preset
 from apolo_app_types.protocols.common.schema_extra import SchemaExtraMetadata
-from apolo_app_types.protocols.common.secrets_ import OptionalSecret
+from apolo_app_types.protocols.common.secrets_ import ApoloSecret, OptionalSecret
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from pydantic import ConfigDict, Field
 
@@ -280,7 +280,7 @@ class LaunchpadWebAppConfig(AbstractAppFieldType):
 
 class KeycloakConfig(AbstractAppFieldType):
     web_app_url: ServiceAPI[HttpApi]
-    auth_admin_password: str = Field(
+    auth_admin_password: ApoloSecret = Field(
         ...,
         json_schema_extra=SchemaExtraMetadata(
             title="Keycloak Admin Password",
@@ -318,7 +318,7 @@ class LaunchpadDefaultAdminUser(AbstractAppFieldType):
     )
     username: str
     email: str
-    password: str
+    password: ApoloSecret
 
 
 class LaunchpadAdminApi(AbstractAppFieldType):
@@ -328,7 +328,7 @@ class LaunchpadAdminApi(AbstractAppFieldType):
             title="Launchpad Admin API",
             description="Admin API used to add new App Templates and "
             "App Instances to Launchpad",
-        ),
+        ).as_json_schema_extra(),
     )
     api_url: ServiceAPI[HttpApi]
 

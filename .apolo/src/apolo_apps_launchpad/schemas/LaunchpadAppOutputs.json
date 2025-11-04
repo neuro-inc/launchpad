@@ -1,5 +1,23 @@
 {
   "$defs": {
+    "ApoloSecret": {
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "ApoloSecret",
+      "type": "object",
+      "x-description": "Apolo Secret Configuration.",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "Secret",
+      "x-type": "ApoloSecret"
+    },
     "AppInstance": {
       "properties": {
         "app_id": {
@@ -144,11 +162,8 @@
           "$ref": "#/$defs/ServiceAPI_HttpApi_"
         },
         "auth_admin_password": {
-          "title": "Auth Admin Password",
-          "type": "string",
+          "$ref": "#/$defs/ApoloSecret",
           "x-description": "Password for the Keycloak admin user.",
-          "x-is-advanced-field": false,
-          "x-meta-type": "inline",
           "x-title": "Keycloak Admin Password"
         }
       },
@@ -175,6 +190,10 @@
       ],
       "title": "LaunchpadAdminApi",
       "type": "object",
+      "x-description": "Admin API used to add new App Templates and App Instances to Launchpad",
+      "x-is-advanced-field": false,
+      "x-meta-type": "inline",
+      "x-title": "Launchpad Admin API",
       "x-type": "LaunchpadAdminApi"
     },
     "LaunchpadDefaultAdminUser": {
@@ -188,8 +207,7 @@
           "type": "string"
         },
         "password": {
-          "title": "Password",
-          "type": "string"
+          "$ref": "#/$defs/ApoloSecret"
         }
       },
       "required": [

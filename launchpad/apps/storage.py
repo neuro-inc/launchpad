@@ -114,10 +114,11 @@ async def list_apps(
     user_id: str | None = None,
     is_internal: bool | None = None,
     is_shared: bool | None = None,
+    template_name: str | None = None,
 ) -> typing.Sequence[InstalledApp]:
     logger.debug(
         f"list_apps called with filters: user_id={user_id}, "
-        f"is_internal={is_internal}, is_shared={is_shared}"
+        f"is_internal={is_internal}, is_shared={is_shared}, template_name={template_name}"
     )
 
     where = []
@@ -127,6 +128,8 @@ async def list_apps(
         where.append(InstalledApp.is_internal.is_(is_internal))
     if is_shared is not None:
         where.append(InstalledApp.is_shared.is_(is_shared))
+    if template_name is not None:
+        where.append(InstalledApp.template_name == template_name)
 
     query = select(InstalledApp)
     if where:

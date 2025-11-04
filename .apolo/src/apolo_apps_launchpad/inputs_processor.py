@@ -119,13 +119,13 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             cache_config = HuggingFaceCache(
                 files_path=ApoloFilesPath(path="storage:.apps/hugging-face-cache")
             )
+        llm_model.hf_cache = cache_config
 
         return LLMInputs(
             hugging_face_model=llm_model,
             tokenizer_hf_name=llm_model.model_hf_name,
             preset=input_.apps_config.quick_start_config.llm_config.llm_preset,
             server_extra_args=llm_extra_args,
-            cache_config=cache_config,
         )
 
     async def get_postgres_inputs(
@@ -221,7 +221,6 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                             "hugging_face_model",
                             "preset",
                             "server_extra_args",
-                            "cache_config",
                         ],
                     ),
                     "postgres": get_nested_values(
