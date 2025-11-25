@@ -79,7 +79,7 @@ ujson = "^5.11.0"
 backoff = "^2.2.1"
 pyjwt = "^2.10.1"
 asyncache = "^0.3.1"
-asyncpg = "^0.30.0"
+asyncpg = "^0.31.0"
 apolo-app-types = "v25.10.18"
 apolo-sdk = "v25.9.1"
 
