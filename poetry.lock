@@ -320,37 +320,38 @@ trio = ["trio (>=0.31.0)"]
 
 [[package]]
 name = "apolo-app-types"
-version = "25.10.18"
+version = "25.11.7"
 description = "Apolo Platform App Types."
 optional = false
 python-versions = "<4.0,>=3.9.0"
 groups = ["main"]
 files = [
-    {file = "apolo_app_types-25.10.18-py3-none-any.whl", hash = "sha256:94df3c966cc30a340d6427b9734e8c89c04874eefe8d0f60e697ed8beda45329"},
-    {file = "apolo_app_types-25.10.18.tar.gz", hash = "sha256:8bb03f2aed4991f8ca19b1a0a8b6dcc043d6f1f30b2811f77c3169bf4e248afd"},
+    {file = "apolo_app_types-25.11.7-py3-none-any.whl", hash = "sha256:88ab52219528763112a6e870583c69dd7273a50b39fc66903c5c4af14b9d7447"},
+    {file = "apolo_app_types-25.11.7.tar.gz", hash = "sha256:3d2f64f9d043a259f9e55a6c6fe2eae5189e29545caa5b16a3407492c69645b7"},
 ]
 
 [package.dependencies]
-apolo-sdk = ">=25.9.1,<26.0.0"
+apolo-sdk = ">=25.11.1,<26.0.0"
 click = ">=8.0.3,<9.0.0"
 httpx = ">=0.28.0,<0.29.0"
 jsonref = ">=1.1.0,<2.0.0"
 kubernetes = ">=34.1.0,<35.0.0"
-pydantic = ">=2.12.3,<3.0.0"
+pydantic = ">=2.12.4,<3.0.0"
 pyyaml = ">=6.0.3,<7.0.0"
+tenacity = ">=9.1.2,<10.0.0"
 types-PyYAML = ">=6.0.12.20250915,<7.0.0.0"
 yarl = ">=1.22.0,<2.0.0"
 
 [[package]]
 name = "apolo-sdk"
-version = "25.9.1"
+version = "25.11.1"
 description = "Apolo SDK"
 optional = false
 python-versions = ">=3.9.0"
 groups = ["main"]
 files = [
-    {file = "apolo_sdk-25.9.1-py3-none-any.whl", hash = "sha256:a4049c707b7eed06b33f0714823b8b7588ed0c9708e8a2aa864b9abfe142ceff"},
-    {file = "apolo_sdk-25.9.1.tar.gz", hash = "sha256:5069eb3202927b357cc2bfe3f97538da11463c5e151c6f0ddc758a03534dbb3f"},
+    {file = "apolo_sdk-25.11.1-py3-none-any.whl", hash = "sha256:b94cfcfa5b28cd5b93d92945e2b0095e50ccf57df8708ff6f1c9cbd32bddd222"},
+    {file = "apolo_sdk-25.11.1.tar.gz", hash = "sha256:9d813c1ff7aefab115b30e395b4e5d1bc55b75a630557658686ad535d272847f"},
 ]
 
 [package.dependencies]
@@ -361,7 +362,7 @@ azure-storage-blob = ">=12.8.1,<12.9.0 || >12.9.0"
 certifi = "*"
 google-auth = ">=2.0.2"
 neuro-admin-client = "25.9.2"
-neuro-config-client = "25.9.4"
+neuro-config-client = "25.10.0"
 packaging = ">=20.4"
 python-dateutil = ">=2.7.0"
 python-jose = ">=3.3.0"
@@ -1964,14 +1965,14 @@ yarl = ">=1.10"
 
 [[package]]
 name = "neuro-config-client"
-version = "25.9.4"
+version = "25.10.0"
 description = "Internal client for Neu.ro config service"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "neuro_config_client-25.9.4-py3-none-any.whl", hash = "sha256:b2a3ab0bafc494111f38f6f09f6760c96f72487ff61b4e8b1f9ac65685af5ece"},
-    {file = "neuro_config_client-25.9.4.tar.gz", hash = "sha256:ee6b76de0be163ea0cfbbe34edd99a26007f14b797aa2dd19af5412778022418"},
+    {file = "neuro_config_client-25.10.0-py3-none-any.whl", hash = "sha256:d1e9c35b6b5069ae72846e2bb10178dccfb0fc2d60dcdedadd8c5dc8261e6b45"},
+    {file = "neuro_config_client-25.10.0.tar.gz", hash = "sha256:c3db71b610fe258ff5ee54a827d0ead613e84efceae22b1215b5f3c1febb3c98"},
 ]
 
 [package.dependencies]
@@ -3199,6 +3200,22 @@ typing-extensions = {version = ">=4.10.0", markers = "python_version < \"3.13\""
 full = ["httpx (>=0.27.0,<0.29.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.18)", "pyyaml"]
 
 [[package]]
+name = "tenacity"
+version = "9.1.2"
+description = "Retry code until it succeeds"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138"},
+    {file = "tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb"},
+]
+
+[package.extras]
+doc = ["reno", "sphinx"]
+test = ["pytest", "tornado (>=4.5)", "typeguard"]
+
+[[package]]
 name = "testcontainers"
 version = "4.13.3"
 description = "Python library for throwaway instances of anything that can run in a Docker container"
@@ -3763,4 +3780,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "76f302f448cbab4c791bc973882ecf67e587ca2a09217007b8acbfc4797e9938"
+content-hash = "0b73c0645a06dd71b3fc698fb974bb29acb63835b607b915df4a2a92a5df3cfc"
