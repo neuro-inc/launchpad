@@ -7,6 +7,7 @@
           "type": "string",
           "x-description": "Provide the Apolo Storage path starting with `storage:` to locate your files.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Storage Path"
         }
@@ -18,6 +19,7 @@
       "type": "object",
       "x-description": "Specify the path within the Apolo Files application to read from or write to.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Apolo Files Path",
       "x-type": "ApoloFilesFile"
@@ -36,6 +38,7 @@
       "type": "object",
       "x-description": "Apolo Secret Configuration.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Secret",
       "x-type": "ApoloSecret"
@@ -61,6 +64,7 @@
       "type": "object",
       "x-description": "Choose some available configuration to jump start this Launchpad instance with some preinstalled applications",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Quickstart Apps",
       "x-type": "AppsConfig"
@@ -72,6 +76,7 @@
           "type": "string",
           "x-description": "The name of the custom LLM model.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Model Name"
         },
@@ -88,6 +93,7 @@
           "type": "array",
           "x-description": "Additional arguments to pass to the VLLM runtime.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "VLLM Extra Arguments"
         }
@@ -100,6 +106,7 @@
       "type": "object",
       "x-description": "Specify a custom LLM model to be used in the Launchpad.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Custom LLM Model",
       "x-type": "CustomLLMModel"
@@ -120,6 +127,7 @@
       "type": "object",
       "x-description": "Configuration for the Hugging Face cache.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "integration",
       "x-title": "Hugging Face Cache",
       "x-type": "HuggingFaceCache"
@@ -139,6 +147,7 @@
           "type": "array",
           "x-description": "Additional arguments to pass to the embeddings runtime.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Embeddings Extra Arguments"
         }
@@ -150,6 +159,7 @@
       "type": "object",
       "x-description": "Specify a custom embeddings model to be used in the Launchpad.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "HuggingFace Embeddings Model",
       "x-type": "HuggingFaceEmbeddingsModel"
@@ -169,6 +179,7 @@
           "type": "array",
           "x-description": "Additional arguments to pass to the VLLM runtime.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "VLLM Extra Arguments"
         }
@@ -180,6 +191,7 @@
       "type": "object",
       "x-description": "Specify a custom LLM model to be used in the Launchpad.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "HuggingFace LLM Model",
       "x-type": "HuggingFaceLLMModel"
@@ -191,6 +203,7 @@
           "type": "string",
           "x-description": "The name of the Hugging Face model.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Hugging Face Model Name"
         },
@@ -206,6 +219,7 @@
           "default": null,
           "x-description": "Provide a Hugging Face API token linked to an account with access to the model specified above. This token will be used to download model files from the Hugging Face Hub, including gated or private repositories where applicable.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "integration",
           "x-title": "Hugging Face Token"
         },
@@ -221,6 +235,7 @@
           "default": null,
           "x-description": "Enables caching of model files to reduce redundant downloads and speed up load times.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Model Cache"
         }
@@ -232,6 +247,7 @@
       "type": "object",
       "x-description": "Configure the Hugging Face model. Ensure it is available on the Hugging Face Hub and provide an API token with access rights if the repository is gated.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "integration",
       "x-title": "Hugging Face Model",
       "x-type": "HuggingFaceModel"
@@ -244,6 +260,7 @@
           "type": "string",
           "x-description": "The name of the Hugging Face token.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Token Name"
         },
@@ -261,6 +278,7 @@
       "type": "object",
       "x-description": "Provide a Hugging Face API token linked to an account with access to the model specified above. This token will be used to download model files from the Hugging Face Hub, including gated or private repositories where applicable.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "integration",
       "x-title": "Hugging Face Token",
       "x-type": "HuggingFaceToken"
@@ -288,6 +306,7 @@
           "title": "Model",
           "x-description": "Select a pre-configured LLM model for the Launchpad.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Pre-configured LLM Model"
         },
@@ -310,6 +329,7 @@
       "type": "object",
       "x-description": "Configuration for the LLM model to be used in this Launchpad.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "LLM Configuration",
       "x-type": "LLMConfig"
@@ -329,6 +349,7 @@
       "type": "object",
       "x-description": "Configuration for the Launchpad application.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Launchpad Configuration",
       "x-type": "LaunchpadWebAppConfig"
@@ -348,6 +369,7 @@
       "type": "object",
       "x-description": "Install only Launchpad. You can add new apps to Launchpad later",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "No Startup Apps",
       "x-type": "NoQuickStartConfig"
@@ -379,6 +401,7 @@
       "type": "object",
       "x-description": "Install OpenWebUI and its dependencies on Launchpad startup",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "OpenWebUI",
       "x-type": "OpenWebUIConfig"
@@ -397,6 +420,7 @@
           "type": "integer",
           "x-description": "Number of replicas for the Postgres database.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Postgres Replicas"
         }
@@ -408,6 +432,7 @@
       "type": "object",
       "x-description": "Configuration for the Postgres database.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Postgres Configuration",
       "x-type": "PostgresConfig"
@@ -426,6 +451,7 @@
           "default": "meta-llama/Llama-3.1-8B-Instruct",
           "x-description": "Select a pre-configured LLM model from the available options.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Pre-configured Model"
         },
@@ -441,6 +467,7 @@
           "default": null,
           "x-description": "Provide a Hugging Face API token for accessing gated or private models.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Hugging Face Token"
         },
@@ -452,6 +479,7 @@
           "type": "array",
           "x-description": "Additional arguments to pass to the VLLM runtime.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "VLLM Extra Arguments"
         }
@@ -460,6 +488,7 @@
       "type": "object",
       "x-description": "Select a pre-configured HuggingFace LLM model with token authentication.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Pre-configured HuggingFace LLM Model",
       "x-type": "PreConfiguredHuggingFaceLLMModel"
@@ -479,6 +508,7 @@
           "type": "string",
           "x-description": "The name of the preset.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Resource Preset"
         }
@@ -490,6 +520,7 @@
       "type": "object",
       "x-description": "Select the resource preset used per service replica.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Resource Preset",
       "x-type": "Preset"
@@ -514,6 +545,7 @@
           "title": "Model",
           "x-description": "The Hugging Face model to use for text embeddings.",
           "x-is-advanced-field": false,
+          "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Embeddings Model"
         }
@@ -525,6 +557,7 @@
       "type": "object",
       "x-description": "Configuration for the text embeddings service.",
       "x-is-advanced-field": false,
+      "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Text Embeddings Configuration",
       "x-type": "TextEmbeddingsConfig"
