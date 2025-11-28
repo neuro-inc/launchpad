@@ -458,7 +458,7 @@
         "hf_token": {
           "anyOf": [
             {
-              "$ref": "#/$defs/ApoloSecret"
+              "$ref": "#/$defs/HuggingFaceToken"
             },
             {
               "type": "null"
