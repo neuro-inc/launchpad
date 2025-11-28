@@ -1,7 +1,7 @@
 import enum
 from typing import Literal
 
-from apolo_app_types import AppInputs, AppOutputs, HuggingFaceModel
+from apolo_app_types import AppInputs, AppOutputs, HuggingFaceModel, HuggingFaceToken
 from apolo_app_types.protocols.apps import AppInstance
 from apolo_app_types.protocols.common.abc_ import AbstractAppFieldType
 from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
@@ -36,7 +36,7 @@ class PreConfiguredHuggingFaceLLMModel(AbstractAppFieldType):
             description="Select a pre-configured LLM model from the available options.",
         ).as_json_schema_extra(),
     )
-    hf_token: OptionalSecret = Field(
+    hf_token: HuggingFaceToken | None = Field(
         default=None,
         json_schema_extra=SchemaExtraMetadata(
             title="Hugging Face Token",

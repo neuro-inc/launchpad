@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from apolo_app_types import ApoloSecret, HuggingFaceToken
 from apolo_app_types.protocols.common import Preset
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
@@ -40,7 +41,11 @@ async def test_launchpad_values_generation_with_preconfigured_model(setup_client
                     openweb_quickstart=True,
                     llm_config=LLMConfig(
                         model=PreConfiguredHuggingFaceLLMModel(
-                            model=PreConfiguredLLMModels.LLAMA_31_8b
+                            model=PreConfiguredLLMModels.LLAMA_31_8b,
+                            hf_token=HuggingFaceToken(
+                                token_name="HF_TOKEN",
+                                token=ApoloSecret(key="HF_TOKEN"),
+                            ),
                         ),
                         llm_preset=Preset(name="gpu-small"),
                         ui_preset=Preset(name="cpu-small"),
@@ -114,7 +119,14 @@ async def test_launchpad_values_generation_with_preconfigured_model(setup_client
                 "vllm": {
                     "hugging_face_model": {
                         "model_hf_name": "meta-llama/Llama-3.1-8B-Instruct",
-                        "hf_token": None,
+                        "hf_token": {
+                            "__type__": "HuggingFaceToken",
+                            "token_name": "HF_TOKEN",
+                            "token": {
+                                "__type__": "ApoloSecret",
+                                "key": "HF_TOKEN",
+                            },
+                        },
                         "hf_cache": {
                             "files_path": {
                                 "path": "storage:.apps/hugging-face-cache",
@@ -464,7 +476,11 @@ async def test_launchpad_values_generation_magistral_model(setup_clients):
                     openweb_quickstart=True,
                     llm_config=LLMConfig(
                         model=PreConfiguredHuggingFaceLLMModel(
-                            model=PreConfiguredLLMModels.MAGISTRAL_24B
+                            model=PreConfiguredLLMModels.MAGISTRAL_24B,
+                            hf_token=HuggingFaceToken(
+                                token_name="HF_TOKEN",
+                                token=ApoloSecret(key="HF_TOKEN"),
+                            ),
                         ),
                         llm_preset=Preset(name="gpu-medium"),
                         ui_preset=Preset(name="cpu-small"),
@@ -538,7 +554,14 @@ async def test_launchpad_values_generation_magistral_model(setup_clients):
                 "vllm": {
                     "hugging_face_model": {
                         "model_hf_name": "unsloth/Magistral-Small-2506-GGUF",
-                        "hf_token": None,
+                        "hf_token": {
+                            "__type__": "HuggingFaceToken",
+                            "token_name": "HF_TOKEN",
+                            "token": {
+                                "__type__": "ApoloSecret",
+                                "key": "HF_TOKEN",
+                            },
+                        },
                         "__type__": "HuggingFaceModel",
                         "hf_cache": {
                             "files_path": {

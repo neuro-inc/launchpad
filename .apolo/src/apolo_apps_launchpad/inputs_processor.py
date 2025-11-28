@@ -13,6 +13,7 @@ from apolo_app_types.helm.utils.dictionaries import get_nested_values
 from apolo_app_types.protocols.common.hugging_face import (
     HuggingFaceCache,
     HuggingFaceModel,
+    HuggingFaceToken,
 )
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from apolo_app_types.protocols.postgres import (
