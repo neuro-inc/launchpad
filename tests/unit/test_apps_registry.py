@@ -155,7 +155,7 @@ def test_llm_inference_app_attributes(mock_internal_app_context: MagicMock) -> N
 
     assert app.name == APP_NAME_LLM_INFERENCE
     assert app.template_name == "llm-inference"
-    assert app.template_version == "v25.10.0"
+    assert app.template_version == "v25.11.2"
     assert app.is_internal is True
     assert app.is_shared is True
     assert app.verbose_name == "LLM Inference"
