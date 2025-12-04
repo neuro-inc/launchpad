@@ -1123,37 +1123,37 @@ standard-no-fastapi-cloud-cli = ["email-validator (>=2.0.0)", "fastapi-cli[stand
 
 [[package]]
 name = "fastapi-pagination"
-version = "0.15.0"
+version = "0.15.1"
 description = "FastAPI pagination"
 optional = false
-python-versions = "<4.0,>=3.10"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "fastapi_pagination-0.15.0-py3-none-any.whl", hash = "sha256:ffef937e78903fcb6f356b8407ec1fb0620a06675087fa7d0c4e537a60aa0447"},
-    {file = "fastapi_pagination-0.15.0.tar.gz", hash = "sha256:11fe39cbe181ed3c18919b90faf6bfcbe40cb596aa9c52a98bbce85111a29a4f"},
+    {file = "fastapi_pagination-0.15.1-py3-none-any.whl", hash = "sha256:d2a22a090db948ec9276bf0464e83be52aaea28109295e695c9e655d9a7da3b4"},
+    {file = "fastapi_pagination-0.15.1.tar.gz", hash = "sha256:29fe3fb49c61e0a6d8340afe7d10588d5818caa9786339a9b1468df519e6a5e9"},
 ]
 
 [package.dependencies]
 fastapi = ">=0.93.0"
 pydantic = ">=1.9.1"
-typing-extensions = ">=4.8.0,<5"
+typing-extensions = ">=4.8.0"
 
 [package.extras]
 asyncpg = ["asyncpg (>=0.24.0)", "sqlalchemy (>=1.3.20)"]
 beanie = ["beanie (>=2.0.0)"]
-bunnet = ["bunnet (>=1.1.0,<2)"]
+bunnet = ["bunnet (>=1.1.0)"]
 databases = ["databases (>=0.6.0)"]
 django = ["databases (>=0.6.0)", "django (<6.0.0)"]
-elasticsearch = ["elasticsearch-dsl (>=8.13.0,<9)"]
-firestore = ["google-cloud-firestore (>=2.19.0,<3)"]
-mongoengine = ["mongoengine (>=0.23.1,<0.30.0)"]
-motor = ["motor (>=3.6.0,<4.0.0)"]
-odmantic = ["odmantic (>=1.0.2,<2)"]
+elasticsearch = ["elasticsearch-dsl (>=8.13.0)"]
+firestore = ["google-cloud-firestore (>=2.19.0)"]
+mongoengine = ["mongoengine (>=0.23.1)"]
+motor = ["motor (>=3.6.0)"]
+odmantic = ["odmantic (>=1.0.2)"]
 orm = ["databases (>=0.6.0)", "orm (>=0.3.1)"]
-piccolo = ["piccolo (>=0.89,<1.25)"]
-scylla-driver = ["scylla-driver (>=3.25.6,<4)"]
-sqlalchemy = ["sqlakeyset (>=2.0.1680321678,<3)", "sqlalchemy (>=1.3.20)"]
-sqlmodel = ["sqlakeyset (>=2.0.1680321678,<3)", "sqlmodel (>=0.0.22)"]
+piccolo = ["piccolo (>=0.89)"]
+scylla-driver = ["scylla-driver (>=3.25.6)"]
+sqlalchemy = ["sqlakeyset (>=2.0.1680321678)", "sqlalchemy (>=1.3.20)"]
+sqlmodel = ["sqlakeyset (>=2.0.1680321678)", "sqlmodel (>=0.0.22)"]
 tortoise = ["tortoise-orm (>=0.22.0)"]
 
 [[package]]
@@ -3854,4 +3854,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "62f286154514ba69e987c4ac013b975e0313c424e9f5be056ed8916617a4f5aa"
+content-hash = "4bbcdc26f122d2ba3cc17e839737116785655cb8893ed538b831bbdb4709b570"
