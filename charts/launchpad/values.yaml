@@ -140,6 +140,9 @@ keycloak:
     initialDelaySeconds: 120
     periodSeconds: 30
     failureThreshold: 5
+  startupProbe:
+    enabled: true
+    initialDelaySeconds: 120
   tolerations:
     - effect: NoSchedule
       key: platform.neuromation.io/job
