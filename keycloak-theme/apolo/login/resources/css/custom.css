@@ -272,8 +272,7 @@ input.pf-m-error:focus {
 
 /* Registration link styling - hidden */
 #kc-registration-container,
-.pf-c-login__main-footer-links,
-.pf-v5-c-login__main-footer {
+.pf-c-login__main-footer-links {
   display: none;
 }
 
@@ -406,8 +405,67 @@ input.pf-m-error:focus {
 }
 
 /* Social providers section */
-.pf-c-login__main-footer {
+.pf-c-login__main-footer,
+.pf-v5-c-login__main-footer {
   margin-top: 2rem;
   padding-top: 1.5rem;
   border-top: 1px solid #e0e0e0;
+}
+
+/* Social provider buttons */
+#kc-social-providers ul,
+.pf-v5-c-login__main-footer-band ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#kc-social-providers li,
+.pf-v5-c-login__main-footer-band li {
+  list-style: none;
+}
+
+/* Social provider links/buttons */
+#kc-social-providers a,
+.pf-v5-c-login__main-footer-band a,
+.pf-v5-c-button.pf-m-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.875rem 1.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: white;
+  color: #333;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+#kc-social-providers a:hover,
+.pf-v5-c-login__main-footer-band a:hover,
+.pf-v5-c-button.pf-m-secondary:hover {
+  background-color: #f5f5f5;
+  border-color: #d0d0d0;
+}
+
+/* Social provider icons */
+#kc-social-providers .kc-social-icon-text,
+.pf-v5-c-login__main-footer-band .kc-social-icon-text {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Title for social providers section */
+.pf-v5-c-login__main-footer-band-item {
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
 }
