@@ -169,7 +169,7 @@ keycloak:
       args:
         - |
           set -euxo pipefail
-          git clone --depth 1 --branch "MLO-540" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
+          git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
           mkdir -p "/opt/bitnami/keycloak/themes/apolo"
           cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
           # Make sure the KC (1001) user can read the files
