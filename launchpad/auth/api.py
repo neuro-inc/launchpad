@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 
-from launchpad.apps.storage import select_app
+from launchpad.apps.storage import select_app_by_any_url
 from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_EMAIL,
     HEADER_X_AUTH_REQUEST_GROUPS,
@@ -129,7 +129,7 @@ async def view_post_authorize(
     oauth: DepOauth,
 ) -> Response:
     app_url = f"https://{request.headers[HEADER_X_FORWARDED_HOST]}"
-    installed_app = await select_app(db=db, url=app_url)
+    installed_app = await select_app_by_any_url(db=db, url=app_url)
     if installed_app is None:
         logger.info(f"Unable to find installed app by url: {app_url}")
         raise Forbidden()
