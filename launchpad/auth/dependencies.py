@@ -115,7 +115,7 @@ def cache_key_getter(*args: Any, **kwargs: str) -> str:
 
 
 @backoff.on_exception(wait_gen=backoff.expo, exception=aiohttp.ClientError, max_tries=5)
-@cached(cache=LRUCache(maxsize=32), key=cache_key_getter)  # type: ignore[untyped-decorator]
+@cached(cache=LRUCache(maxsize=32), key=cache_key_getter)  # type: ignore[misc]
 async def _get_jwks(
     *,
     http: ClientSession,

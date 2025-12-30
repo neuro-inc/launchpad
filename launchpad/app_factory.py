@@ -1,5 +1,6 @@
 from typing import Any, TypedDict
 
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from fastapi_pagination import add_pagination
 from fastapi_pagination.utils import disable_installed_extensions_check
@@ -36,6 +37,16 @@ def create_app(config: Config) -> Launchpad:
 
     app = Launchpad(**app_kwargs)
     app.config = config
+
+    # Configure CORS to allow frontend to access the API
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[f"https://{config.apolo.self_domain}"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     app.include_router(root_router)
     add_pagination(app)
     disable_installed_extensions_check()  # disable pagination warnings

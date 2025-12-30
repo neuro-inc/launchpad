@@ -23,6 +23,34 @@ def test_config_endpoint(app_client: TestClient, config: Config) -> None:
     }
 
 
+def test_cors_middleware(app_client: TestClient, config: Config) -> None:
+    """Test that CORS middleware is configured correctly"""
+    frontend_origin = f"https://{config.apolo.self_domain}"
+
+    # Test preflight OPTIONS request
+    response = app_client.options(
+        "/api/v1/apps/templates",
+        headers={
+            "Origin": frontend_origin,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == frontend_origin
+    assert response.headers["access-control-allow-credentials"] == "true"
+    assert "GET" in response.headers["access-control-allow-methods"]
+
+    # Test actual request with CORS headers
+    response = app_client.get(
+        "/api/v1/apps/templates",
+        headers={"Origin": frontend_origin},
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == frontend_origin
+    assert response.headers["access-control-allow-credentials"] == "true"
+
+
 class TestTemplatesEndpoint:
     """Integration tests for the /templates endpoint"""
 

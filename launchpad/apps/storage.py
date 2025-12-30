@@ -53,6 +53,7 @@ async def insert_app(
     user_id: str | None,
     url: str | None,
     template_name: str,
+    external_url_list: list[str] | None = None,
 ) -> InstalledApp:
     query = (
         insert(InstalledApp)
@@ -67,6 +68,7 @@ async def insert_app(
                 user_id=user_id,
                 url=url,
                 template_name=template_name,
+                external_url_list=external_url_list or [],
             )
         )
         # possible update a URL of an app
@@ -76,6 +78,7 @@ async def insert_app(
                 app_id=app_id,
                 app_name=app_name,
                 url=url,
+                external_url_list=external_url_list or [],
             ),
         )
         .returning(InstalledApp)
@@ -96,6 +99,24 @@ async def update_app_url(
         update(InstalledApp)
         .where(InstalledApp.app_id == app_id)
         .values(url=url)
+        .returning(InstalledApp)
+    )
+    cursor = await db.execute(query)
+    return cursor.scalar_one_or_none()
+
+
+async def update_app_endpoints(
+    db: AsyncSession,
+    app_id: UUID,
+    url: str | None,
+    external_url_list: list[str],
+) -> InstalledApp | None:
+    """Update the URL and external_url_list of an installed app"""
+
+    query = (
+        update(InstalledApp)
+        .where(InstalledApp.app_id == app_id)
+        .values(url=url, external_url_list=external_url_list)
         .returning(InstalledApp)
     )
     cursor = await db.execute(query)

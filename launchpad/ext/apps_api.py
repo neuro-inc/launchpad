@@ -173,3 +173,69 @@ class AppsApiClient:
             url=f"{self.v2_url}/instances",
             params=params,
         )
+
+    def _extract_service_api_urls(self, data: Any) -> list[str]:
+        """Recursively search for ServiceAPI objects and extract their external URLs"""
+        urls = []
+
+        if isinstance(data, dict):
+            # Check if this dict is a ServiceAPI object
+            type_value = data.get("__type__")
+            if isinstance(type_value, str) and type_value.startswith("ServiceAPI["):
+                # Extract external_url from this ServiceAPI object
+                external_url = data.get("external_url")
+                if isinstance(external_url, dict):
+                    protocol = external_url.get("protocol")
+                    host = external_url.get("host")
+                    endpoint_url = external_url.get("endpoint_url", "")
+
+                    if protocol and host:
+                        full_url = f"{protocol}://{host}{endpoint_url}"
+                        urls.append(full_url)
+
+            # Recursively search in all values
+            for value in data.values():
+                urls.extend(self._extract_service_api_urls(value))
+
+        elif isinstance(data, list):
+            # Recursively search in list items
+            for item in data:
+                urls.extend(self._extract_service_api_urls(item))
+
+        return urls
+
+    async def get_app_endpoints(self, app_id: UUID) -> tuple[str | None, list[str]]:
+        """
+        Get the main app URL and list of external endpoint URLs from app outputs.
+
+        Args:
+            app_id: The app instance ID
+
+        Returns:
+            Tuple of (main_url, external_urls_list)
+            - main_url: The main app URL from outputs["app_url"]["external_url"], or None
+            - external_urls_list: List of external endpoint URLs from ServiceAPI objects
+
+        Raises:
+            AppsApiError: If the request to get outputs fails
+        """
+        outputs = await self.get_outputs(app_id)
+
+        # Extract main app URL
+        main_url = None
+        try:
+            app_url_output = outputs.get("app_url")
+            if app_url_output and isinstance(app_url_output, dict):
+                external_url = app_url_output.get("external_url")
+                if isinstance(external_url, dict):
+                    protocol = external_url.get("protocol")
+                    host = external_url.get("host")
+                    if protocol and host:
+                        main_url = f"{protocol}://{host}"
+        except (KeyError, TypeError):
+            logger.debug(f"No main app_url found for app {app_id}")
+
+        # Extract all ServiceAPI external URLs
+        external_urls = self._extract_service_api_urls(outputs)
+
+        return main_url, external_urls
