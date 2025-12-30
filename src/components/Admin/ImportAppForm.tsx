@@ -56,7 +56,11 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
     setValue('descriptionLong', '');
     setValue('logo', '');
     setValue('tags', '');
-    setValue('isInternal', false);
+    // If the instance has no endpoints, it should be marked as internal
+    setValue(
+      'isInternal',
+      !instance.endpoints || instance.endpoints.length === 0,
+    );
   };
 
   const handleBackToList = () => {
