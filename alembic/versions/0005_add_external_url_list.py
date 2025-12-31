@@ -31,7 +31,14 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
+    op.create_index(
+        "ix_installed_apps_external_url_list",
+        "installed_apps",
+        ["external_url_list"],
+        postgresql_using="gin",
+    )
 
 
 def downgrade() -> None:
+    op.drop_index("ix_installed_apps_external_url_list", table_name="installed_apps")
     op.drop_column("installed_apps", "external_url_list")
