@@ -4,8 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
 import pytest
+from aiohttp import ClientResponseError
 
-from launchpad.ext.apps_api import AppsApiClient
+from launchpad.ext.apps_api import AppsApiClient, NotFound, ServerError
 
 
 @pytest.fixture
@@ -181,3 +182,150 @@ async def test_get_app_endpoints_empty_outputs(
 
         assert main_url is None
         assert external_urls == []
+
+
+async def test_get_by_id_not_found(
+    apps_api_client: AppsApiClient, app_id: UUID, mock_http_session: AsyncMock
+) -> None:
+    """Test get_by_id raises NotFound on 404 response"""
+    # Mock 404 response
+    mock_response = MagicMock()
+    mock_response.status = 404
+    mock_text = AsyncMock(return_value="Not found")
+    mock_response.text = mock_text
+    mock_response.raise_for_status.side_effect = ClientResponseError(
+        request_info=MagicMock(),
+        history=(),
+        status=404,
+        message="Not Found",
+    )
+    mock_http_session.request.return_value = mock_response
+
+    with pytest.raises(NotFound):
+        await apps_api_client.get_by_id(app_id)
+
+
+async def test_get_template_not_found(
+    apps_api_client: AppsApiClient, mock_http_session: AsyncMock
+) -> None:
+    """Test get_template raises NotFound on 404 response"""
+    # Mock 404 response
+    mock_response = MagicMock()
+    mock_response.status = 404
+    mock_text = AsyncMock(return_value="Template not found")
+    mock_response.text = mock_text
+    mock_response.raise_for_status.side_effect = ClientResponseError(
+        request_info=MagicMock(),
+        history=(),
+        status=404,
+        message="Not Found",
+    )
+    mock_http_session.request.return_value = mock_response
+
+    with pytest.raises(NotFound):
+        await apps_api_client.get_template("nonexistent-template", "1.0.0")
+
+
+async def test_get_outputs_not_found(
+    apps_api_client: AppsApiClient, app_id: UUID, mock_http_session: AsyncMock
+) -> None:
+    """Test get_outputs raises NotFound on 404 response"""
+    # Mock 404 response
+    mock_response = MagicMock()
+    mock_response.status = 404
+    mock_text = AsyncMock(return_value="App not found")
+    mock_response.text = mock_text
+    mock_response.raise_for_status.side_effect = ClientResponseError(
+        request_info=MagicMock(),
+        history=(),
+        status=404,
+        message="Not Found",
+    )
+    mock_http_session.request.return_value = mock_response
+
+    with pytest.raises(NotFound):
+        await apps_api_client.get_outputs(app_id)
+
+
+async def test_get_inputs_not_found(
+    apps_api_client: AppsApiClient, app_id: UUID, mock_http_session: AsyncMock
+) -> None:
+    """Test get_inputs raises NotFound on 404 response"""
+    # Mock 404 response
+    mock_response = MagicMock()
+    mock_response.status = 404
+    mock_text = AsyncMock(return_value="App not found")
+    mock_response.text = mock_text
+    mock_response.raise_for_status.side_effect = ClientResponseError(
+        request_info=MagicMock(),
+        history=(),
+        status=404,
+        message="Not Found",
+    )
+    mock_http_session.request.return_value = mock_response
+
+    with pytest.raises(NotFound):
+        await apps_api_client.get_inputs(app_id)
+
+
+async def test_delete_app_not_found(
+    apps_api_client: AppsApiClient, app_id: UUID, mock_http_session: AsyncMock
+) -> None:
+    """Test delete_app raises NotFound on 404 response"""
+    # Mock 404 response
+    mock_response = MagicMock()
+    mock_response.status = 404
+    mock_text = AsyncMock(return_value="App not found")
+    mock_response.text = mock_text
+    mock_response.raise_for_status.side_effect = ClientResponseError(
+        request_info=MagicMock(),
+        history=(),
+        status=404,
+        message="Not Found",
+    )
+    mock_http_session.request.return_value = mock_response
+
+    with pytest.raises(NotFound):
+        await apps_api_client.delete_app(app_id)
+
+
+async def test_get_app_endpoints_not_found(
+    apps_api_client: AppsApiClient, app_id: UUID, mock_http_session: AsyncMock
+) -> None:
+    """Test get_app_endpoints raises NotFound when app doesn't exist"""
+    # Mock 404 response for get_outputs (called by get_app_endpoints)
+    mock_response = MagicMock()
+    mock_response.status = 404
+    mock_text = AsyncMock(return_value="App not found")
+    mock_response.text = mock_text
+    mock_response.raise_for_status.side_effect = ClientResponseError(
+        request_info=MagicMock(),
+        history=(),
+        status=404,
+        message="Not Found",
+    )
+    mock_http_session.request.return_value = mock_response
+
+    with pytest.raises(NotFound):
+        await apps_api_client.get_app_endpoints(app_id)
+
+
+async def test_server_error_500(
+    apps_api_client: AppsApiClient, app_id: UUID, mock_http_session: AsyncMock
+) -> None:
+    """Test that 500 responses raise ServerError"""
+    # Mock 500 response
+    mock_response = MagicMock()
+    mock_response.status = 500
+    mock_text = AsyncMock(return_value="Internal server error")
+    mock_response.text = mock_text
+    mock_response.raise_for_status.side_effect = ClientResponseError(
+        request_info=MagicMock(),
+        history=(),
+        status=500,
+        message="Internal Server Error",
+    )
+    mock_http_session.request.return_value = mock_response
+
+    with pytest.raises(ServerError):
+        await apps_api_client.get_by_id(app_id)

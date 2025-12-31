@@ -177,6 +177,8 @@ def mock_apps_api_client() -> AsyncMock:
     # Return proper structure for outputs with installed_apps list
     mock_client.get_outputs.return_value = {"installed_apps": {"app_list": []}}
     mock_client.update_outputs.return_value = None
+    # Mock get_app_endpoints to return empty/None values (fallback behavior)
+    mock_client.get_app_endpoints.return_value = (None, [])
 
     return mock_client
 
