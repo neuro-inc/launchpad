@@ -613,7 +613,7 @@ class AppService:
                     app_id=import_request.app_id,
                     app_name=app_name,
                     launchpad_app_name=template.name,
-                    is_internal=import_request.is_internal,
+                    is_internal=import_request.is_internal or url is None,
                     is_shared=True,  # Imported installed apps are always shared
                     user_id=None,
                     url=url,
