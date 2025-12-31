@@ -138,7 +138,20 @@ async def view_post_authorize(
         logger.info("access to an internal app is forbidden")
         raise Forbidden()
 
+    # Try to get token from cookie first
     access_token = oauth.get_token_from_cookie(request)
+
+    # If no cookie, try to get it from Authorization header
+    if not access_token:
+        try:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                access_token = auth_header.split(" ", 1)[1]
+                logger.info("access token obtained from Authorization header")
+        except Exception:
+            pass  # Will be handled below
+
+    # If still no token, redirect to keycloak
     if not access_token:
         logger.info("no access token present. redirecting to keycloak")
         return oauth.redirect(original_redirect_uri=app_url)
