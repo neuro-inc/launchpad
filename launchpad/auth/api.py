@@ -134,9 +134,10 @@ async def view_post_authorize(
         logger.info(f"Unable to find installed app by url: {app_url}")
         raise Forbidden()
 
-    if installed_app.is_internal:
-        logger.info("access to an internal app is forbidden")
-        raise Forbidden()
+    # make internal apps accessible for apps that only expose an api, not a web page
+    # if installed_app.is_internal:
+    #     logger.info("access to an internal app is forbidden")
+    #     raise Forbidden()
 
     # Try to get token from cookie first
     access_token = oauth.get_token_from_cookie(request)
