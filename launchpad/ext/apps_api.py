@@ -187,10 +187,16 @@ class AppsApiClient:
                 if isinstance(external_url, dict):
                     protocol = external_url.get("protocol")
                     host = external_url.get("host")
-                    endpoint_url = external_url.get("endpoint_url", "")
+                    base_path = external_url.get("base_path", "/")
 
                     if protocol and host:
-                        full_url = f"{protocol}://{host}{endpoint_url}"
+                        # Normalize URL - don't include trailing slash for base path "/"
+                        if base_path == "/":
+                            full_url = f"{protocol}://{host}"
+                        else:
+                            # Remove trailing slash from base_path if present
+                            base_path = base_path.rstrip("/")
+                            full_url = f"{protocol}://{host}{base_path}"
                         urls.append(full_url)
 
             # Recursively search in all values

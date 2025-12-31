@@ -40,7 +40,7 @@ def test_extract_service_api_urls_with_service_apis(
             "external_url": {
                 "protocol": "https",
                 "host": "llm-inference.apps.dev.apolo.us",
-                "endpoint_url": "/v1/chat",
+                "base_path": "/",
             },
         },
         "embeddings_api": {
@@ -48,7 +48,7 @@ def test_extract_service_api_urls_with_service_apis(
             "external_url": {
                 "protocol": "https",
                 "host": "llm-inference.apps.dev.apolo.us",
-                "endpoint_url": "/v1/embeddings",
+                "base_path": "/v1",
             },
         },
         "some_other_field": "value",
@@ -57,8 +57,8 @@ def test_extract_service_api_urls_with_service_apis(
     urls = apps_api_client._extract_service_api_urls(outputs)
 
     assert len(urls) == 2
-    assert "https://llm-inference.apps.dev.apolo.us/v1/chat" in urls
-    assert "https://llm-inference.apps.dev.apolo.us/v1/embeddings" in urls
+    assert "https://llm-inference.apps.dev.apolo.us" in urls
+    assert "https://llm-inference.apps.dev.apolo.us/v1" in urls
 
 
 def test_extract_service_api_urls_nested(apps_api_client: AppsApiClient) -> None:
@@ -70,7 +70,7 @@ def test_extract_service_api_urls_nested(apps_api_client: AppsApiClient) -> None
                 "external_url": {
                     "protocol": "https",
                     "host": "example.com",
-                    "endpoint_url": "/api",
+                    "base_path": "/api",
                 },
             }
         }
@@ -99,7 +99,7 @@ def test_extract_service_api_urls_missing_fields(
         "incomplete_api": {
             "__type__": "ServiceAPI[SomeAPI]",
             "external_url": {
-                "endpoint_url": "/api",
+                "base_path": "/api",
                 # Missing protocol and host
             },
         }
@@ -126,7 +126,7 @@ async def test_get_app_endpoints_with_app_url_and_service_apis(
             "external_url": {
                 "protocol": "https",
                 "host": "api.example.com",
-                "endpoint_url": "/v1/chat",
+                "base_path": "/v1",
             },
         },
     }
@@ -139,7 +139,7 @@ async def test_get_app_endpoints_with_app_url_and_service_apis(
 
         assert main_url == "https://myapp.example.com"
         assert len(external_urls) == 1
-        assert "https://api.example.com/v1/chat" in external_urls
+        assert "https://api.example.com/v1" in external_urls
 
 
 async def test_get_app_endpoints_no_app_url(
@@ -153,7 +153,7 @@ async def test_get_app_endpoints_no_app_url(
             "external_url": {
                 "protocol": "https",
                 "host": "api.example.com",
-                "endpoint_url": "/v1/chat",
+                "base_path": "/",
             },
         },
     }
@@ -165,6 +165,7 @@ async def test_get_app_endpoints_no_app_url(
 
         assert main_url is None
         assert len(external_urls) == 1
+        assert "https://api.example.com" in external_urls
 
 
 async def test_get_app_endpoints_empty_outputs(
