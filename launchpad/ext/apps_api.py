@@ -236,8 +236,16 @@ class AppsApiClient:
                 if isinstance(external_url, dict):
                     protocol = external_url.get("protocol")
                     host = external_url.get("host")
+                    base_path = external_url.get("base_path", "/")
+
                     if protocol and host:
-                        main_url = f"{protocol}://{host}"
+                        # Normalize URL - don't include trailing slash for base path "/"
+                        if base_path == "/":
+                            main_url = f"{protocol}://{host}"
+                        else:
+                            # Remove trailing slash from base_path if present
+                            base_path = base_path.rstrip("/")
+                            main_url = f"{protocol}://{host}{base_path}"
         except (KeyError, TypeError):
             logger.debug(f"No main app_url found for app {app_id}")
 
