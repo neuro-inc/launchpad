@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 
-from launchpad.apps.storage import select_app
+from launchpad.apps.storage import select_app_by_any_url
 from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_EMAIL,
     HEADER_X_AUTH_REQUEST_GROUPS,
@@ -129,16 +129,30 @@ async def view_post_authorize(
     oauth: DepOauth,
 ) -> Response:
     app_url = f"https://{request.headers[HEADER_X_FORWARDED_HOST]}"
-    installed_app = await select_app(db=db, url=app_url)
+    installed_app = await select_app_by_any_url(db=db, url=app_url)
     if installed_app is None:
         logger.info(f"Unable to find installed app by url: {app_url}")
         raise Forbidden()
 
-    if installed_app.is_internal:
-        logger.info("access to an internal app is forbidden")
-        raise Forbidden()
+    # make internal apps accessible for apps that only expose an api, not a web page
+    # if installed_app.is_internal:
+    #     logger.info("access to an internal app is forbidden")
+    #     raise Forbidden()
 
+    # Try to get token from cookie first
     access_token = oauth.get_token_from_cookie(request)
+
+    # If no cookie, try to get it from Authorization header
+    if not access_token:
+        try:
+            auth_header = request.headers.get("Authorization", "")
+            if auth_header.startswith("Bearer "):
+                access_token = auth_header.split(" ", 1)[1]
+                logger.info("access token obtained from Authorization header")
+        except Exception:
+            pass  # Will be handled below
+
+    # If still no token, redirect to keycloak
     if not access_token:
         logger.info("no access token present. redirecting to keycloak")
         return oauth.redirect(original_redirect_uri=app_url)

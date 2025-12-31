@@ -37,6 +37,7 @@ from launchpad.apps.storage import (
     insert_app,
     list_apps,
     select_app,
+    update_app_endpoints,
     update_app_url,
 )
 from launchpad.apps.template_models import AppTemplate
@@ -163,26 +164,28 @@ class AppService:
         if with_url and installed_app.url is None:
             # an app doesn't have a URL yet, so let's try to get it from the outputs
             try:
-                outputs = await self._apps_api_client.get_outputs(installed_app.app_id)
-            except AppsApiError:
-                logger.info(f"App {launchpad_app_name} has not yet pushed outputs")
-            else:
-                try:
-                    output_url = outputs["app_url"]["external_url"]
-                    url = f"{output_url['protocol']}://{output_url['host']}"
+                url, external_url_list = await self._apps_api_client.get_app_endpoints(
+                    installed_app.app_id
+                )
+                logger.info(
+                    f"Fetched endpoints for app {launchpad_app_name}: "
+                    f"url={url}, external_urls={len(external_url_list)}"
+                )
 
-                    # Update the URL in the database
-                    async with self._db() as db:
-                        async with db.begin():
-                            updated_app = await update_app_url(
-                                db, installed_app.app_id, url
-                            )
-                            if updated_app:
-                                installed_app.url = url
-                except KeyError:
-                    logger.error(
-                        f"App {launchpad_app_name} does not declare external web app url"
-                    )
+                # Update the URL and external_url_list in the database
+                async with self._db() as db:
+                    async with db.begin():
+                        updated_app = await update_app_endpoints(
+                            db, installed_app.app_id, url, external_url_list
+                        )
+                        if updated_app:
+                            installed_app.url = url
+                            installed_app.external_url_list = external_url_list
+            except AppsApiError:
+                logger.info(
+                    f"App {launchpad_app_name} has not yet pushed outputs, "
+                    "url and external_url_list remain empty"
+                )
 
         return installed_app
 
@@ -564,6 +567,23 @@ class AppService:
         app_name = app_info["name"]
         display_name = app_info["display_name"]
 
+        # Fetch app endpoints (main URL and external URLs)
+        url = None
+        external_url_list: list[str] = []
+        try:
+            url, external_url_list = await self._apps_api_client.get_app_endpoints(
+                import_request.app_id
+            )
+            logger.info(
+                f"Fetched endpoints for app {import_request.app_id}: "
+                f"url={url}, external_urls={len(external_url_list)}"
+            )
+        except AppsApiError:
+            logger.warning(
+                f"Failed to fetch endpoints for app {import_request.app_id}, "
+                "will use null url and empty external_url_list"
+            )
+
         # Create/update template using helper method
         # NOTE: We ignore import_request.name for app imports because the template
         # should always be identified by the template_name from Apps API, not a custom name.
@@ -579,7 +599,7 @@ class AppService:
             documentation_urls=import_request.documentation_urls,
             external_urls=import_request.external_urls,
             tags=import_request.tags,
-            is_internal=import_request.is_internal,
+            is_internal=import_request.is_internal or url is None,
             is_shared=True,  # Imported installed apps are always shared
             fallback_verbose_name=display_name,  # Use display_name as fallback
             input=app_inputs,  # Use actual inputs from the running app
@@ -593,11 +613,12 @@ class AppService:
                     app_id=import_request.app_id,
                     app_name=app_name,
                     launchpad_app_name=template.name,
-                    is_internal=import_request.is_internal,
+                    is_internal=import_request.is_internal or url is None,
                     is_shared=True,  # Imported installed apps are always shared
                     user_id=None,
-                    url=None,
+                    url=url,
                     template_name=template.name,  # Reference to AppTemplate
+                    external_url_list=external_url_list,
                 )
 
         await self._add_app_to_buffer(installed_app)

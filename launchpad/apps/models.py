@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import String, UniqueConstraint
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from launchpad.db.base import Base
@@ -35,6 +36,11 @@ class InstalledApp(Base):
     """
     user_id: Mapped[str | None]
     url: Mapped[str | None]
+    external_url_list: Mapped[list[str]] = mapped_column(
+        ARRAY(String), server_default="{}"
+    )
+    """Additional endpoints from the app instance (API, metrics, admin panel, etc.)
+    """
     template_name: Mapped[str]
     """References AppTemplate.name - the template used for this installation
     """

@@ -98,6 +98,7 @@ async def test_app_service_install_app_success(
             user_id=None,
             url=None,
             template_name="test-template",
+            external_url_list=[],
         )
 
         result = await app_service.install(

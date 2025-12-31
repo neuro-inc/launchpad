@@ -117,3 +117,4 @@ class LaunchpadInstalledAppRead(BaseModel):
     is_shared: bool
     user_id: str | None
     url: str | None
+    external_url_list: list[str]

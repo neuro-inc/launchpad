@@ -43,6 +43,36 @@ async def select_app(
     return cursor.scalar_one_or_none()
 
 
+async def select_app_by_any_url(
+    db: AsyncSession,
+    url: str,
+) -> InstalledApp | None:
+    """
+    Find an installed app by checking both the main URL and external_url_list.
+
+    This is useful for authorization where a request might come to any of the app's endpoints.
+
+    Args:
+        db: Database session
+        url: The URL to search for
+
+    Returns:
+        The installed app if found by main URL or any external URL, None otherwise
+    """
+    from sqlalchemy import any_, or_
+
+    # Search for app where url matches either the main url field OR is in external_url_list
+    # Using PostgreSQL's = ANY(array) syntax via SQLAlchemy's any_ function
+    query = select(InstalledApp).where(
+        or_(
+            InstalledApp.url == url,
+            url == any_(InstalledApp.external_url_list),  # type: ignore[arg-type]
+        )
+    )
+    cursor = await db.execute(query)
+    return cursor.scalar_one_or_none()
+
+
 async def insert_app(
     db: AsyncSession,
     app_id: UUID,
@@ -53,6 +83,7 @@ async def insert_app(
     user_id: str | None,
     url: str | None,
     template_name: str,
+    external_url_list: list[str] | None = None,
 ) -> InstalledApp:
     query = (
         insert(InstalledApp)
@@ -67,6 +98,7 @@ async def insert_app(
                 user_id=user_id,
                 url=url,
                 template_name=template_name,
+                external_url_list=external_url_list or [],
             )
         )
         # possible update a URL of an app
@@ -76,6 +108,7 @@ async def insert_app(
                 app_id=app_id,
                 app_name=app_name,
                 url=url,
+                external_url_list=external_url_list or [],
             ),
         )
         .returning(InstalledApp)
@@ -96,6 +129,24 @@ async def update_app_url(
         update(InstalledApp)
         .where(InstalledApp.app_id == app_id)
         .values(url=url)
+        .returning(InstalledApp)
+    )
+    cursor = await db.execute(query)
+    return cursor.scalar_one_or_none()
+
+
+async def update_app_endpoints(
+    db: AsyncSession,
+    app_id: UUID,
+    url: str | None,
+    external_url_list: list[str],
+) -> InstalledApp | None:
+    """Update the URL and external_url_list of an installed app"""
+
+    query = (
+        update(InstalledApp)
+        .where(InstalledApp.app_id == app_id)
+        .values(url=url, external_url_list=external_url_list)
         .returning(InstalledApp)
     )
     cursor = await db.execute(query)

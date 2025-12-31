@@ -73,6 +73,7 @@ async def test_insert_app_success(mock_db_session: MagicMock, app_id: UUID) -> N
         user_id=app_data["user_id"],
         url=app_data["url"],
         template_name=app_data["template_name"],
+        external_url_list=[],
     )
 
     result = await insert_app(mock_db_session, **app_data)
