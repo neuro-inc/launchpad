@@ -567,27 +567,6 @@ class AppService:
         app_name = app_info["name"]
         display_name = app_info["display_name"]
 
-        # Create/update template using helper method
-        # NOTE: We ignore import_request.name for app imports because the template
-        # should always be identified by the template_name from Apps API, not a custom name.
-        # The 'name' parameter is only meaningful for template imports (ImportTemplateRequest).
-        template = await self._fetch_and_create_template(
-            template_name=template_name,
-            template_version=template_version,
-            name=import_request.name,
-            verbose_name=import_request.verbose_name,
-            description_short=import_request.description_short,
-            description_long=import_request.description_long,
-            logo=import_request.logo,
-            documentation_urls=import_request.documentation_urls,
-            external_urls=import_request.external_urls,
-            tags=import_request.tags,
-            is_internal=import_request.is_internal,
-            is_shared=True,  # Imported installed apps are always shared
-            fallback_verbose_name=display_name,  # Use display_name as fallback
-            input=app_inputs,  # Use actual inputs from the running app
-        )
-
         # Fetch app endpoints (main URL and external URLs)
         url = None
         external_url_list: list[str] = []
@@ -604,6 +583,27 @@ class AppService:
                 f"Failed to fetch endpoints for app {import_request.app_id}, "
                 "will use null url and empty external_url_list"
             )
+
+        # Create/update template using helper method
+        # NOTE: We ignore import_request.name for app imports because the template
+        # should always be identified by the template_name from Apps API, not a custom name.
+        # The 'name' parameter is only meaningful for template imports (ImportTemplateRequest).
+        template = await self._fetch_and_create_template(
+            template_name=template_name,
+            template_version=template_version,
+            name=import_request.name,
+            verbose_name=import_request.verbose_name,
+            description_short=import_request.description_short,
+            description_long=import_request.description_long,
+            logo=import_request.logo,
+            documentation_urls=import_request.documentation_urls,
+            external_urls=import_request.external_urls,
+            tags=import_request.tags,
+            is_internal=import_request.is_internal or url is None,
+            is_shared=True,  # Imported installed apps are always shared
+            fallback_verbose_name=display_name,  # Use display_name as fallback
+            input=app_inputs,  # Use actual inputs from the running app
+        )
 
         # Link the app installation
         async with self._db() as db:
