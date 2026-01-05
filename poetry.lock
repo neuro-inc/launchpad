@@ -1592,6 +1592,7 @@ description = "Mypyc runtime library"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
+markers = "platform_python_implementation != \"PyPy\""
 files = [
     {file = "librt-0.7.7-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:e4836c5645f40fbdc275e5670819bde5ab5f2e882290d304e3c6ddab1576a6d0"},
     {file = "librt-0.7.7-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:6ae8aec43117a645a31e5f60e9e3a0797492e747823b9bda6972d521b436b4e8"},
@@ -2844,14 +2845,14 @@ dev = ["backports.zoneinfo ; python_version < \"3.9\"", "black", "build", "freez
 
 [[package]]
 name = "python-keycloak"
-version = "5.8.1"
+version = "6.0.0"
 description = "python-keycloak is a Python package providing access to the Keycloak API."
 optional = false
 python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "python_keycloak-5.8.1-py3-none-any.whl", hash = "sha256:f80accf3e63b6c907f0f873ffac7a07705bd89d935520ba235259ba81b9ed864"},
-    {file = "python_keycloak-5.8.1.tar.gz", hash = "sha256:b99a1efc7eb8715c3a7d915005728f8ba2ee03c81cdf12210c65ce794cd148ad"},
+    {file = "python_keycloak-6.0.0-py3-none-any.whl", hash = "sha256:6f6697a0a894d6ded077aa86e12aa41433a0afffa27aa0b9e38395dd69a94009"},
+    {file = "python_keycloak-6.0.0.tar.gz", hash = "sha256:87271d381639f4179a9add88afbb3dbbe9689509cf240d1cf883e44beff4d8f9"},
 ]
 
 [package.dependencies]
@@ -3810,4 +3811,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "647baee1cc15c8346b579cc8d0e511dc4296210fc7e24120aafe4fc143cc5454"
+content-hash = "17e81a1f82542ea666d311d95ab4fff6e439e13d78c07db305e1afc7d4532dfc"
