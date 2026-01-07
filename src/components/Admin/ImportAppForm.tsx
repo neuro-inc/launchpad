@@ -202,8 +202,22 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-4">
-          <Field.Checkbox label="Internal" {...register('isInternal')} />
+        <div className="col-span-2 sm:col-span-1">
+          <label className="flex cursor-pointer items-start">
+            <input
+              type="checkbox"
+              {...register('isInternal')}
+              className="mr-3 mt-1"
+            />
+            <div>
+              <span className="text-body font-medium">Internal</span>
+              <p className="text-caption text-neutral-600">
+                This app will not appear in the app list to users. This is
+                enabled automatically if the app does not expose a main public
+                web page.
+              </p>
+            </div>
+          </label>
         </div>
       </div>
 
