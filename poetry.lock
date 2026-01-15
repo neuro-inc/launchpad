@@ -2839,14 +2839,14 @@ dev = ["backports.zoneinfo ; python_version < \"3.9\"", "black", "build", "freez
 
 [[package]]
 name = "python-keycloak"
-version = "7.0.1"
+version = "7.0.2"
 description = "python-keycloak is a Python package providing access to the Keycloak API."
 optional = false
-python-versions = "<4,>=3.9"
+python-versions = "<4,>=3.10"
 groups = ["main"]
 files = [
-    {file = "python_keycloak-7.0.1-py3-none-any.whl", hash = "sha256:345104b7ec4ef9f46c527745fb79bcce6f0f3114ebb31332b7fa688473879ba1"},
-    {file = "python_keycloak-7.0.1.tar.gz", hash = "sha256:3ebe55a68b101f9fa0a21b41046c9682a3c14edbb855ec6a3930057461110860"},
+    {file = "python_keycloak-7.0.2-py3-none-any.whl", hash = "sha256:0e90612f0ea57822376085426086fa636a874678b03e9676d06fb0da0bb2fe2a"},
+    {file = "python_keycloak-7.0.2.tar.gz", hash = "sha256:37923f9f0c8dab67a3f3b92b5a78b639fd2461548918a8d9774bd0532fb09173"},
 ]
 
 [package.dependencies]
@@ -3804,4 +3804,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "9617cb48d8f5ed0c047499f804aa47030cbfda37f2ace6b646fb60eda4ba2fc7"
+content-hash = "27856a9ed53508b3e0e2fe2048bd5bd43aa6cde3c35c00bd9badb0d3eed6e5a7"
