@@ -283,6 +283,17 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             ],
         }
 
+        extra_env = {}
+        if input_.branding:
+            extra_env.update(
+                {
+                    "BRANDING_LOGO_URL": input_.branding.logo_url,
+                    "BRANDING_FAVICON_URL": input_.branding.favicon_url,
+                    "BRANDING_TITLE": input_.branding.title,
+                    "BRANDING_BACKGROUND": input_.branding.background,
+                }
+            )
+
         return {
             **values,
             "image": {"tag": os.getenv("APP_IMAGE_TAG", "latest")},
@@ -295,6 +306,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 },
             },
             "dbPassword": _generate_password(),
+            "extraEnv": extra_env,
             "domain": domain,
             "keycloak": keycloak_values,  # keeping this for backwards compatibility
             "mlops-keycloak": keycloak_values,
