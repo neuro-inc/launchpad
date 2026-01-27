@@ -333,9 +333,25 @@ class LaunchpadAdminApi(AbstractAppFieldType):
     api_url: ServiceAPI[HttpApi]
 
 
+class BrandingConfig(AbstractAppFieldType):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Branding Configuration",
+            description="Configuration for the branding of the Launchpad.",
+        ).as_json_schema_extra(),
+        is_advanced_field=True,
+    )
+    logo_url: str | None = None
+    favicon_url: str | None = None
+    title: str | None = None
+    background: str | None = None
+
+
 class LaunchpadAppInputs(AppInputs):
     launchpad_web_app_config: LaunchpadWebAppConfig
     apps_config: AppsConfig
+    branding: BrandingConfig | None = None
 
 
 class LaunchpadAppOutputs(AppOutputs):

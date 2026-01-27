@@ -10,6 +10,9 @@ image:
 replicas: 1
 port: 8080
 
+# passed to lauchpad API deployment
+extraEnv: {}
+
 domain: "apps.dev.apolo.us"
 netlifyDomain: "launchpad-web-ui-dev-apolo-us.netlify.app"
 netlifySecretName: launchpad-secrets
