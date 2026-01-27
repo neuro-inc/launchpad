@@ -1117,14 +1117,14 @@ standard-no-fastapi-cloud-cli = ["email-validator (>=2.0.0)", "fastapi-cli[stand
 
 [[package]]
 name = "fastapi-pagination"
-version = "0.15.6"
+version = "0.15.7"
 description = "FastAPI pagination"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "fastapi_pagination-0.15.6-py3-none-any.whl", hash = "sha256:5c44bfaa78c1c968ca6f027b01a27c1805194c7cc8776eb84ec78235abcdaece"},
-    {file = "fastapi_pagination-0.15.6.tar.gz", hash = "sha256:c59ca1aa056dccee3526953357c2d1128f988f83d3034d95ddb8de6f5a68e9f8"},
+    {file = "fastapi_pagination-0.15.7-py3-none-any.whl", hash = "sha256:eee5fcd2b421df90cbfa458239aa2c575a98331219136588282fd965dbc157bc"},
+    {file = "fastapi_pagination-0.15.7.tar.gz", hash = "sha256:28c705b3f261873c2812120a948a6711a909967cb6f33c0ffa826f44a76aafba"},
 ]
 
 [package.dependencies]
@@ -1340,6 +1340,7 @@ description = "Lightweight in-process concurrent programming"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
+markers = "platform_machine == \"aarch64\" or platform_machine == \"ppc64le\" or platform_machine == \"x86_64\" or platform_machine == \"amd64\" or platform_machine == \"AMD64\" or platform_machine == \"win32\" or platform_machine == \"WIN32\""
 files = [
     {file = "greenlet-3.3.1-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:04bee4775f40ecefcdaa9d115ab44736cd4b9c5fba733575bfe9379419582e13"},
     {file = "greenlet-3.3.1-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:50e1457f4fed12a50e427988a07f0f9df53cf0ee8da23fab16e6732c2ec909d4"},
@@ -3818,4 +3819,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "617efff4f77f69fda94d62bd2f2127bf1f56cc95ac4844d7f78f73ca55cd128c"
+content-hash = "14e84dc55e6508b1463979c4fed0c6065e3cdbd89179aea82f03a6beca871894"
