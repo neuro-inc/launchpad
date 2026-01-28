@@ -20,6 +20,7 @@ from launchpad.auth.models import User
 from launchpad.config import (
     ApoloConfig,
     AppsConfig,
+    BrandingConfig,
     Config,
     KeycloakConfig,
     PostgresConfig,
@@ -85,6 +86,12 @@ def config(postgres_container: PostgresContainer, setup_database: str) -> Config
     )
     mock_pg_config = PostgresConfig(dsn=pg_dsn)
     mock_server_config = ServerConfig()
+    mock_branding_config = BrandingConfig(
+        logo_url="https://example.com/logo.png",
+        favicon_url="https://example.com/favicon.png",
+        title="Test Title",
+        background="12345",
+    )
 
     mock_cfg = MagicMock(spec=Config)
     mock_cfg.keycloak = kc_config
@@ -93,6 +100,7 @@ def config(postgres_container: PostgresContainer, setup_database: str) -> Config
     mock_cfg.postgres = mock_pg_config
     mock_cfg.server = mock_server_config
     mock_cfg.skip_seed_templates = False
+    mock_cfg.branding = mock_branding_config
     # Set a mock instance_id for output processing tests
     mock_cfg.instance_id = uuid4()
     return mock_cfg

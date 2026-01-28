@@ -41,5 +41,11 @@ async def view_get_config(request: Request) -> dict[str, Any]:
         "keycloak": {
             "url": str(app.config.keycloak.url),
             "realm": app.config.keycloak.realm,
-        }
+        },
+        "branding": {
+            "logo_url": app.config.branding.logo_url,
+            "favicon_url": app.config.branding.favicon_url,
+            "title": app.config.branding.title,
+            "background": app.config.branding.background,
+        },
     }

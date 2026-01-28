@@ -66,10 +66,19 @@ class PostgresConfig:
 
 
 @dataclass(frozen=True)
+class BrandingConfig:
+    logo_url: str | None = None
+    favicon_url: str | None = None
+    title: str | None = None
+    background: str | None = None
+
+
+@dataclass(frozen=True)
 class Config:
     postgres: PostgresConfig
     keycloak: KeycloakConfig
     apolo: ApoloConfig
+    branding: BrandingConfig
     apps: AppsConfig | None
     server: ServerConfig = ServerConfig()
     instance_id: UUID | None = None
@@ -97,6 +106,7 @@ class EnvironConfigFactory:
                 skip_seed_templates=bool(
                     self._environ.get("LAUNCHPAD_SKIP_SEED_TEMPLATES")
                 ),
+                branding=self.create_branding(),
             )
         except KeyError as e:
             logger.exception("Missing required environment variable: %s", e)
@@ -213,4 +223,12 @@ class EnvironConfigFactory:
             vllm=initial_config["vllm"],
             postgres=initial_config["postgres"],
             embeddings=initial_config["text-embeddings"],
+        )
+
+    def create_branding(self) -> BrandingConfig:
+        return BrandingConfig(
+            logo_url=self._environ.get("BRANDING_LOGO_URL"),
+            favicon_url=self._environ.get("BRANDING_FAVICON_URL"),
+            title=self._environ.get("BRANDING_TITLE"),
+            background=self._environ.get("BRANDING_BACKGROUND"),
         )
