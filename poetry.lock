@@ -1112,14 +1112,14 @@ standard-no-fastapi-cloud-cli = ["email-validator (>=2.0.0)", "fastapi-cli[stand
 
 [[package]]
 name = "fastapi-pagination"
-version = "0.15.7"
+version = "0.15.8"
 description = "FastAPI pagination"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "fastapi_pagination-0.15.7-py3-none-any.whl", hash = "sha256:eee5fcd2b421df90cbfa458239aa2c575a98331219136588282fd965dbc157bc"},
-    {file = "fastapi_pagination-0.15.7.tar.gz", hash = "sha256:28c705b3f261873c2812120a948a6711a909967cb6f33c0ffa826f44a76aafba"},
+    {file = "fastapi_pagination-0.15.8-py3-none-any.whl", hash = "sha256:2334e435e65fbc5bc1f0960ce7c1449fc3ae1c2abd48f40e40e6e48992c5e27b"},
+    {file = "fastapi_pagination-0.15.8.tar.gz", hash = "sha256:f14d572741370b74194a9879c2ed7dc75a7a4e3819d5db22492871be76b28bc9"},
 ]
 
 [package.dependencies]
@@ -3814,4 +3814,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "14e84dc55e6508b1463979c4fed0c6065e3cdbd89179aea82f03a6beca871894"
+content-hash = "5c6ac4585c590c7e315064c36dbc044ee50743031b680459786384627d151082"
