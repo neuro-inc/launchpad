@@ -294,7 +294,6 @@ export async function getAuthOptions(): Promise<AuthOptions> {
         // DO NOT include tokens here - they are stored in JWT on server only
         // Tokens can be accessed server-side via getServerSession and token callback
         session.error = token.error;
-        
         // Only include roles for client-side authorization checks
         // Remove groups to reduce cookie size - use roles instead
         session.realm_roles = token.realm_roles;
