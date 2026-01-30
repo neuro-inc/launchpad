@@ -1,6 +1,10 @@
 import { Metadata } from 'next';
+import { redirect } from 'next/navigation';
+import { getServerSession } from 'next-auth';
 
 import { InstalledApp, Template, WithPagination } from '@typings';
+import { PATH } from '@constants';
+import { getAuthOptions } from '@features';
 import { formatToCamelCase } from '@utils/formatters';
 import { request } from '@utils/helpers';
 
@@ -16,8 +20,24 @@ export const metadata: Metadata = {
 };
 
 export default async function Page() {
+  // Server-side admin access check
+  const authOptions = await getAuthOptions();
+  const session = await getServerSession(authOptions);
+
+  if (!session) {
+    redirect(PATH.AUTH);
+  }
+
+  const clientRoles = (session.client_roles as string[]) || [];
+  const realmRoles = (session.realm_roles as string[]) || [];
+  const roles = clientRoles.length > 0 ? clientRoles : realmRoles;
+  const isAdmin = roles.includes('admin');
+
+  if (!isAdmin) {
+    redirect(PATH.APPS);
+  }
+
   // Fetch initial data server-side
-  // Note: Authentication and admin access are handled by middleware.ts
   let templates: Template[] = [];
   let instances: InstalledApp[] = [];
 

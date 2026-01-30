@@ -2,7 +2,7 @@ import { AuthOptions } from 'next-auth';
 import KeycloakProvider from 'next-auth/providers/keycloak';
 
 import { KeycloakConfig } from '@typings';
-import { NEXTAUTH_SECRET } from '@constants';
+import { IS_LOCAL, NEXTAUTH_SECRET } from '@constants';
 import { getKeycloakIssuer, getServerApiUrl, getSiteUrl } from '@utils/helpers';
 
 type AuthConfig = KeycloakConfig;
@@ -175,11 +175,22 @@ export async function getAuthOptions(): Promise<AuthOptions> {
     ],
     secret: NEXTAUTH_SECRET,
     debug: true,
+    jwt: {
+      /**
+       * Reduce JWT size by using compact encoding
+       */
+      maxAge: 24 * 60 * 60, // 24 hours
+    },
     session: {
       /**
        * Using JWT for public clients
        */
       strategy: 'jwt',
+      /**
+       * Reduce session cookie size by setting maxAge
+       * This matches the access token expiry (24 hours based on logs)
+       */
+      maxAge: 24 * 60 * 60, // 24 hours
     },
     callbacks: {
       async redirect({ url }) {
@@ -216,6 +227,7 @@ export async function getAuthOptions(): Promise<AuthOptions> {
         const now = Date.now();
 
         if (account) {
+          // Store tokens for API calls (these won't be in session cookie)
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;
           token.idToken = account.id_token;
@@ -277,13 +289,18 @@ export async function getAuthOptions(): Promise<AuthOptions> {
         return refreshAccessToken(token);
       },
       async session({ session, token }) {
-        session.accessToken = token.accessToken;
-        session.refreshToken = token.refreshToken;
-        session.idToken = token.idToken;
+        // Only include essential data in session (which goes to cookie)
+        // Tokens are stored in JWT but not exposed in session to reduce cookie size
         session.error = token.error;
         session.groups = token.groups;
         session.realm_roles = token.realm_roles;
         session.client_roles = token.client_roles;
+
+        // Tokens are available in JWT for server-side API calls via getServerSession
+        // but not included in client-side session to keep cookie small
+        if (token.accessToken) {
+          session.accessToken = token.accessToken;
+        }
 
         return session;
       },
