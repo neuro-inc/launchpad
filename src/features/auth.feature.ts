@@ -174,7 +174,8 @@ export async function getAuthOptions(): Promise<AuthOptions> {
       }),
     ],
     secret: NEXTAUTH_SECRET,
-    debug: true,
+    // Only enable debug in development, not production (reduces logs and overhead)
+    debug: process.env.NODE_ENV === 'development',
     jwt: {
       /**
        * Reduce JWT size by using compact encoding
@@ -289,18 +290,18 @@ export async function getAuthOptions(): Promise<AuthOptions> {
         return refreshAccessToken(token);
       },
       async session({ session, token }) {
-        // Only include essential data in session (which goes to cookie)
-        // Tokens are stored in JWT but not exposed in session to reduce cookie size
+        // Only include minimal essential data in session (which goes to cookie)
+        // DO NOT include tokens here - they are stored in JWT on server only
+        // Tokens can be accessed server-side via getServerSession and token callback
         session.error = token.error;
-        session.groups = token.groups;
+        
+        // Only include roles for client-side authorization checks
+        // Remove groups to reduce cookie size - use roles instead
         session.realm_roles = token.realm_roles;
         session.client_roles = token.client_roles;
 
-        // Tokens are available in JWT for server-side API calls via getServerSession
-        // but not included in client-side session to keep cookie small
-        if (token.accessToken) {
-          session.accessToken = token.accessToken;
-        }
+        // IMPORTANT: Do NOT include accessToken, refreshToken, idToken in session
+        // This keeps cookie size small and avoids timeouts in Edge Functions
 
         return session;
       },
