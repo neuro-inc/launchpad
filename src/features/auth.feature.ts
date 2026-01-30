@@ -2,7 +2,7 @@ import { AuthOptions } from 'next-auth';
 import KeycloakProvider from 'next-auth/providers/keycloak';
 
 import { KeycloakConfig } from '@typings';
-import { IS_LOCAL, NEXTAUTH_SECRET } from '@constants';
+import { NEXTAUTH_SECRET } from '@constants';
 import { getKeycloakIssuer, getServerApiUrl, getSiteUrl } from '@utils/helpers';
 
 type AuthConfig = KeycloakConfig;

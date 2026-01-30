@@ -23,11 +23,15 @@ export const middleware = async (request: NextRequest) => {
 
   const isProtected = pathname !== PATH.AUTH;
 
-  // Fast auth check - just verify cookie exists without decoding JWT
+  // Fast auth check - verify session cookie exists without decoding JWT
   // This avoids slow getToken() calls that cause edge function timeouts
   const cookieName = getTokenCookieName();
+
+  // Check for both regular and chunked session cookies
+  // NextAuth may chunk the session cookie if it's large
   const sessionCookie = request.cookies.get(cookieName);
-  const hasSession = !!sessionCookie?.value;
+  const chunkedCookie = request.cookies.get(`${cookieName}.0`);
+  const hasSession = !!(sessionCookie?.value || chunkedCookie?.value);
 
   if (!hasSession && isProtected) {
     const url = new URL(PATH.AUTH, request.url);
