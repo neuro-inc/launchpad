@@ -2,7 +2,6 @@ import NextAuth from 'next-auth';
 
 import { getAuthOptions } from '@features';
 
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const handler = async (req: any, context: any) => {
