@@ -23,10 +23,9 @@ export const middleware = async (request: NextRequest) => {
   requestHeaders.set('x-origin', origin);
 
   /**
-   * Skip authentication checks for all NextAuth API routes
-   * This includes callback, signin, signout, session, providers, etc.
+   * Skip authentication checks for logout endpoint
    */
-  if (pathname.startsWith('/api/auth/')) {
+  if (pathname === '/api/auth/logout') {
     return NextResponse.next({
       request: {
         headers: requestHeaders,
