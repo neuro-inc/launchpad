@@ -15,6 +15,7 @@ KEYCLOAK_HELM_VALUES = {
     "LAUNCHPAD_ADMIN_USER": "admin",
     "LAUNCHPAD_ADMIN_EMAIL": "admin@example.com",
     "LAUNCHPAD_ADMIN_PASSWORD": "admin-password",
+    "dbPassword": "test-db-password",
 }
 
 

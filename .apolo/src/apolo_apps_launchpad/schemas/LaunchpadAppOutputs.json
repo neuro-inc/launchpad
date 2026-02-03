@@ -178,11 +178,17 @@
           "$ref": "#/$defs/ApoloSecret",
           "x-description": "Password for the Keycloak admin user.",
           "x-title": "Keycloak Admin Password"
+        },
+        "db_password": {
+          "$ref": "#/$defs/ApoloSecret",
+          "x-description": "Password for the Keycloak database.",
+          "x-title": "Keycloak DB Password"
         }
       },
       "required": [
         "web_app_url",
-        "auth_admin_password"
+        "auth_admin_password",
+        "db_password"
       ],
       "title": "KeycloakConfig",
       "type": "object",

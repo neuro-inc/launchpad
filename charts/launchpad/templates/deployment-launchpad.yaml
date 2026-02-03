@@ -81,6 +81,10 @@ spec:
                 secretKeyRef:
                   name: {{ include "launchpad.admin-secret" . }}
                   key: LAUNCHPAD_ADMIN_PASSWORD
+            {{- range $name, $value := .Values.extraEnv }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
           {{- if .Values.resources }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

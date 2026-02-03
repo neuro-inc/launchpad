@@ -20,6 +20,12 @@ def test_config_endpoint(app_client: TestClient, config: Config) -> None:
             "url": str(config.keycloak.url),
             "realm": config.keycloak.realm,
         },
+        "branding": {
+            "logo_url": "https://example.com/logo.png",
+            "favicon_url": "https://example.com/favicon.png",
+            "title": "Test Title",
+            "background": "12345",
+        },
     }
 
 

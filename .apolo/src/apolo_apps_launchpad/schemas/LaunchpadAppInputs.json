@@ -69,6 +69,66 @@
       "x-title": "Quickstart Apps",
       "x-type": "AppsConfig"
     },
+    "BrandingConfig": {
+      "properties": {
+        "logo_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Logo Url"
+        },
+        "favicon_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Favicon Url"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        },
+        "background": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Background"
+        }
+      },
+      "title": "BrandingConfig",
+      "type": "object",
+      "x-description": "Configuration for the branding of the Launchpad.",
+      "x-is-advanced-field": false,
+      "x-is-configurable": true,
+      "x-meta-type": "inline",
+      "x-title": "Branding Configuration",
+      "x-type": "BrandingConfig"
+    },
     "CustomLLMModel": {
       "properties": {
         "model_name": {
@@ -569,6 +629,17 @@
     },
     "apps_config": {
       "$ref": "#/$defs/AppsConfig"
+    },
+    "branding": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/BrandingConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [
