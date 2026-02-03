@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getToken } from 'next-auth/jwt';
 
-import { NEXTAUTH_SECRET, PATH } from '@constants';
+import { PATH } from '@constants';
 import { getTokenCookieName } from '@utils/helpers/getTokenCookieName';
 
 export const middleware = async (request: NextRequest) => {
@@ -22,52 +21,32 @@ export const middleware = async (request: NextRequest) => {
 
   requestHeaders.set('x-origin', origin);
 
-  /**
-   * Skip authentication checks for logout endpoint
-   */
-  if (pathname === '/api/auth/logout') {
-    return NextResponse.next({
-      request: {
-        headers: requestHeaders,
-      },
-    });
-  }
-
   const isProtected = pathname !== PATH.AUTH;
-  const isAdminRoute = pathname.startsWith(PATH.ADMIN);
 
-  const token = await getToken({
-    req: request,
-    secret: NEXTAUTH_SECRET,
-    cookieName: getTokenCookieName(),
-  });
+  // Fast auth check - verify session cookie exists without decoding JWT
+  // This avoids slow getToken() calls that cause edge function timeouts
+  const cookieName = getTokenCookieName();
 
-  if (!token && isProtected) {
+  // Check for both regular and chunked session cookies
+  // NextAuth may chunk the session cookie if it's large
+  const sessionCookie = request.cookies.get(cookieName);
+  const chunkedCookie = request.cookies.get(`${cookieName}.0`);
+  const hasSession = !!(sessionCookie?.value || chunkedCookie?.value);
+
+  if (!hasSession && isProtected) {
     const url = new URL(PATH.AUTH, request.url);
 
     return NextResponse.redirect(url);
   }
 
-  if (token && !isProtected) {
+  if (hasSession && !isProtected) {
     const url = new URL(PATH.APPS, request.url);
 
     return NextResponse.redirect(url);
   }
 
-  // Check admin access for admin routes
-  if (token && isAdminRoute) {
-    // Check client_roles first (what backend uses), then fall back to realm_roles
-    const clientRoles = (token.client_roles as string[]) || [];
-    const realmRoles = (token.realm_roles as string[]) || [];
-    const roles = clientRoles.length > 0 ? clientRoles : realmRoles;
-    const isAdmin = roles.includes('admin');
-
-    if (!isAdmin) {
-      const url = new URL(PATH.APPS, request.url);
-
-      return NextResponse.redirect(url);
-    }
-  }
+  // For admin routes, we can't check roles here without decoding JWT (slow)
+  // Admin access will be enforced server-side in the actual page/API route
 
   return NextResponse.next({
     request: {

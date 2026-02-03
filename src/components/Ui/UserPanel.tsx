@@ -19,16 +19,18 @@ export const UserPanel: React.FC<Props> = ({ user, isAdmin = false }) => {
   }
 
   const { name, email } = user;
-  const nameInitials = getNameInitials(name);
+
+  const nameInitials = getNameInitials(name || email);
 
   return (
     <Popover showArrow={false} align="end" side="bottom" className="p-5">
       <div
         slot="trigger"
-        className="flex size-10 items-center justify-center rounded-full bg-rebecca"
+        className="flex size-10 items-center justify-center rounded-full bg-rebecca capitalize"
       >
         <span className="text-h7 text-white">{nameInitials}</span>
       </div>
+
       <div className="min-w-64">
         <p>{email}</p>
         <p className="mt-0.5 text-body-small text-neural-04">{name}</p>

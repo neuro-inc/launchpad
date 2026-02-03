@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import { ImportTemplateRequest, InstalledApp, Template } from '@typings';
+import { cn } from '@utils';
 import { parseTags, tagsToString } from '@utils/helpers';
 
 import { Button, Field } from '@components/Shared';
@@ -397,7 +398,7 @@ export const ImportTemplateForm = forwardRef<
                   ? ''
                   : '{"preset": {"name": "cpu-small"}, "customKey": "value"}'
               }
-              readOnly={isReadOnly || undefined}
+              readOnly={isReadOnly ?? undefined}
               error={errors.input?.message}
               note="Optional: Provide default configuration values that will be merged with user inputs when installing this template."
             />
@@ -411,8 +412,10 @@ export const ImportTemplateForm = forwardRef<
                 <input
                   type="checkbox"
                   {...register('isInternal')}
-                  className={`mr-3 mt-1 ${isReadOnly || templateHasInstances ? 'cursor-not-allowed' : ''}`}
                   disabled={isReadOnly || templateHasInstances}
+                  className={cn('flex cursor-pointer items-start', {
+                    'cursor-not-allowed opacity-60': isReadOnly,
+                  })}
                 />
                 <div>
                   <span className="text-body font-medium">Internal</span>
