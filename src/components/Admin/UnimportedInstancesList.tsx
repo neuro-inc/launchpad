@@ -33,9 +33,16 @@ export const UnimportedInstancesList: React.FC<
         method: 'GET',
       });
       // Transform snake_case API response to camelCase
-      const items = formatToCamelCase(data.items) as UnimportedInstance[];
+      const camelCaseItems = formatToCamelCase(
+        data.items,
+      ) as UnimportedInstance[];
 
-      setInstances(items);
+      // Filter to only show instances with non-empty endpoints
+      const filteredInstances = camelCaseItems.filter(
+        (instance) => instance.endpoints && instance.endpoints.length > 0,
+      );
+
+      setInstances(filteredInstances);
     } catch (error: any) {
       onError(error.message || 'Failed to fetch unimported instances');
     } finally {
