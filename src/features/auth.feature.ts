@@ -174,24 +174,12 @@ export async function getAuthOptions(): Promise<AuthOptions> {
       }),
     ],
     secret: NEXTAUTH_SECRET,
-    // Only enable debug in development, not production (reduces logs and overhead)
-    debug: process.env.NODE_ENV === 'development',
-    jwt: {
-      /**
-       * Reduce JWT size by using compact encoding
-       */
-      maxAge: 24 * 60 * 60, // 24 hours
-    },
+    debug: true,
     session: {
       /**
        * Using JWT for public clients
        */
       strategy: 'jwt',
-      /**
-       * Reduce session cookie size by setting maxAge
-       * This matches the access token expiry (24 hours based on logs)
-       */
-      maxAge: 24 * 60 * 60, // 24 hours
     },
     callbacks: {
       async redirect({ url }) {
@@ -228,7 +216,6 @@ export async function getAuthOptions(): Promise<AuthOptions> {
         const now = Date.now();
 
         if (account) {
-          // Store tokens for API calls (these won't be in session cookie)
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;
           token.idToken = account.id_token;
@@ -290,17 +277,13 @@ export async function getAuthOptions(): Promise<AuthOptions> {
         return refreshAccessToken(token);
       },
       async session({ session, token }) {
-        // Only include minimal essential data in session (which goes to cookie)
-        // DO NOT include tokens here - they are stored in JWT on server only
-        // Tokens can be accessed server-side via getServerSession and token callback
+        session.accessToken = token.accessToken;
+        session.refreshToken = token.refreshToken;
+        session.idToken = token.idToken;
         session.error = token.error;
-        // Only include roles for client-side authorization checks
-        // Remove groups to reduce cookie size - use roles instead
+        session.groups = token.groups;
         session.realm_roles = token.realm_roles;
         session.client_roles = token.client_roles;
-
-        // IMPORTANT: Do NOT include accessToken, refreshToken, idToken in session
-        // This keeps cookie size small and avoids timeouts in Edge Functions
 
         return session;
       },
