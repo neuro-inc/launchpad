@@ -10,7 +10,9 @@ from apolo_app_types.outputs.utils.apolo_secrets import create_apolo_secret
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
 from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
+from apolo_app_types.protocols.common.secrets_ import ApoloSecret
 
+from .consts import APP_SECRET_KEYS
 from .types import (
     KeycloakConfig,
     LaunchpadAdminApi,
@@ -23,12 +25,6 @@ from .types import (
 logger = logging.getLogger(__name__)
 
 
-APP_SECRET_KEYS = {
-    "LAUNCHPAD": "launchpad-admin-pswd",
-    "KEYCLOAK": "keycloak-admin-pswd",
-}
-
-
 @backoff.on_exception(
     backoff.expo,
     Exception,
@@ -39,7 +35,7 @@ APP_SECRET_KEYS = {
 )
 async def create_apolo_secret_with_retry(
     app_instance_id: str, key: str, value: str
-) -> str:
+) -> ApoloSecret:
     """
     Attempt to create an Apolo secret with retry logic using exponential backoff.
     Retries up to 5 times with delays: 2s, 4s, 8s, 16s, 32s.
@@ -159,6 +155,7 @@ async def get_launchpad_outputs(
         )
 
     keycloak_password = helm_values["keycloak"]["auth"]["adminPassword"]
+    keycloak_db_password = helm_values["dbPassword"]
 
     # -------------- MIDDLEWARE ----------------
     # Construct middleware name using helm chart logic: launchpad-{apolo_app_id}-auth-middleware
@@ -184,6 +181,11 @@ async def get_launchpad_outputs(
                 app_instance_id=apolo_app_id,
                 key=APP_SECRET_KEYS["KEYCLOAK"],
                 value=keycloak_password,
+            ),
+            db_password=await create_apolo_secret_with_retry(
+                app_instance_id=apolo_app_id,
+                key=APP_SECRET_KEYS["KEYCLOAK_DB"],
+                value=keycloak_db_password,
             ),
         ),
         installed_apps=None,

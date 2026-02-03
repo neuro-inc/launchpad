@@ -4,16 +4,17 @@ import random
 import string
 import typing as t
 
+import apolo_sdk
 from apolo_app_types import LLMInputs, TextEmbeddingsInferenceAppInputs
 from apolo_app_types.app_types import AppType
 from apolo_app_types.helm.apps.base import BaseChartValueProcessor
 from apolo_app_types.helm.apps.common import gen_extra_values
 from apolo_app_types.helm.apps.ingress import _get_ingress_name_template
 from apolo_app_types.helm.utils.dictionaries import get_nested_values
+from apolo_app_types.outputs.utils.apolo_secrets import get_apolo_secret
 from apolo_app_types.protocols.common.hugging_face import (
     HuggingFaceCache,
     HuggingFaceModel,
-    HuggingFaceToken,
 )
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from apolo_app_types.protocols.postgres import (
@@ -24,6 +25,7 @@ from apolo_app_types.protocols.postgres import (
     PostgresInputs,
 )
 
+from .consts import APP_SECRET_KEYS
 from .types import (
     CustomLLMModel,
     HuggingFaceEmbeddingsModel,
@@ -248,7 +250,28 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         domain = ingress_template.split(".", 1)[1]
         if domain.endswith("."):
             domain = domain[:-1]
-        keycloak_admin_password = _generate_password()
+
+        try:
+            keycloak_admin_password = await get_apolo_secret(
+                app_instance_id=app_id, key=APP_SECRET_KEYS["KEYCLOAK"]
+            )
+        except apolo_sdk.ResourceNotFound:
+            keycloak_admin_password = _generate_password()
+
+        try:
+            keycloak_db_password = await get_apolo_secret(
+                app_instance_id=app_id, key=APP_SECRET_KEYS["KEYCLOAK_DB"]
+            )
+        except apolo_sdk.ResourceNotFound:
+            keycloak_db_password = _generate_password()
+
+        try:
+            launchpad_admin_password = await get_apolo_secret(
+                app_instance_id=app_id, key=APP_SECRET_KEYS["LAUNCHPAD"]
+            )
+        except apolo_sdk.ResourceNotFound:
+            launchpad_admin_password = _generate_password()
+
         db_secret_name = f"launchpad-{app_id}-db-secret"
         realm_import_config_map_name = f"launchpad-{app_id}-keycloak-realm"
 
@@ -305,13 +328,13 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     "existingSecret": db_secret_name,
                 },
             },
-            "dbPassword": _generate_password(),
+            "dbPassword": keycloak_db_password,
             "extraEnv": extra_env,
             "domain": domain,
             "keycloak": keycloak_values,  # keeping this for backwards compatibility
             "mlops-keycloak": keycloak_values,
             "LAUNCHPAD_ADMIN_USER": "admin",
             "LAUNCHPAD_ADMIN_EMAIL": "admin@launchpad.com",
-            "LAUNCHPAD_ADMIN_PASSWORD": _generate_password(),
+            "LAUNCHPAD_ADMIN_PASSWORD": launchpad_admin_password,
             "LAUNCHPAD_INITIAL_CONFIG": LAUNCHPAD_INITIAL_CONFIG,
         }

@@ -344,14 +344,14 @@ trio = ["trio (>=0.31.0) ; python_version < \"3.10\"", "trio (>=0.32.0) ; python
 
 [[package]]
 name = "apolo-app-types"
-version = "26.1.2"
+version = "26.2.0"
 description = "Apolo Platform App Types."
 optional = false
 python-versions = "<4.0,>=3.10.0"
 groups = ["main"]
 files = [
-    {file = "apolo_app_types-26.1.2-py3-none-any.whl", hash = "sha256:fcd3650b00b4897de4cdc4b74caad4d14006d674ac0c31bcaebe33efbfd0c504"},
-    {file = "apolo_app_types-26.1.2.tar.gz", hash = "sha256:b461632d8a5ee68cde8db23fd68e8b67dc46b8fa3aab535cb26c5f343a325154"},
+    {file = "apolo_app_types-26.2.0-py3-none-any.whl", hash = "sha256:1197005367c845c683b2d65c2f3f2de5eaa94d5607bb0476691a1e42b9315525"},
+    {file = "apolo_app_types-26.2.0.tar.gz", hash = "sha256:ba8c25e244fdd9b79aefaef22f69c8a031ecc7bc09ed599458bb08fae240d15f"},
 ]
 
 [package.dependencies]
@@ -359,7 +359,7 @@ apolo-sdk = ">=26.1.0,<27.0.0"
 click = ">=8.3.1,<9.0.0"
 httpx = ">=0.28.0,<0.29.0"
 jsonref = ">=1.1.0,<2.0.0"
-kubernetes = ">=34.1.0,<35.0.0"
+kubernetes = ">=35.0.0,<36.0.0"
 pydantic = ">=2.12.5,<3.0.0"
 pyyaml = ">=6.0.3,<7.0.0"
 tenacity = ">=9.1.2,<10.0.0"
@@ -1833,30 +1833,30 @@ typing-extensions = ">=4.5.0"
 
 [[package]]
 name = "kubernetes"
-version = "34.1.0"
+version = "35.0.0"
 description = "Kubernetes python client"
 optional = false
 python-versions = ">=3.6"
 groups = ["main"]
 files = [
-    {file = "kubernetes-34.1.0-py2.py3-none-any.whl", hash = "sha256:bffba2272534e224e6a7a74d582deb0b545b7c9879d2cd9e4aae9481d1f2cc2a"},
-    {file = "kubernetes-34.1.0.tar.gz", hash = "sha256:8fe8edb0b5d290a2f3ac06596b23f87c658977d46b5f8df9d0f4ea83d0003912"},
+    {file = "kubernetes-35.0.0-py2.py3-none-any.whl", hash = "sha256:39e2b33b46e5834ef6c3985ebfe2047ab39135d41de51ce7641a7ca5b372a13d"},
+    {file = "kubernetes-35.0.0.tar.gz", hash = "sha256:3d00d344944239821458b9efd484d6df9f011da367ecb155dadf9513f05f09ee"},
 ]
 
 [package.dependencies]
 certifi = ">=14.05.14"
 durationpy = ">=0.7"
-google-auth = ">=1.0.1"
 python-dateutil = ">=2.5.3"
 pyyaml = ">=5.4.1"
 requests = "*"
 requests-oauthlib = "*"
 six = ">=1.9.0"
-urllib3 = ">=1.24.2,<2.4.0"
+urllib3 = ">=1.24.2,<2.6.0 || >2.6.0"
 websocket-client = ">=0.32.0,<0.40.0 || >0.40.0,<0.41.dev0 || >=0.43.dev0"
 
 [package.extras]
 adal = ["adal (>=1.0.2)"]
+google-auth = ["google-auth (>=1.0.1)"]
 
 [[package]]
 name = "librt"
@@ -4201,4 +4201,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "24041fedabdeb049b6c651bd81a509a3eb52b7cb8f401e712f2375f455ae2036"
+content-hash = "3e4c301ca2f865b5709e2efabca82430a162de81c823c9af5c2badd9bff75fa5"

@@ -287,6 +287,13 @@ class KeycloakConfig(AbstractAppFieldType):
             description="Password for the Keycloak admin user.",
         ).as_json_schema_extra(),
     )
+    db_password: ApoloSecret = Field(
+        ...,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Keycloak DB Password",
+            description="Password for the Keycloak database.",
+        ).as_json_schema_extra(),
+    )
 
 
 class InstalledApps(AbstractAppFieldType):
