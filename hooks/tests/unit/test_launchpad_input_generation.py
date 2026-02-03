@@ -28,9 +28,9 @@ from apolo_app_types_fixtures.constants import (
 
 
 @pytest.mark.asyncio
-async def test_launchpad_values_generation_with_preconfigured_model(setup_clients):
+async def test_launchpad_values_generation_with_preconfigured_model(apolo_client):
     """Test launchpad helm values generation with a pre-configured LLM model."""
-    processor = LaunchpadInputsProcessor(client=setup_clients)
+    processor = LaunchpadInputsProcessor(client=apolo_client)
     helm_params = await processor.gen_extra_values(
         input_=LaunchpadAppInputs(
             launchpad_web_app_config=LaunchpadWebAppConfig(
@@ -171,6 +171,10 @@ async def test_launchpad_values_generation_with_preconfigured_model(setup_client
         json.dumps(json.loads(helm_params["LAUNCHPAD_INITIAL_CONFIG"]), sort_keys=True)
         == expected_helm_params["LAUNCHPAD_INITIAL_CONFIG"]
     )
+    assert (
+        helm_params["LAUNCHPAD_ADMIN_PASSWORD"]
+        == f"launchpad-admin-pswd-{APP_ID}-value"
+    )
 
     # Check that dynamic fields are present
     assert "dbPassword" in helm_params
@@ -189,6 +193,10 @@ async def test_launchpad_values_generation_with_preconfigured_model(setup_client
     assert helm_params["keycloak"]["podLabels"] == expected_helm_params["podLabels"]
     assert (
         helm_params["keycloak"]["apolo_app_id"] == expected_helm_params["apolo_app_id"]
+    )
+    assert (
+        helm_params["keycloak"]["auth"]["adminPassword"]
+        == f"keycloak-admin-pswd-{APP_ID}-value"
     )
 
     assert "fullnameOverride" in helm_params["mlops-keycloak"]
@@ -219,14 +227,15 @@ async def test_launchpad_values_generation_with_preconfigured_model(setup_client
     # Test postgres fields
     assert "fullnameOverride" in helm_params["postgresql"]
     assert helm_params["postgresql"]["fullnameOverride"] == f"launchpad-{APP_ID}-db"
+    assert helm_params["dbPassword"] == f"keycloak-db-pswd-{APP_ID}-value"
 
 
 @pytest.mark.asyncio
-async def test_launchpad_values_generation_with_huggingface_model(setup_clients):
+async def test_launchpad_values_generation_with_huggingface_model(apolo_client):
     """Test launchpad helm values generation with a HuggingFace LLM model."""
     from apolo_app_types import HuggingFaceModel
 
-    processor = LaunchpadInputsProcessor(client=setup_clients)
+    processor = LaunchpadInputsProcessor(client=apolo_client)
     helm_params = await processor.gen_extra_values(
         input_=LaunchpadAppInputs(
             launchpad_web_app_config=LaunchpadWebAppConfig(
@@ -365,6 +374,10 @@ async def test_launchpad_values_generation_with_huggingface_model(setup_clients)
         json.dumps(json.loads(helm_params["LAUNCHPAD_INITIAL_CONFIG"]), sort_keys=True)
         == expected_helm_params["LAUNCHPAD_INITIAL_CONFIG"]
     )
+    assert (
+        helm_params["LAUNCHPAD_ADMIN_PASSWORD"]
+        == f"launchpad-admin-pswd-{APP_ID}-value"
+    )
 
     # Check that dynamic fields are present
     assert "dbPassword" in helm_params
@@ -376,17 +389,22 @@ async def test_launchpad_values_generation_with_huggingface_model(setup_clients)
     # Test keycloak fields
     assert "fullnameOverride" in helm_params["keycloak"]
     assert helm_params["keycloak"]["fullnameOverride"] == f"launchpad-{APP_ID}-keycloak"
+    assert (
+        helm_params["keycloak"]["auth"]["adminPassword"]
+        == f"keycloak-admin-pswd-{APP_ID}-value"
+    )
 
     # Test postgres fields
     assert "fullnameOverride" in helm_params["postgresql"]
     assert helm_params["postgresql"]["fullnameOverride"] == f"launchpad-{APP_ID}-db"
+    assert helm_params["dbPassword"] == f"keycloak-db-pswd-{APP_ID}-value"
 
 
 @pytest.mark.asyncio
-async def test_launchpad_values_generation_with_custom_model(setup_clients):
+async def test_launchpad_values_generation_with_custom_model(apolo_client):
     """Test launchpad helm values generation with a custom LLM model."""
     # Custom models are now supported
-    processor = LaunchpadInputsProcessor(client=setup_clients)
+    processor = LaunchpadInputsProcessor(client=apolo_client)
     helm_params = await processor.gen_extra_values(
         input_=LaunchpadAppInputs(
             launchpad_web_app_config=LaunchpadWebAppConfig(
@@ -455,17 +473,25 @@ async def test_launchpad_values_generation_with_custom_model(setup_clients):
     assert launchpad_web_app_config["vllm"] == expected_vllm_config
 
     # Check that dynamic fields are present
-    assert "dbPassword" in helm_params
     assert "dbSecretName" in helm_params
     assert "domain" in helm_params
     assert "keycloak" in helm_params
     assert "postgresql" in helm_params
+    assert helm_params["dbPassword"] == f"keycloak-db-pswd-{APP_ID}-value"
+    assert (
+        helm_params["keycloak"]["auth"]["adminPassword"]
+        == f"keycloak-admin-pswd-{APP_ID}-value"
+    )
+    assert (
+        helm_params["LAUNCHPAD_ADMIN_PASSWORD"]
+        == f"launchpad-admin-pswd-{APP_ID}-value"
+    )
 
 
 @pytest.mark.asyncio
-async def test_launchpad_values_generation_magistral_model(setup_clients):
+async def test_launchpad_values_generation_magistral_model(apolo_client):
     """Test launchpad helm values generation with Magistral pre-configured model."""
-    processor = LaunchpadInputsProcessor(client=setup_clients)
+    processor = LaunchpadInputsProcessor(client=apolo_client)
     helm_params = await processor.gen_extra_values(
         input_=LaunchpadAppInputs(
             launchpad_web_app_config=LaunchpadWebAppConfig(
@@ -602,8 +628,6 @@ async def test_launchpad_values_generation_magistral_model(setup_clients):
         ),
     }
 
-    # Check that dynamic fields are present
-    assert "dbPassword" in helm_params
     assert "dbSecretName" in helm_params
     assert "domain" in helm_params
     assert "keycloak" in helm_params
@@ -620,10 +644,19 @@ async def test_launchpad_values_generation_magistral_model(setup_clients):
         json.dumps(json.loads(helm_params["LAUNCHPAD_INITIAL_CONFIG"]), sort_keys=True)
         == expected_helm_params["LAUNCHPAD_INITIAL_CONFIG"]
     )
+    assert (
+        helm_params["LAUNCHPAD_ADMIN_PASSWORD"]
+        == f"launchpad-admin-pswd-{APP_ID}-value"
+    )
 
     # Test keycloak fields
     assert "fullnameOverride" in helm_params["keycloak"]
     assert helm_params["keycloak"]["fullnameOverride"] == f"launchpad-{APP_ID}-keycloak"
+    assert helm_params["dbPassword"] == f"keycloak-db-pswd-{APP_ID}-value"
+    assert (
+        helm_params["keycloak"]["auth"]["adminPassword"]
+        == f"keycloak-admin-pswd-{APP_ID}-value"
+    )
 
     # Test postgres fields
     assert "fullnameOverride" in helm_params["postgresql"]
