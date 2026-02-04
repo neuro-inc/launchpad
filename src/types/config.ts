@@ -7,7 +7,7 @@ export type LaunchpadConfig = {
 
 // Backend response type with snake_case
 export type LaunchpadConfigResponse = {
-  branding: {
+  branding?: {
     logo_url: string | null;
     favicon_url: string | null;
     title: string | null;

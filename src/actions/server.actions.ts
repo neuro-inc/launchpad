@@ -18,14 +18,15 @@ export const getConfig = cache(async (): Promise<LaunchpadConfig> => {
     const response = await serverRequest<LaunchpadConfigResponse>('/config');
 
     // Extract branding data and convert snake_case to camelCase
-    const { branding } = response;
+    // Defensively handle missing response or branding to avoid runtime errors
+    const branding = response?.branding;
 
     // Merge with defaults to ensure all fields are present
     return {
-      logoUrl: branding.logo_url ?? DEFAULT_CONFIG.logoUrl,
-      faviconUrl: branding.favicon_url ?? DEFAULT_CONFIG.faviconUrl,
-      title: branding.title ?? DEFAULT_CONFIG.title,
-      background: branding.background ?? DEFAULT_CONFIG.background,
+      logoUrl: branding?.logo_url ?? DEFAULT_CONFIG.logoUrl,
+      faviconUrl: branding?.favicon_url ?? DEFAULT_CONFIG.faviconUrl,
+      title: branding?.title ?? DEFAULT_CONFIG.title,
+      background: branding?.background ?? DEFAULT_CONFIG.background,
     };
   } catch (error) {
     console.error('Error fetching config, using defaults:', error);
