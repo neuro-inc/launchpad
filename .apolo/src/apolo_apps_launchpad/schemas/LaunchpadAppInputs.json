@@ -72,8 +72,20 @@
     "BrandingConfig": {
       "properties": {
         "logo_file": {
-          "$ref": "#/$defs/UploadedImage",
-          "default": null
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UploadedImage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "x-description": "Upload a custom logo image for the Launchpad.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Logo Image"
         },
         "favicon_file": {
           "anyOf": [
@@ -84,7 +96,12 @@
               "type": "null"
             }
           ],
-          "default": null
+          "default": null,
+          "x-description": "Upload a custom favicon image for the Launchpad.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Favicon Image"
         },
         "title": {
           "anyOf": [
@@ -96,7 +113,12 @@
             }
           ],
           "default": null,
-          "title": "Title"
+          "title": "Title",
+          "x-description": "Set custom title for the Launchpad.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Launchpad Title"
         },
         "background": {
           "anyOf": [
@@ -111,7 +133,12 @@
             }
           ],
           "default": null,
-          "title": "Background"
+          "title": "Background",
+          "x-description": "Customize background for the Launchpad (set color or upload an image).",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Background"
         }
       },
       "title": "BrandingConfig",

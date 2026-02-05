@@ -372,10 +372,34 @@ class BrandingConfig(AbstractAppFieldType):
         ).as_json_schema_extra(),
         is_advanced_field=True,
     )
-    logo_file: UploadedImage = None
-    favicon_file: UploadedImage | None = None
-    title: str | None = None
-    background: ColorPicker | UploadedImage | None = None
+    logo_file: UploadedImage | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Logo Image",
+            description="Upload a custom logo image for the Launchpad.",
+        ).as_json_schema_extra(),
+    )
+    favicon_file: UploadedImage | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Favicon Image",
+            description="Upload a custom favicon image for the Launchpad.",
+        ).as_json_schema_extra(),
+    )
+    title: str | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Launchpad Title",
+            description="Set custom title for the Launchpad.",
+        ).as_json_schema_extra(),
+    )
+    background: ColorPicker | UploadedImage | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Background",
+            description="Customize background for the Launchpad (set color or upload an image).",
+        ).as_json_schema_extra(),
+    )
 
 
 class LaunchpadAppInputs(AppInputs):
