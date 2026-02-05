@@ -45,9 +45,9 @@ body {
 }
 
 /* Replace brand logo on v2 theme (PatternFly brand element) */
+/* This is overridden by the img tag in login.ftl which handles custom logo with fallback */
 .pf-c-brand,
 .pf-v5-c-brand {
-  content: url("../img/launchpad-logo.svg");
   height: auto;
   margin-bottom: 1rem;
 }

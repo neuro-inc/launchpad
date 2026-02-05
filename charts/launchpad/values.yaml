@@ -24,6 +24,13 @@ preset_name: cpu-medium
 labels:
   application: launchpad
 
+# branding
+branding: {}
+  # logo: null
+  # logoMediaType: null
+  # favicon: null
+  # faviconMediaType: null
+
 
 podLabels: {}
 podAnnotations: {}

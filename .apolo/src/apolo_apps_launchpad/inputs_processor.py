@@ -27,6 +27,7 @@ from apolo_app_types.protocols.postgres import (
 
 from .consts import APP_SECRET_KEYS
 from .types import (
+    ColorPicker,
     CustomLLMModel,
     HuggingFaceEmbeddingsModel,
     HuggingFaceLLMModel,
@@ -36,12 +37,17 @@ from .types import (
     PreConfiguredEmbeddingsModels,
     PreConfiguredHuggingFaceLLMModel,
     PreConfiguredLLMModels,
+    UploadedImage,
 )
 
 
 PASSWORD_CHAR_POOL = string.ascii_letters + string.digits
 PASSWORD_DEFAULT_LENGTH = 12
 PASSWORD_MIN_LENGTH = 4
+
+# Branding paths
+BRANDING_DIR_LAUNCHPAD = "/etc/launchpad/branding"
+BRANDING_DIR_KEYCLOAK = "/opt/bitnami/keycloak/themes/apolo/login/resources/branding"
 
 
 def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
@@ -274,6 +280,54 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         db_secret_name = f"launchpad-{app_id}-db-secret"
         realm_import_config_map_name = f"launchpad-{app_id}-keycloak-realm"
+        branding_config_map_name = f"launchpad-{app_id}-branding"
+
+        kc_extra_volumes = [
+            {
+                "name": "realm-import",
+                "configMap": {
+                    "name": realm_import_config_map_name,
+                    "items": [
+                        {
+                            "key": "realm.json",
+                            "path": "realm.json",
+                        }
+                    ],
+                },
+            }
+        ]
+        kc_extra_volume_mounts = []
+        kc_extra_env_vars = []
+
+        # Add branding volume to keycloak if branding is provided
+        if input_.branding and (
+            input_.branding.logo_file or input_.branding.favicon_file
+        ):
+            kc_extra_volumes.append(
+                {
+                    "name": "branding",
+                    "configMap": {
+                        "name": branding_config_map_name,
+                    },
+                }
+            )
+            kc_extra_volume_mounts.append(
+                {
+                    "name": "branding",
+                    "mountPath": BRANDING_DIR_KEYCLOAK,
+                    "readOnly": True,
+                }
+            )
+
+        # Add background color as environment variable for keycloak theme
+        if input_.branding and input_.branding.background:
+            if isinstance(input_.branding.background, ColorPicker):
+                kc_extra_env_vars.append(
+                    {
+                        "name": "BRANDING_BACKGROUND_COLOR",
+                        "value": input_.branding.background.hex_code,
+                    }
+                )
 
         keycloak_values = {
             "fullnameOverride": f"launchpad-{app_id}-keycloak",
@@ -290,36 +344,56 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     "service": "keycloak",
                 }
             },
-            "extraVolumes": [
-                {
-                    "name": "realm-import",
-                    "configMap": {
-                        "name": realm_import_config_map_name,
-                        "items": [
-                            {
-                                "key": "realm.json",
-                                "path": "realm.json",
-                            }
-                        ],
-                    },
-                }
-            ],
+            "extraVolumes": kc_extra_volumes,
+            "extraVolumeMounts": kc_extra_volume_mounts,
         }
 
+        if kc_extra_env_vars:
+            keycloak_values["extraEnvVars"] = kc_extra_env_vars
+
         extra_env = {}
+        branding_values = {}
         if input_.branding:
-            extra_env.update(
-                {
-                    "BRANDING_LOGO_URL": input_.branding.logo_url,
-                    "BRANDING_FAVICON_URL": input_.branding.favicon_url,
-                    "BRANDING_TITLE": input_.branding.title,
-                    "BRANDING_BACKGROUND": input_.branding.background,
-                }
-            )
+            # Handle logo file
+            if input_.branding.logo_file:
+                branding_values["logo"] = input_.branding.logo_file.content_b64
+                if input_.branding.logo_file.type:
+                    branding_values["logoMediaType"] = input_.branding.logo_file.type
+
+            # Handle favicon file
+            if input_.branding.favicon_file:
+                branding_values["favicon"] = input_.branding.favicon_file.content_b64
+                if input_.branding.favicon_file.type:
+                    branding_values["faviconMediaType"] = (
+                        input_.branding.favicon_file.type
+                    )
+            if branding_values:
+                extra_env["BRANDING_DIR"] = BRANDING_DIR_LAUNCHPAD
+                branding_values["mountPath"] = BRANDING_DIR_LAUNCHPAD
+
+            # Handle title
+            if input_.branding.title:
+                extra_env["BRANDING_TITLE"] = input_.branding.title
+
+            # Handle background - can be ColorPicker or UploadedImage
+            if input_.branding.background:
+                if isinstance(input_.branding.background, ColorPicker):
+                    extra_env["BRANDING_BACKGROUND"] = (
+                        input_.branding.background.hex_code
+                    )
+                elif isinstance(input_.branding.background, UploadedImage):
+                    branding_values["background"] = (
+                        input_.branding.background.content_b64
+                    )
+                    if input_.branding.background.type:
+                        branding_values["backgroundMediaType"] = (
+                            input_.branding.background.type
+                        )
 
         return {
             **values,
             "image": {"tag": os.getenv("APP_IMAGE_TAG", "latest")},
+            "branding": branding_values,
             "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": realm_import_config_map_name,
             "postgresql": {

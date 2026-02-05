@@ -89,6 +89,18 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- end}}
+          {{- if and (.Values.branding .Values.branding.mountPath) }}
+          volumeMounts:
+            - name: branding
+              mountPath: {{ .Values.branding.mountPath }}
+              readOnly: true
+          {{- end }}
+      {{- if .Values.branding }}
+      volumes:
+        - name: branding
+          configMap:
+            name: launchpad-{{ .Values.apolo_app_id }}-branding
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

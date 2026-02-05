@@ -13,6 +13,29 @@ from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from pydantic import ConfigDict, Field
 
 
+class UploadedImage(AbstractAppFieldType):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Upload image",
+            description="Upload your image file",
+        ).as_json_schema_extra(),
+    )
+    content_b64: str
+    type: str | None = None
+
+
+class ColorPicker(AbstractAppFieldType):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Color",
+            description=("Select a color"),
+        ).as_json_schema_extra(),
+    )
+    hex_code: str
+
+
 class PreConfiguredLLMModels(enum.StrEnum):
     LLAMA_31_8b = "meta-llama/Llama-3.1-8B-Instruct"
     MAGISTRAL_24B = "unsloth/Magistral-Small-2506-GGUF"
@@ -349,10 +372,10 @@ class BrandingConfig(AbstractAppFieldType):
         ).as_json_schema_extra(),
         is_advanced_field=True,
     )
-    logo_url: str | None = None
-    favicon_url: str | None = None
+    logo_file: UploadedImage = None
+    favicon_file: UploadedImage | None = None
     title: str | None = None
-    background: str | None = None
+    background: ColorPicker | UploadedImage | None = None
 
 
 class LaunchpadAppInputs(AppInputs):

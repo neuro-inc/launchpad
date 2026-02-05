@@ -71,29 +71,20 @@
     },
     "BrandingConfig": {
       "properties": {
-        "logo_url": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Logo Url"
+        "logo_file": {
+          "$ref": "#/$defs/UploadedImage",
+          "default": null
         },
-        "favicon_url": {
+        "favicon_file": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/UploadedImage"
             },
             {
               "type": "null"
             }
           ],
-          "default": null,
-          "title": "Favicon Url"
+          "default": null
         },
         "title": {
           "anyOf": [
@@ -110,7 +101,10 @@
         "background": {
           "anyOf": [
             {
-              "type": "string"
+              "$ref": "#/$defs/ColorPicker"
+            },
+            {
+              "$ref": "#/$defs/UploadedImage"
             },
             {
               "type": "null"
@@ -128,6 +122,25 @@
       "x-meta-type": "inline",
       "x-title": "Branding Configuration",
       "x-type": "BrandingConfig"
+    },
+    "ColorPicker": {
+      "properties": {
+        "hex_code": {
+          "title": "Hex Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hex_code"
+      ],
+      "title": "ColorPicker",
+      "type": "object",
+      "x-description": "Select a color",
+      "x-is-advanced-field": false,
+      "x-is-configurable": true,
+      "x-meta-type": "inline",
+      "x-title": "Color",
+      "x-type": "ColorPicker"
     },
     "CustomLLMModel": {
       "properties": {
@@ -621,6 +634,37 @@
       "x-meta-type": "inline",
       "x-title": "Text Embeddings Configuration",
       "x-type": "TextEmbeddingsConfig"
+    },
+    "UploadedImage": {
+      "properties": {
+        "content_b64": {
+          "title": "Content B64",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        }
+      },
+      "required": [
+        "content_b64"
+      ],
+      "title": "UploadedImage",
+      "type": "object",
+      "x-description": "Upload your image file",
+      "x-is-advanced-field": false,
+      "x-is-configurable": true,
+      "x-meta-type": "inline",
+      "x-title": "Upload image",
+      "x-type": "UploadedImage"
     }
   },
   "properties": {

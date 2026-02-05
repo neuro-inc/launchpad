@@ -10,7 +10,7 @@ ENV PYTHONPATH=/app \
     POETRY_VIRTUALENVS_IN_PROJECT=1 \
     POETRY_VIRTUALENVS_CREATE=1
 
-RUN apt-get update && apt-get install -y git make && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y git make libmagic1 && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --disable-pip-version-check --no-cache-dir poetry==2.1.3
 
@@ -25,6 +25,8 @@ FROM python:${PY_VERSION}-slim-bullseye as runtime
 LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/launchpad"
 
 ENV SERVICE_NAME="launchpad"
+
+RUN apt-get update && apt-get install -y libmagic1 && rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --gid 1001 $SERVICE_NAME && \
     adduser --gid 1001 --shell /bin/false --disabled-password --gecos "" --uid 1001 $SERVICE_NAME && \
