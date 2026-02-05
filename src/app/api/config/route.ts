@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 
-import { LaunchpadConfig, LaunchpadConfigResponse } from '@typings';
+import {
+  DEFAULT_CONFIG,
+  LaunchpadConfig,
+  LaunchpadConfigResponse,
+} from '@typings';
 import { serverRequest } from '@utils/helpers/request';
 
 export const dynamic = 'force-dynamic';
@@ -13,10 +17,10 @@ export async function GET() {
     // Extract branding data and convert snake_case to camelCase
     const { branding } = response;
     const config: LaunchpadConfig = {
-      logoUrl: branding.logo_url,
-      faviconUrl: branding.favicon_url,
-      title: branding.title,
-      background: branding.background,
+      logoUrl: branding?.logo_url ?? DEFAULT_CONFIG.logoUrl,
+      faviconUrl: branding?.favicon_url ?? DEFAULT_CONFIG.faviconUrl,
+      title: branding?.title ?? DEFAULT_CONFIG.title,
+      background: branding?.background ?? DEFAULT_CONFIG.background,
     };
 
     return NextResponse.json(config);

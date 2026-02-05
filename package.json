@@ -3,12 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "prepare": "husky",
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint:eslint": "next lint --dir ./src",
     "lint:ts": "tsc --noEmit",
     "lint": "yarn lint:ts && yarn lint:eslint"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "yarn lint:eslint",
+      "git add"
+    ]
   },
   "dependencies": {
     "@fortawesome/fontawesome-pro": "^6.7.2",
@@ -69,6 +76,8 @@
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "eslint-plugin-tailwindcss": "^3.18.0",
     "eslint-watch": "^8.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "15",
     "prettier": "^3.6.2",
     "typescript": "^5"
   }
