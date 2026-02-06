@@ -24,12 +24,10 @@ preset_name: cpu-medium
 labels:
   application: launchpad
 
-# branding
+# branding - files mounted from Apolo storage
+# Logo/favicon provided as ApoloFilesImagePath by user
+# Platform handles mounting via labels/annotations
 branding: {}
-  # logo: null
-  # logoMediaType: null
-  # favicon: null
-  # faviconMediaType: null
 
 
 podLabels: {}

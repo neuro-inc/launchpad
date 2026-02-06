@@ -8,7 +8,11 @@ import apolo_sdk
 from apolo_app_types import LLMInputs, TextEmbeddingsInferenceAppInputs
 from apolo_app_types.app_types import AppType
 from apolo_app_types.helm.apps.base import BaseChartValueProcessor
-from apolo_app_types.helm.apps.common import gen_extra_values
+from apolo_app_types.helm.apps.common import (
+    append_apolo_storage_integration_annotations,
+    gen_apolo_storage_integration_labels,
+    gen_extra_values,
+)
 from apolo_app_types.helm.apps.ingress import _get_ingress_name_template
 from apolo_app_types.helm.utils.dictionaries import get_nested_values
 from apolo_app_types.outputs.utils.apolo_secrets import get_apolo_secret
@@ -16,7 +20,11 @@ from apolo_app_types.protocols.common.hugging_face import (
     HuggingFaceCache,
     HuggingFaceModel,
 )
-from apolo_app_types.protocols.common.storage import ApoloFilesPath
+from apolo_app_types.protocols.common.storage import (
+    ApoloFilesMount,
+    ApoloFilesPath,
+    MountPath,
+)
 from apolo_app_types.protocols.postgres import (
     PGBackupConfig,
     PGBouncer,
@@ -27,6 +35,7 @@ from apolo_app_types.protocols.postgres import (
 
 from .consts import APP_SECRET_KEYS
 from .types import (
+    ApoloFilesImagePath,
     ColorPicker,
     CustomLLMModel,
     HuggingFaceEmbeddingsModel,
@@ -37,7 +46,6 @@ from .types import (
     PreConfiguredEmbeddingsModels,
     PreConfiguredHuggingFaceLLMModel,
     PreConfiguredLLMModels,
-    UploadedImage,
 )
 
 
@@ -210,6 +218,9 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         #     app_name=app_name,
         # )
         LAUNCHPAD_INITIAL_CONFIG = ""
+        db_secret_name = f"launchpad-{app_id}-db-secret"
+        kc_realm_import_config_map_name = f"launchpad-{app_id}-keycloak-realm"
+
         print("Quick start config:", input_.apps_config.quick_start_config)
         if isinstance(input_.apps_config.quick_start_config, OpenWebUIConfig):
             print("Using OpenWebUI preset configuration")
@@ -243,6 +254,75 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 }
             )
 
+        # Add storage integration labels to lauchpad deployment if branding files provided
+        needs_branding_mounts = False
+        if input_.branding and (
+            input_.branding.logo_file
+            or input_.branding.favicon_file
+            or (
+                input_.branding.background
+                and isinstance(input_.branding.background, ApoloFilesImagePath)
+            )
+        ):
+            needs_branding_mounts = True
+
+        lauchpad_file_mounts = []
+        kc_file_mounts = []
+
+        if needs_branding_mounts:
+            if input_.branding.logo_file:
+                lauchpad_file_mounts.append(
+                    ApoloFilesMount(
+                        storage_uri=t.cast(ApoloFilesPath, input_.branding.logo_file),
+                        mount_path=MountPath(path=f"{BRANDING_DIR_LAUNCHPAD}/logo"),
+                    )
+                )
+                kc_file_mounts.append(
+                    ApoloFilesMount(
+                        storage_uri=t.cast(ApoloFilesPath, input_.branding.logo_file),
+                        mount_path=MountPath(path=f"{BRANDING_DIR_KEYCLOAK}/logo"),
+                    )
+                )
+
+            if input_.branding.favicon_file:
+                lauchpad_file_mounts.append(
+                    ApoloFilesMount(
+                        storage_uri=t.cast(
+                            ApoloFilesPath, input_.branding.favicon_file
+                        ),
+                        mount_path=MountPath(path=f"{BRANDING_DIR_LAUNCHPAD}/favicon"),
+                    )
+                )
+                kc_file_mounts.append(
+                    ApoloFilesMount(
+                        storage_uri=t.cast(
+                            ApoloFilesPath, input_.branding.favicon_file
+                        ),
+                        mount_path=MountPath(path=f"{BRANDING_DIR_KEYCLOAK}/favicon"),
+                    )
+                )
+
+            if input_.branding.background and isinstance(
+                input_.branding.background, ApoloFilesImagePath
+            ):
+                lauchpad_file_mounts.append(
+                    ApoloFilesMount(
+                        storage_uri=t.cast(ApoloFilesPath, input_.branding.background),
+                        mount_path=MountPath(
+                            path=f"{BRANDING_DIR_LAUNCHPAD}/background"
+                        ),
+                    )
+                )
+                kc_file_mounts.append(
+                    ApoloFilesMount(
+                        storage_uri=t.cast(ApoloFilesPath, input_.branding.background),
+                        mount_path=MountPath(
+                            path=f"{BRANDING_DIR_KEYCLOAK}/background"
+                        ),
+                    )
+                )
+
+        ### LAUCHPAD CONFIGURATION ###
         values = await gen_extra_values(
             apolo_client=self.client,
             preset_type=input_.launchpad_web_app_config.preset,
@@ -250,6 +330,22 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             app_id=app_id,
             app_type=AppType.Launchpad,
         )
+
+        if lauchpad_file_mounts:
+            storage_labels = gen_apolo_storage_integration_labels(
+                client=self.client, inject_storage=True
+            )
+            if "podLabels" not in values:
+                values["podLabels"] = {}
+            values["podLabels"].update(storage_labels)
+
+            pod_annotations = append_apolo_storage_integration_annotations(
+                current_annotations=values.get("podAnnotations", {}),
+                files_mounts=lauchpad_file_mounts,
+                client=self.client,
+            )
+            values["podAnnotations"] = pod_annotations
+
         ingress_template = await _get_ingress_name_template(
             client=self.client,
         )
@@ -257,6 +353,20 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         if domain.endswith("."):
             domain = domain[:-1]
 
+        extra_env = {}
+        if input_.branding:
+            if needs_branding_mounts:
+                extra_env["BRANDING_DIR"] = BRANDING_DIR_LAUNCHPAD
+
+            if input_.branding.title:
+                extra_env["BRANDING_TITLE"] = input_.branding.title
+
+            if input_.branding.background and isinstance(
+                input_.branding.background, ColorPicker
+            ):
+                extra_env["BRANDING_BACKGROUND"] = input_.branding.background.hex_code
+
+        ### KEYCLOAK CONFIGURATION ###
         try:
             keycloak_admin_password = await get_apolo_secret(
                 app_instance_id=app_id, key=APP_SECRET_KEYS["KEYCLOAK"]
@@ -278,57 +388,6 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         except apolo_sdk.ResourceNotFound:
             launchpad_admin_password = _generate_password()
 
-        db_secret_name = f"launchpad-{app_id}-db-secret"
-        realm_import_config_map_name = f"launchpad-{app_id}-keycloak-realm"
-        branding_config_map_name = f"launchpad-{app_id}-branding"
-
-        kc_extra_volumes = [
-            {
-                "name": "realm-import",
-                "configMap": {
-                    "name": realm_import_config_map_name,
-                    "items": [
-                        {
-                            "key": "realm.json",
-                            "path": "realm.json",
-                        }
-                    ],
-                },
-            }
-        ]
-        kc_extra_volume_mounts = []
-        kc_extra_env_vars = []
-
-        # Add branding volume to keycloak if branding is provided
-        if input_.branding and (
-            input_.branding.logo_file or input_.branding.favicon_file
-        ):
-            kc_extra_volumes.append(
-                {
-                    "name": "branding",
-                    "configMap": {
-                        "name": branding_config_map_name,
-                    },
-                }
-            )
-            kc_extra_volume_mounts.append(
-                {
-                    "name": "branding",
-                    "mountPath": BRANDING_DIR_KEYCLOAK,
-                    "readOnly": True,
-                }
-            )
-
-        # Add background color as environment variable for keycloak theme
-        if input_.branding and input_.branding.background:
-            if isinstance(input_.branding.background, ColorPicker):
-                kc_extra_env_vars.append(
-                    {
-                        "name": "BRANDING_BACKGROUND_COLOR",
-                        "value": input_.branding.background.hex_code,
-                    }
-                )
-
         keycloak_values = {
             "fullnameOverride": f"launchpad-{app_id}-keycloak",
             "auth": {
@@ -344,58 +403,55 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     "service": "keycloak",
                 }
             },
-            "extraVolumes": kc_extra_volumes,
-            "extraVolumeMounts": kc_extra_volume_mounts,
+            "extraVolumes": [
+                {
+                    "name": "realm-import",
+                    "configMap": {
+                        "name": kc_realm_import_config_map_name,
+                        "items": [
+                            {
+                                "key": "realm.json",
+                                "path": "realm.json",
+                            }
+                        ],
+                    },
+                }
+            ],
         }
 
+        if kc_file_mounts:
+            if "podLabels" not in keycloak_values:
+                keycloak_values["podLabels"] = {}
+            keycloak_values["podLabels"].update(
+                gen_apolo_storage_integration_labels(
+                    client=self.client, inject_storage=True
+                )
+            )
+            keycloak_values["podAnnotations"] = (
+                append_apolo_storage_integration_annotations(
+                    current_annotations={},  # ignore annotations from lauchpad
+                    files_mounts=kc_file_mounts,
+                    client=self.client,
+                )
+            )
+
+        kc_extra_env_vars = []
+        if input_.branding and input_.branding.background:
+            if isinstance(input_.branding.background, ColorPicker):
+                kc_extra_env_vars.append(
+                    {
+                        "name": "BRANDING_BACKGROUND_COLOR",
+                        "value": input_.branding.background.hex_code,
+                    }
+                )
         if kc_extra_env_vars:
             keycloak_values["extraEnvVars"] = kc_extra_env_vars
-
-        extra_env = {}
-        branding_values = {}
-        if input_.branding:
-            # Handle logo file
-            if input_.branding.logo_file:
-                branding_values["logo"] = input_.branding.logo_file.content_b64
-                if input_.branding.logo_file.type:
-                    branding_values["logoMediaType"] = input_.branding.logo_file.type
-
-            # Handle favicon file
-            if input_.branding.favicon_file:
-                branding_values["favicon"] = input_.branding.favicon_file.content_b64
-                if input_.branding.favicon_file.type:
-                    branding_values["faviconMediaType"] = (
-                        input_.branding.favicon_file.type
-                    )
-            if branding_values:
-                extra_env["BRANDING_DIR"] = BRANDING_DIR_LAUNCHPAD
-                branding_values["mountPath"] = BRANDING_DIR_LAUNCHPAD
-
-            # Handle title
-            if input_.branding.title:
-                extra_env["BRANDING_TITLE"] = input_.branding.title
-
-            # Handle background - can be ColorPicker or UploadedImage
-            if input_.branding.background:
-                if isinstance(input_.branding.background, ColorPicker):
-                    extra_env["BRANDING_BACKGROUND"] = (
-                        input_.branding.background.hex_code
-                    )
-                elif isinstance(input_.branding.background, UploadedImage):
-                    branding_values["background"] = (
-                        input_.branding.background.content_b64
-                    )
-                    if input_.branding.background.type:
-                        branding_values["backgroundMediaType"] = (
-                            input_.branding.background.type
-                        )
 
         return {
             **values,
             "image": {"tag": os.getenv("APP_IMAGE_TAG", "latest")},
-            "branding": branding_values,
             "dbSecretName": db_secret_name,
-            "keycloakRealmImportConfigMapName": realm_import_config_map_name,
+            "keycloakRealmImportConfigMapName": kc_realm_import_config_map_name,
             "postgresql": {
                 "fullnameOverride": f"launchpad-{app_id}-db",
                 "auth": {

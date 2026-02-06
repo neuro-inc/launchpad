@@ -8,12 +8,15 @@ from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
 from apolo_apps_launchpad.types import (
     AppsConfig,
+    ApoloFilesImagePath,
     CustomLLMModel,
     HuggingFaceLLMModel,
     LaunchpadAppInputs,
     LaunchpadWebAppConfig,
     LLMConfig,
     OpenWebUIConfig,
+    NoQuickStartConfig,
+    LauchpadBrandingConfig,
     PostgresConfig,
     PreConfiguredEmbeddingsModels,
     PreConfiguredHuggingFaceLLMModel,
@@ -661,3 +664,293 @@ async def test_launchpad_values_generation_magistral_model(apolo_client):
     # Test postgres fields
     assert "fullnameOverride" in helm_params["postgresql"]
     assert helm_params["postgresql"]["fullnameOverride"] == f"launchpad-{APP_ID}-db"
+
+
+async def test_launchpad_values_generation__min(apolo_client):
+    processor = LaunchpadInputsProcessor(client=apolo_client)
+    helm_params = await processor.gen_extra_values(
+        input_=LaunchpadAppInputs(
+            launchpad_web_app_config=LaunchpadWebAppConfig(
+                preset=Preset(name="cpu-medium"),
+            ),
+            apps_config=AppsConfig(
+                quick_start_config=NoQuickStartConfig(no_quickstart=True),
+            ),
+        ),
+        app_name="launchpad-app",
+        namespace="default-namespace",
+        app_secrets_name=APP_SECRETS_NAME,
+        app_id=APP_ID,
+    )
+
+    expected_affinity = {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "platform.neuromation.io/nodepool",
+                                "operator": "In",
+                                "values": ["cpu_pool"],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+    expected_resources = {
+        "requests": {"cpu": "2000.0m", "memory": "0M"},
+        "limits": {"cpu": "2000.0m", "memory": "0M"},
+    }
+    expected_tolerations = [
+        {
+            "effect": "NoSchedule",
+            "key": "platform.neuromation.io/job",
+            "operator": "Exists",
+        },
+        {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists",
+            "tolerationSeconds": 300,
+        },
+        {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "tolerationSeconds": 300,
+        },
+    ]
+    expected_pod_labels = {
+        "platform.apolo.us/component": "app",
+        "platform.apolo.us/preset": "cpu-medium",
+    }
+    keycloak_values = {
+        "fullnameOverride": f"launchpad-{APP_ID}-keycloak",
+        "auth": {"adminPassword": f"keycloak-admin-pswd-{APP_ID}-value"},
+        "externalDatabase": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
+        "preset_name": "cpu-medium",
+        "resources": expected_resources,
+        "tolerations": expected_tolerations,
+        "affinity": expected_affinity,
+        "podLabels": expected_pod_labels,
+        "apolo_app_id": APP_ID,
+        "labels": {
+            "application": "launchpad",
+        },
+        "service": {"extraLabels": {"service": "keycloak"}},
+        "extraVolumes": [
+            {
+                "name": "realm-import",
+                "configMap": {
+                    "name": f"launchpad-{APP_ID}-keycloak-realm",
+                    "items": [{"key": "realm.json", "path": "realm.json"}],
+                },
+            },
+        ],
+    }
+
+    expected_helm_values = {
+        "preset_name": "cpu-medium",
+        "resources": expected_resources,
+        "tolerations": expected_tolerations,
+        "affinity": expected_affinity,
+        "podLabels": expected_pod_labels,
+        "apolo_app_id": APP_ID,
+        "dbPassword": f"keycloak-db-pswd-{APP_ID}-value",
+        "dbSecretName": f"launchpad-{APP_ID}-db-secret",
+        "postgresql": {
+            "auth": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
+            "fullnameOverride": f"launchpad-{APP_ID}-db",
+        },
+        "domain": "apps.some.org.neu.ro",
+        "extraEnv": {},
+        "image": {"tag": "latest"},
+        "LAUNCHPAD_INITIAL_CONFIG": "",
+        "LAUNCHPAD_ADMIN_PASSWORD": f"launchpad-admin-pswd-{APP_ID}-value",
+        "LAUNCHPAD_ADMIN_EMAIL": "admin@launchpad.com",
+        "LAUNCHPAD_ADMIN_USER": "admin",
+        "keycloak": keycloak_values,
+        "mlops-keycloak": keycloak_values,
+        "keycloakRealmImportConfigMapName": f"launchpad-{APP_ID}-keycloak-realm",
+    }
+
+    assert helm_params == expected_helm_values
+
+
+async def test_launchpad_values_generation__brand(apolo_client):
+    processor = LaunchpadInputsProcessor(client=apolo_client)
+    helm_params = await processor.gen_extra_values(
+        input_=LaunchpadAppInputs(
+            launchpad_web_app_config=LaunchpadWebAppConfig(
+                preset=Preset(name="cpu-medium"),
+            ),
+            apps_config=AppsConfig(
+                quick_start_config=NoQuickStartConfig(no_quickstart=True),
+            ),
+            branding=LauchpadBrandingConfig(
+                logo_file=ApoloFilesImagePath(
+                    path="storage://cluster/org/project/app-assets/logo.png"
+                ),
+                favicon_file=ApoloFilesImagePath(
+                    path="storage://cluster/org/project/app-assets/favicon.ico"
+                ),
+                title="My Custom Launchpad",
+                background=ApoloFilesImagePath(
+                    path="storage://cluster/org/project/app-assets/background.png"
+                ),
+            ),
+        ),
+        app_name="launchpad-app",
+        namespace="default-namespace",
+        app_secrets_name=APP_SECRETS_NAME,
+        app_id=APP_ID,
+    )
+
+    expected_affinity = {
+        "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                    {
+                        "matchExpressions": [
+                            {
+                                "key": "platform.neuromation.io/nodepool",
+                                "operator": "In",
+                                "values": ["cpu_pool"],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+    expected_resources = {
+        "requests": {"cpu": "2000.0m", "memory": "0M"},
+        "limits": {"cpu": "2000.0m", "memory": "0M"},
+    }
+    expected_tolerations = [
+        {
+            "effect": "NoSchedule",
+            "key": "platform.neuromation.io/job",
+            "operator": "Exists",
+        },
+        {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists",
+            "tolerationSeconds": 300,
+        },
+        {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "tolerationSeconds": 300,
+        },
+    ]
+    expected_pod_labels = {
+        "platform.apolo.us/component": "app",
+        "platform.apolo.us/preset": "cpu-medium",
+        "platform.apolo.us/inject-storage": "true",
+        "platform.apolo.us/org": "test-org",
+        "platform.apolo.us/project": "test-project",
+    }
+    keycloak_values = {
+        "fullnameOverride": f"launchpad-{APP_ID}-keycloak",
+        "auth": {"adminPassword": f"keycloak-admin-pswd-{APP_ID}-value"},
+        "externalDatabase": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
+        "preset_name": "cpu-medium",
+        "resources": expected_resources,
+        "tolerations": expected_tolerations,
+        "affinity": expected_affinity,
+        "podLabels": expected_pod_labels,
+        "podAnnotations": {
+            "platform.apolo.us/inject-storage": (
+                json.dumps(
+                    [
+                        {
+                            "storage_uri": "storage://cluster/org/project/app-assets/logo.png",
+                            "mount_path": "/opt/bitnami/keycloak/themes/apolo/login/resources/branding/logo",
+                            "mount_mode": "rw",
+                        },
+                        {
+                            "storage_uri": "storage://cluster/org/project/app-assets/favicon.ico",
+                            "mount_path": "/opt/bitnami/keycloak/themes/apolo/login/resources/branding/favicon",
+                            "mount_mode": "rw",
+                        },
+                        {
+                            "storage_uri": "storage://cluster/org/project/app-assets/background.png",
+                            "mount_path": "/opt/bitnami/keycloak/themes/apolo/login/resources/branding/background",
+                            "mount_mode": "rw",
+                        },
+                    ]
+                )
+            ),
+        },
+        "apolo_app_id": APP_ID,
+        "labels": {
+            "application": "launchpad",
+        },
+        "service": {"extraLabels": {"service": "keycloak"}},
+        "extraVolumes": [
+            {
+                "name": "realm-import",
+                "configMap": {
+                    "name": f"launchpad-{APP_ID}-keycloak-realm",
+                    "items": [{"key": "realm.json", "path": "realm.json"}],
+                },
+            },
+        ],
+    }
+
+    expected_helm_values = {
+        "preset_name": "cpu-medium",
+        "resources": expected_resources,
+        "tolerations": expected_tolerations,
+        "affinity": expected_affinity,
+        "podLabels": expected_pod_labels,
+        "podAnnotations": {
+            "platform.apolo.us/inject-storage": json.dumps(
+                [
+                    {
+                        "storage_uri": "storage://cluster/org/project/app-assets/logo.png",
+                        "mount_path": "/etc/launchpad/branding/logo",
+                        "mount_mode": "rw",
+                    },
+                    {
+                        "storage_uri": "storage://cluster/org/project/app-assets/favicon.ico",
+                        "mount_path": "/etc/launchpad/branding/favicon",
+                        "mount_mode": "rw",
+                    },
+                    {
+                        "storage_uri": "storage://cluster/org/project/app-assets/background.png",
+                        "mount_path": "/etc/launchpad/branding/background",
+                        "mount_mode": "rw",
+                    },
+                ]
+            ),
+        },
+        "apolo_app_id": APP_ID,
+        "dbPassword": f"keycloak-db-pswd-{APP_ID}-value",
+        "dbSecretName": f"launchpad-{APP_ID}-db-secret",
+        "postgresql": {
+            "auth": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
+            "fullnameOverride": f"launchpad-{APP_ID}-db",
+        },
+        "domain": "apps.some.org.neu.ro",
+        "extraEnv": {
+            "BRANDING_TITLE": "My Custom Launchpad",
+            "BRANDING_DIR": "/etc/launchpad/branding",
+        },
+        "image": {"tag": "latest"},
+        "LAUNCHPAD_INITIAL_CONFIG": "",
+        "LAUNCHPAD_ADMIN_PASSWORD": f"launchpad-admin-pswd-{APP_ID}-value",
+        "LAUNCHPAD_ADMIN_EMAIL": "admin@launchpad.com",
+        "LAUNCHPAD_ADMIN_USER": "admin",
+        "keycloak": keycloak_values,
+        "mlops-keycloak": keycloak_values,
+        "keycloakRealmImportConfigMapName": f"launchpad-{APP_ID}-keycloak-realm",
+    }
+
+    assert helm_params == expected_helm_values
