@@ -21,8 +21,8 @@ def test_config_endpoint(app_client: TestClient, config: Config) -> None:
             "realm": config.keycloak.realm,
         },
         "branding": {
-            "logo_url": "https://example.com/logo.png",
-            "favicon_url": "https://example.com/favicon.png",
+            "logo_url": f"{app_client.base_url}/branding/logo",
+            "favicon_url": f"{app_client.base_url}/branding/favicon",
             "title": "Test Title",
             "background": "12345",
         },

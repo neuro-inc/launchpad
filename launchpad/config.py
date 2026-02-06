@@ -67,10 +67,9 @@ class PostgresConfig:
 
 @dataclass(frozen=True)
 class BrandingConfig:
-    logo_url: str | None = None
-    favicon_url: str | None = None
     title: str | None = None
     background: str | None = None
+    branding_dir: Path = Path("/etc/launchpad/branding")
 
 
 @dataclass(frozen=True)
@@ -226,9 +225,9 @@ class EnvironConfigFactory:
         )
 
     def create_branding(self) -> BrandingConfig:
+        branding_dir = self._environ.get("BRANDING_DIR", "/etc/launchpad/branding")
         return BrandingConfig(
-            logo_url=self._environ.get("BRANDING_LOGO_URL"),
-            favicon_url=self._environ.get("BRANDING_FAVICON_URL"),
             title=self._environ.get("BRANDING_TITLE"),
             background=self._environ.get("BRANDING_BACKGROUND"),
+            branding_dir=Path(branding_dir),
         )

@@ -13,6 +13,45 @@ from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from pydantic import ConfigDict, Field
 
 
+ACCEPTED_IMAGE_EXTENSIONS = [
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".bmp",
+    ".tiff",
+    ".ico",
+]
+
+
+class FileFilterExtraSchema(SchemaExtraMetadata):
+    accept_ext: list[str] | None = Field(..., alias="x-accept-ext")
+
+
+class ApoloFilesImagePath(ApoloFilesPath):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=FileFilterExtraSchema(
+            title="Apolo Files Image Path",
+            description="Specify the path within the Apolo Files application to read an image file from.",
+            accept_ext=ACCEPTED_IMAGE_EXTENSIONS,
+        ).as_json_schema_extra(),
+    )
+
+
+class ColorPicker(AbstractAppFieldType):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Color",
+            description=("Select a color"),
+        ).as_json_schema_extra(),
+    )
+    hex_code: str
+
+
 class PreConfiguredLLMModels(enum.StrEnum):
     LLAMA_31_8b = "meta-llama/Llama-3.1-8B-Instruct"
     MAGISTRAL_24B = "unsloth/Magistral-Small-2506-GGUF"
@@ -340,7 +379,7 @@ class LaunchpadAdminApi(AbstractAppFieldType):
     api_url: ServiceAPI[HttpApi]
 
 
-class BrandingConfig(AbstractAppFieldType):
+class LauchpadBrandingConfig(AbstractAppFieldType):
     model_config = ConfigDict(
         protected_namespaces=(),
         json_schema_extra=SchemaExtraMetadata(
@@ -349,16 +388,45 @@ class BrandingConfig(AbstractAppFieldType):
         ).as_json_schema_extra(),
         is_advanced_field=True,
     )
-    logo_url: str | None = None
-    favicon_url: str | None = None
-    title: str | None = None
-    background: str | None = None
+    logo_file: ApoloFilesImagePath | None = Field(
+        None,
+        json_schema_extra=FileFilterExtraSchema(
+            title="Logo Image",
+            description="Use custom logo image from Apolo Storage for Lauchpad.",
+            accept_ext=ACCEPTED_IMAGE_EXTENSIONS,
+        ).as_json_schema_extra(),
+    )
+    favicon_file: ApoloFilesImagePath | None = Field(
+        None,
+        json_schema_extra=FileFilterExtraSchema(
+            title="Favicon Image",
+            description="Use custom favicon image from Apolo Storage for Lauchpad.",
+            accept_ext=ACCEPTED_IMAGE_EXTENSIONS,
+        ).as_json_schema_extra(),
+    )
+    title: str | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Launchpad Title",
+            description="Set custom title for the Launchpad.",
+        ).as_json_schema_extra(),
+    )
+    background: ColorPicker | ApoloFilesImagePath | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Background",
+            description=(
+                "Customize background for the Launchpad"
+                "(set color or use an image from Apolo Storage)."
+            ),
+        ).as_json_schema_extra(),
+    )
 
 
 class LaunchpadAppInputs(AppInputs):
     launchpad_web_app_config: LaunchpadWebAppConfig
     apps_config: AppsConfig
-    branding: BrandingConfig | None = None
+    branding: LauchpadBrandingConfig | None = None
 
 
 class LaunchpadAppOutputs(AppOutputs):

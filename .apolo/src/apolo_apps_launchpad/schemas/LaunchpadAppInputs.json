@@ -1,5 +1,40 @@
 {
   "$defs": {
+    "ApoloFilesImagePath": {
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string",
+          "x-description": "Provide the Apolo Storage path starting with `storage:` to locate your files.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Storage Path"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "ApoloFilesImagePath",
+      "type": "object",
+      "x-accept-ext": [
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".webp",
+        ".svg",
+        ".bmp",
+        ".tiff",
+        ".ico"
+      ],
+      "x-description": "Specify the path within the Apolo Files application to read an image file from.",
+      "x-is-advanced-field": false,
+      "x-is-configurable": true,
+      "x-meta-type": "inline",
+      "x-title": "Apolo Files Image Path",
+      "x-type": "ApoloFilesImagePath"
+    },
     "ApoloFilesPath": {
       "properties": {
         "path": {
@@ -69,65 +104,24 @@
       "x-title": "Quickstart Apps",
       "x-type": "AppsConfig"
     },
-    "BrandingConfig": {
+    "ColorPicker": {
       "properties": {
-        "logo_url": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Logo Url"
-        },
-        "favicon_url": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Favicon Url"
-        },
-        "title": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Title"
-        },
-        "background": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Background"
+        "hex_code": {
+          "title": "Hex Code",
+          "type": "string"
         }
       },
-      "title": "BrandingConfig",
+      "required": [
+        "hex_code"
+      ],
+      "title": "ColorPicker",
       "type": "object",
-      "x-description": "Configuration for the branding of the Launchpad.",
+      "x-description": "Select a color",
       "x-is-advanced-field": false,
       "x-is-configurable": true,
       "x-meta-type": "inline",
-      "x-title": "Branding Configuration",
-      "x-type": "BrandingConfig"
+      "x-title": "Color",
+      "x-type": "ColorPicker"
     },
     "CustomLLMModel": {
       "properties": {
@@ -394,6 +388,109 @@
       "x-title": "LLM Configuration",
       "x-type": "LLMConfig"
     },
+    "LauchpadBrandingConfig": {
+      "properties": {
+        "logo_file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApoloFilesImagePath"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "x-accept-ext": [
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp",
+            ".svg",
+            ".bmp",
+            ".tiff",
+            ".ico"
+          ],
+          "x-description": "Use custom logo image from Apolo Storage for Lauchpad.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Logo Image"
+        },
+        "favicon_file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApoloFilesImagePath"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "x-accept-ext": [
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".webp",
+            ".svg",
+            ".bmp",
+            ".tiff",
+            ".ico"
+          ],
+          "x-description": "Use custom favicon image from Apolo Storage for Lauchpad.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Favicon Image"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title",
+          "x-description": "Set custom title for the Launchpad.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Launchpad Title"
+        },
+        "background": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ColorPicker"
+            },
+            {
+              "$ref": "#/$defs/ApoloFilesImagePath"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Background",
+          "x-description": "Customize background for the Launchpad(set color or use an image from Apolo Storage).",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Background"
+        }
+      },
+      "title": "LauchpadBrandingConfig",
+      "type": "object",
+      "x-description": "Configuration for the branding of the Launchpad.",
+      "x-is-advanced-field": false,
+      "x-is-configurable": true,
+      "x-meta-type": "inline",
+      "x-title": "Branding Configuration",
+      "x-type": "LauchpadBrandingConfig"
+    },
     "LaunchpadWebAppConfig": {
       "properties": {
         "preset": {
@@ -633,7 +730,7 @@
     "branding": {
       "anyOf": [
         {
-          "$ref": "#/$defs/BrandingConfig"
+          "$ref": "#/$defs/LauchpadBrandingConfig"
         },
         {
           "type": "null"

@@ -1,5 +1,6 @@
 import logging
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
@@ -87,10 +88,9 @@ def config(postgres_container: PostgresContainer, setup_database: str) -> Config
     mock_pg_config = PostgresConfig(dsn=pg_dsn)
     mock_server_config = ServerConfig()
     mock_branding_config = BrandingConfig(
-        logo_url="https://example.com/logo.png",
-        favicon_url="https://example.com/favicon.png",
         title="Test Title",
         background="12345",
+        branding_dir=Path(__file__).parent.parent / "assets",
     )
 
     mock_cfg = MagicMock(spec=Config)
