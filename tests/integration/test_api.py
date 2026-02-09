@@ -245,7 +245,10 @@ class TestDeleteInstance:
         )
 
         # Delete the instance
-        delete_response = app_client.delete(f"/api/v1/apps/instances/{actual_app_id}")
+        delete_response = app_client.delete(
+            f"/api/v1/apps/instances/{actual_app_id}",
+            params={"uninstall": "true"},
+        )
         assert delete_response.status_code == 204
 
         # Verify it was deleted via Apps API

@@ -123,9 +123,27 @@ async def test_app_service_delete_app_success(
 
     # Mock the delete_app function
     with patch("launchpad.apps.service.delete_app", new=AsyncMock()) as mock_delete_app:
-        await app_service.delete(app_id)
+        await app_service.delete(app_id, uninstall=True)
 
         mock_apps_api_client.delete_app.assert_called_once_with(app_id)
+        mock_delete_app.assert_called_once_with(
+            mock_db_session_maker.return_value.__aenter__.return_value, app_id
+        )
+
+
+async def test_app_service_delete_app_no_uninstall_success(
+    app_service: AppService,
+    mock_apps_api_client: AsyncMock,
+    mock_db_session_maker: MagicMock,
+    app_id: UUID,
+) -> None:
+    mock_apps_api_client.delete_app.return_value = None
+
+    # Mock the delete_app function
+    with patch("launchpad.apps.service.delete_app", new=AsyncMock()) as mock_delete_app:
+        await app_service.delete(app_id)
+
+        mock_apps_api_client.delete_app.assert_not_called()
         mock_delete_app.assert_called_once_with(
             mock_db_session_maker.return_value.__aenter__.return_value, app_id
         )
@@ -144,7 +162,7 @@ async def test_app_service_delete_app_not_found(
         )  # Simulate delete_app raising error
 
         with pytest.raises(ValueError, match="App not found"):
-            await app_service.delete(app_id)
+            await app_service.delete(app_id, uninstall=True)
 
         mock_apps_api_client.delete_app.assert_called_once_with(app_id)
         mock_delete_app.assert_called_once_with(
