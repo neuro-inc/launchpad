@@ -28,6 +28,7 @@ ACCEPTED_IMAGE_EXTENSIONS = [
 
 class FileFilterExtraSchema(SchemaExtraMetadata):
     accept_ext: list[str] | None = Field(..., alias="x-accept-ext")
+    max_size_kb: float | None = Field(None, alias="x-max-size-kb")
 
 
 class ApoloFilesImagePath(ApoloFilesPath):
@@ -394,6 +395,7 @@ class LauchpadBrandingConfig(AbstractAppFieldType):
             title="Logo Image",
             description="Use custom logo image from Apolo Storage for Lauchpad.",
             accept_ext=ACCEPTED_IMAGE_EXTENSIONS,
+            max_size_kb=5e03,  # 1 MB
         ).as_json_schema_extra(),
     )
     favicon_file: ApoloFilesImagePath | None = Field(
@@ -402,6 +404,7 @@ class LauchpadBrandingConfig(AbstractAppFieldType):
             title="Favicon Image",
             description="Use custom favicon image from Apolo Storage for Lauchpad.",
             accept_ext=ACCEPTED_IMAGE_EXTENSIONS,
+            max_size_kb=500,  # 500 KB
         ).as_json_schema_extra(),
     )
     title: str | None = Field(
