@@ -8,7 +8,6 @@ from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
 from apolo_apps_launchpad.types import (
     AppsConfig,
-    ApoloFilesImagePath,
     CustomLLMModel,
     HuggingFaceLLMModel,
     LaunchpadAppInputs,
@@ -17,6 +16,9 @@ from apolo_apps_launchpad.types import (
     OpenWebUIConfig,
     NoQuickStartConfig,
     LauchpadBrandingConfig,
+    LogoFileApoloFilesImagePath,
+    FavIconFileApoloFilesImagePath,
+    BackgroundApoloFilesImagePath,
     PostgresConfig,
     PreConfiguredEmbeddingsModels,
     PreConfiguredHuggingFaceLLMModel,
@@ -791,14 +793,14 @@ async def test_launchpad_values_generation__brand(apolo_client):
                 quick_start_config=NoQuickStartConfig(no_quickstart=True),
             ),
             branding=LauchpadBrandingConfig(
-                logo_file=ApoloFilesImagePath(
+                logo_file=LogoFileApoloFilesImagePath(
                     path="storage://cluster/org/project/app-assets/logo.png"
                 ),
-                favicon_file=ApoloFilesImagePath(
+                favicon_file=FavIconFileApoloFilesImagePath(
                     path="storage://cluster/org/project/app-assets/favicon.ico"
                 ),
                 title="My Custom Launchpad",
-                background=ApoloFilesImagePath(
+                background=BackgroundApoloFilesImagePath(
                     path="storage://cluster/org/project/app-assets/background.png"
                 ),
             ),
