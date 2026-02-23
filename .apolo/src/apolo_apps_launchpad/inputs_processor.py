@@ -62,17 +62,19 @@ BRANDING_DIR_KEYCLOAK = "/opt/bitnami/keycloak/themes/apolo/login/resources/bran
 # preprocessor), the versioned kc-theme/ folder is used instead of the legacy
 # keycloak-theme/apolo/ path on master. This is the authoritative copy of the
 # script; values.yaml carries the same script as a local-dev fallback.
-KEYCLOAK_THEME_INIT_SCRIPT = """\
+KEYCLOAK_CUSTOM_THEME_INIT_SCRIPT = """\
 set -euxo pipefail
-if [ -n "$APOLO_APP_GIT_REPO" ] && [ -n "$APOLO_APP_GIT_REVISION" ]; then
-  git clone --depth 1 --branch "$APOLO_APP_GIT_REVISION" "$APOLO_APP_GIT_REPO" /tmp/repo
-  THEME_SRC="/tmp/repo/kc-theme/apolo"
-else
-  git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
-  THEME_SRC="/tmp/repo/keycloak-theme/apolo"
-fi
+git clone --depth 1 --branch "{APOLO_APP_GIT_REVISION}" "{APOLO_APP_GIT_REPO}" /tmp/repo
 mkdir -p "/opt/bitnami/keycloak/themes/apolo"
-cp -R "$THEME_SRC/." "/opt/bitnami/keycloak/themes/apolo/"
+cp -R "/tmp/repo/kc-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
+chown -R 1001:0 /opt/bitnami/keycloak/themes
+"""
+
+KEYCLOAK_DEFAULT_THEME_INIT_SCRIPT = """\
+set -euxo pipefail
+git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
+mkdir -p "/opt/bitnami/keycloak/themes/apolo"
+cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
 chown -R 1001:0 /opt/bitnami/keycloak/themes
 """
 
@@ -341,6 +343,16 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     )
                 )
 
+        app_repo = os.getenv("APOLO_APP_GIT_REPO")
+        app_revision = os.getenv("APOLO_APP_GIT_REVISION")
+        if app_repo and app_revision:
+            fetch_theme_script = KEYCLOAK_CUSTOM_THEME_INIT_SCRIPT.format(
+                APOLO_APP_GIT_REPO=app_repo,
+                APOLO_APP_GIT_REVISION=app_revision,
+            )
+        else:
+            fetch_theme_script = KEYCLOAK_DEFAULT_THEME_INIT_SCRIPT
+
         ### LAUCHPAD CONFIGURATION ###
         values = await gen_extra_values(
             apolo_client=self.client,
@@ -428,17 +440,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     "image": "alpine/git:2.45.2",
                     "imagePullPolicy": "IfNotPresent",
                     "command": ["/bin/sh", "-lc"],
-                    "args": [KEYCLOAK_THEME_INIT_SCRIPT],
-                    "env": [
-                        {
-                            "name": "APOLO_APP_GIT_REPO",
-                            "value": os.getenv("APOLO_APP_GIT_REPO", ""),
-                        },
-                        {
-                            "name": "APOLO_APP_GIT_REVISION",
-                            "value": os.getenv("APOLO_APP_GIT_REVISION", ""),
-                        },
-                    ],
+                    "args": [fetch_theme_script],
                     "volumeMounts": [
                         {
                             "name": "empty-dir",

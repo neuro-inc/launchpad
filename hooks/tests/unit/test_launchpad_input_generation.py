@@ -8,7 +8,8 @@ from apolo_app_types.protocols.common import Preset
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
 from apolo_apps_launchpad.inputs_processor import (
     LaunchpadInputsProcessor,
-    KEYCLOAK_THEME_INIT_SCRIPT,
+    KEYCLOAK_CUSTOM_THEME_INIT_SCRIPT,
+    KEYCLOAK_DEFAULT_THEME_INIT_SCRIPT,
 )
 from apolo_apps_launchpad.types import (
     AppsConfig,
@@ -756,17 +757,7 @@ async def test_launchpad_values_generation__min(apolo_client):
                 "securityContext": {
                     "runAsUser": 0,
                 },
-                "args": [KEYCLOAK_THEME_INIT_SCRIPT],
-                "env": [
-                    {
-                        "name": "APOLO_APP_GIT_REPO",
-                        "value": "",
-                    },
-                    {
-                        "name": "APOLO_APP_GIT_REVISION",
-                        "value": "",
-                    },
-                ],
+                "args": [KEYCLOAK_DEFAULT_THEME_INIT_SCRIPT],
                 "volumeMounts": [
                     {
                         "name": "empty-dir",
@@ -948,16 +939,11 @@ async def test_launchpad_values_generation__brand(apolo_client):
                 "securityContext": {
                     "runAsUser": 0,
                 },
-                "args": [KEYCLOAK_THEME_INIT_SCRIPT],
-                "env": [
-                    {
-                        "name": "APOLO_APP_GIT_REPO",
-                        "value": "somerepo",
-                    },
-                    {
-                        "name": "APOLO_APP_GIT_REVISION",
-                        "value": "somerevision",
-                    },
+                "args": [
+                    KEYCLOAK_CUSTOM_THEME_INIT_SCRIPT.format(
+                        APOLO_APP_GIT_REPO="somerepo",
+                        APOLO_APP_GIT_REVISION="somerevision",
+                    )
                 ],
                 "volumeMounts": [
                     {
