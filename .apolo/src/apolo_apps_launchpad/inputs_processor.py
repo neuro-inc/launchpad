@@ -57,6 +57,25 @@ PASSWORD_MIN_LENGTH = 4
 BRANDING_DIR_LAUNCHPAD = "/etc/launchpad/branding"
 BRANDING_DIR_KEYCLOAK = "/opt/bitnami/keycloak/themes/apolo/login/resources/branding"
 
+# Init container script for fetching the Keycloak theme.
+# When APOLO_APP_GIT_REPO + APOLO_APP_GIT_REVISION are set (injected by this
+# preprocessor), the versioned kc-theme/ folder is used instead of the legacy
+# keycloak-theme/apolo/ path on master. This is the authoritative copy of the
+# script; values.yaml carries the same script as a local-dev fallback.
+KEYCLOAK_THEME_INIT_SCRIPT = """\
+set -euxo pipefail
+if [ -n "$APOLO_APP_GIT_REPO" ] && [ -n "$APOLO_APP_GIT_REVISION" ]; then
+  git clone --depth 1 --branch "$APOLO_APP_GIT_REVISION" "$APOLO_APP_GIT_REPO" /tmp/repo
+  THEME_SRC="/tmp/repo/kc-theme/apolo"
+else
+  git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
+  THEME_SRC="/tmp/repo/keycloak-theme/apolo"
+fi
+mkdir -p "/opt/bitnami/keycloak/themes/apolo"
+cp -R "$THEME_SRC/." "/opt/bitnami/keycloak/themes/apolo/"
+chown -R 1001:0 /opt/bitnami/keycloak/themes
+"""
+
 
 def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
     if length < PASSWORD_MIN_LENGTH:
@@ -403,6 +422,33 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     "service": "keycloak",
                 }
             },
+            "initContainers": [
+                {
+                    "name": "fetch-theme",
+                    "image": "alpine/git:2.45.2",
+                    "imagePullPolicy": "IfNotPresent",
+                    "command": ["/bin/sh", "-lc"],
+                    "args": [KEYCLOAK_THEME_INIT_SCRIPT],
+                    "env": [
+                        {
+                            "name": "APOLO_APP_GIT_REPO",
+                            "value": os.getenv("APOLO_APP_GIT_REPO", ""),
+                        },
+                        {
+                            "name": "APOLO_APP_GIT_REVISION",
+                            "value": os.getenv("APOLO_APP_GIT_REVISION", ""),
+                        },
+                    ],
+                    "volumeMounts": [
+                        {
+                            "name": "empty-dir",
+                            "mountPath": "/opt/bitnami/keycloak/themes",
+                            "subPath": "app-themes-dir",
+                        }
+                    ],
+                    "securityContext": {"runAsUser": 0},
+                }
+            ],
             "extraVolumes": [
                 {
                     "name": "realm-import",

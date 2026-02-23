@@ -1,11 +1,15 @@
 import json
+import os
 
 import pytest
 
 from apolo_app_types import ApoloSecret, HuggingFaceToken
 from apolo_app_types.protocols.common import Preset
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
-from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
+from apolo_apps_launchpad.inputs_processor import (
+    LaunchpadInputsProcessor,
+    KEYCLOAK_THEME_INIT_SCRIPT,
+)
 from apolo_apps_launchpad.types import (
     AppsConfig,
     CustomLLMModel,
@@ -743,6 +747,35 @@ async def test_launchpad_values_generation__min(apolo_client):
             "application": "launchpad",
         },
         "service": {"extraLabels": {"service": "keycloak"}},
+        "initContainers": [
+            {
+                "name": "fetch-theme",
+                "image": "alpine/git:2.45.2",
+                "imagePullPolicy": "IfNotPresent",
+                "command": ["/bin/sh", "-lc"],
+                "securityContext": {
+                    "runAsUser": 0,
+                },
+                "args": [KEYCLOAK_THEME_INIT_SCRIPT],
+                "env": [
+                    {
+                        "name": "APOLO_APP_GIT_REPO",
+                        "value": "",
+                    },
+                    {
+                        "name": "APOLO_APP_GIT_REVISION",
+                        "value": "",
+                    },
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "empty-dir",
+                        "mountPath": "/opt/bitnami/keycloak/themes",
+                        "subPath": "app-themes-dir",
+                    }
+                ],
+            },
+        ],
         "extraVolumes": [
             {
                 "name": "realm-import",
@@ -784,6 +817,8 @@ async def test_launchpad_values_generation__min(apolo_client):
 
 async def test_launchpad_values_generation__brand(apolo_client):
     processor = LaunchpadInputsProcessor(client=apolo_client)
+    os.environ["APOLO_APP_GIT_REPO"] = "somerepo"
+    os.environ["APOLO_APP_GIT_REVISION"] = "somerevision"
     helm_params = await processor.gen_extra_values(
         input_=LaunchpadAppInputs(
             launchpad_web_app_config=LaunchpadWebAppConfig(
@@ -902,6 +937,35 @@ async def test_launchpad_values_generation__brand(apolo_client):
                     "name": f"launchpad-{APP_ID}-keycloak-realm",
                     "items": [{"key": "realm.json", "path": "realm.json"}],
                 },
+            },
+        ],
+        "initContainers": [
+            {
+                "name": "fetch-theme",
+                "image": "alpine/git:2.45.2",
+                "imagePullPolicy": "IfNotPresent",
+                "command": ["/bin/sh", "-lc"],
+                "securityContext": {
+                    "runAsUser": 0,
+                },
+                "args": [KEYCLOAK_THEME_INIT_SCRIPT],
+                "env": [
+                    {
+                        "name": "APOLO_APP_GIT_REPO",
+                        "value": "somerepo",
+                    },
+                    {
+                        "name": "APOLO_APP_GIT_REVISION",
+                        "value": "somerevision",
+                    },
+                ],
+                "volumeMounts": [
+                    {
+                        "name": "empty-dir",
+                        "mountPath": "/opt/bitnami/keycloak/themes",
+                        "subPath": "app-themes-dir",
+                    }
+                ],
             },
         ],
     }

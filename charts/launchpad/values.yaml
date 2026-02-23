@@ -174,18 +174,31 @@ keycloak:
       image: alpine/git:2.45.2
       imagePullPolicy: IfNotPresent
       command: [ "/bin/sh","-lc" ]
+      # NOTE: this script is duplicated from KEYCLOAK_THEME_INIT_SCRIPT in
+      # inputs_processor.py, which is the authoritative copy used in production.
+      # Keep them in sync when making changes.
       args:
         - |
           set -euxo pipefail
-          git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
+          if [ -n "$APOLO_APP_GIT_REPO" ] && [ -n "$APOLO_APP_GIT_REVISION" ]; then
+            git clone --depth 1 --branch "$APOLO_APP_GIT_REVISION" "$APOLO_APP_GIT_REPO" /tmp/repo
+            THEME_SRC="/tmp/repo/kc-theme/apolo"
+          else
+            git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
+            THEME_SRC="/tmp/repo/keycloak-theme/apolo"
+          fi
           mkdir -p "/opt/bitnami/keycloak/themes/apolo"
-          cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
-          # Make sure the KC (1001) user can read the files
+          cp -R "$THEME_SRC/." "/opt/bitnami/keycloak/themes/apolo/"
           chown -R 1001:0 /opt/bitnami/keycloak/themes
       volumeMounts:
         - name: empty-dir
           mountPath: /opt/bitnami/keycloak/themes
           subPath: app-themes-dir
+      env:
+        - name: APOLO_APP_GIT_REPO
+          value: ""
+        - name: APOLO_APP_GIT_REVISION
+          value: ""
       securityContext:
         runAsUser: 0
   extraStartupArgs: >-

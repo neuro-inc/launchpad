@@ -6,8 +6,22 @@
 <@layout.registrationLayout displayMessage=!messagesPerField.existsError('username','password') displayInfo=realm.password && realm.registrationAllowed && !registrationDisabled??; section>
 <!-- template: login.ftl -->
 
-    <#if section = "header">
-        <img src="${url.resourcesPath}/img/launchpad-logo.svg" alt="Launchpad" class="kc-logo" />
+    <#if section = "head">
+        <#-- Inject custom background color from environment variable if available -->
+        <#if properties.brandingBackgroundColor?has_content>
+        <style>
+            body,
+            .pf-c-login,
+            .pf-v5-c-login {
+                background-color: ${properties.brandingBackgroundColor} !important;
+            }
+        </style>
+        </#if>
+    <#elseif section = "header">
+        <#-- Try to use custom logo first, fallback to default -->
+        <#assign customLogo = "${url.resourcesPath}/branding/logo">
+        <#assign defaultLogo = "${url.resourcesPath}/img/launchpad-logo.svg">
+        <img src="${customLogo}" alt="Launchpad" class="kc-logo" onerror="this.onerror=null; this.src='${defaultLogo}';" />
     <#elseif section = "form">
         <div id="kc-form">
           <div id="kc-form-wrapper">
