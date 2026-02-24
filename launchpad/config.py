@@ -43,6 +43,7 @@ class ApoloConfig:
     apps_api_url: str
     token: str
     self_domain: str
+    web_app_domain: str
     base_domain: str
     auth_middleware_name: str
 
@@ -171,6 +172,7 @@ class EnvironConfigFactory:
                 apps_api_url=apps_api_url,
                 token=parsed_config["token"],
                 self_domain=self._environ["SELF_DOMAIN"],
+                web_app_domain=self._environ["WEB_DOMAIN"],
                 base_domain=self._environ["BASE_DOMAIN"],
                 auth_middleware_name=self._environ["AUTH_MIDDLEWARE_NAME"],
             )

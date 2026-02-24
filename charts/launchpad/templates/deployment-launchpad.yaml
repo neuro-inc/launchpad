@@ -70,6 +70,8 @@ spec:
               value: {{ .Values.LAUNCHPAD_INITIAL_CONFIG | quote }}
             - name: SELF_DOMAIN
               value: {{ include "launchpad.apiDomain" . }}
+            - name: WEB_DOMAIN
+              value: {{ include "launchpad.domain" . }}
             - name: BASE_DOMAIN
               value: {{ .Values.domain }}
             - name: AUTH_MIDDLEWARE_NAME

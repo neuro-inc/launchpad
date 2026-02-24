@@ -77,6 +77,7 @@ def config(postgres_container: PostgresContainer, setup_database: str) -> Config
         token="mock-token",
         self_domain="http://mock-self.com",
         base_domain="http://mock-base.com",
+        web_app_domain="http://mock-web.com",
         auth_middleware_name="test-middleware",
     )
     mock_apps_config = AppsConfig(vllm={}, postgres={}, embeddings={})
