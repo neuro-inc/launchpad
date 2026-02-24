@@ -43,7 +43,9 @@ def create_app(config: Config) -> Launchpad:
         CORSMiddleware,
         allow_origins=[
             f"https://{config.apolo.self_domain}",
+            f"https://{config.apolo.self_domain}/",
             f"https://{config.apolo.web_app_domain}",
+            f"https://{config.apolo.web_app_domain}/",
         ],
         allow_credentials=True,
         allow_methods=["*"],
