@@ -877,13 +877,6 @@ async def test_launchpad_values_generation__brand(apolo_client):
             "tolerationSeconds": 300,
         },
     ]
-    expected_pod_labels = {
-        "platform.apolo.us/component": "app",
-        "platform.apolo.us/preset": "cpu-medium",
-        "platform.apolo.us/inject-storage": "true",
-        "platform.apolo.us/org": "test-org",
-        "platform.apolo.us/project": "test-project",
-    }
     keycloak_values = {
         "fullnameOverride": f"launchpad-{APP_ID}-keycloak",
         "auth": {"adminPassword": f"keycloak-admin-pswd-{APP_ID}-value"},
@@ -892,30 +885,13 @@ async def test_launchpad_values_generation__brand(apolo_client):
         "resources": expected_resources,
         "tolerations": expected_tolerations,
         "affinity": expected_affinity,
-        "podLabels": expected_pod_labels,
-        "podAnnotations": {
-            "platform.apolo.us/inject-storage": (
-                json.dumps(
-                    [
-                        {
-                            "storage_uri": "storage://cluster/org/project/app-assets/logo.png",
-                            "mount_path": "/opt/bitnami/keycloak/themes/apolo/login/resources/branding/logo",
-                            "mount_mode": "rw",
-                        },
-                        {
-                            "storage_uri": "storage://cluster/org/project/app-assets/favicon.ico",
-                            "mount_path": "/opt/bitnami/keycloak/themes/apolo/login/resources/branding/favicon.ico",
-                            "mount_mode": "rw",
-                        },
-                        {
-                            "storage_uri": "storage://cluster/org/project/app-assets/background.png",
-                            "mount_path": "/opt/bitnami/keycloak/themes/apolo/login/resources/branding/background",
-                            "mount_mode": "rw",
-                        },
-                    ]
-                )
-            ),
+        "podLabels": {
+            "platform.apolo.us/component": "app",
+            "platform.apolo.us/preset": "cpu-medium",
+            "platform.apolo.us/org": "test-org",
+            "platform.apolo.us/project": "test-project",
         },
+        "podAnnotations": {},
         "apolo_app_id": APP_ID,
         "labels": {
             "application": "launchpad",
@@ -923,12 +899,16 @@ async def test_launchpad_values_generation__brand(apolo_client):
         "service": {"extraLabels": {"service": "keycloak"}},
         "extraEnvVars": [
             {
-                "name": "BRANDING_BACKGROUND_URL",
-                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/background",
+                "name": "BRANDING_LOGO_URL",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/logo",
             },
             {
-                "name": "BRANDING_FAVICON_TYPE",
-                "value": ".ico",
+                "name": "BRANDING_FAVICON_URL",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/favicon",
+            },
+            {
+                "name": "BRANDING_BACKGROUND_URL",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/background",
             },
         ],
         "extraVolumes": [
@@ -971,7 +951,13 @@ async def test_launchpad_values_generation__brand(apolo_client):
         "resources": expected_resources,
         "tolerations": expected_tolerations,
         "affinity": expected_affinity,
-        "podLabels": expected_pod_labels,
+        "podLabels": {
+            "platform.apolo.us/component": "app",
+            "platform.apolo.us/preset": "cpu-medium",
+            "platform.apolo.us/inject-storage": "true",
+            "platform.apolo.us/org": "test-org",
+            "platform.apolo.us/project": "test-project",
+        },
         "podAnnotations": {
             "platform.apolo.us/inject-storage": json.dumps(
                 [

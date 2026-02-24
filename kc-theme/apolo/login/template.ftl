@@ -14,28 +14,15 @@
     </#if>
     <title>${msg("loginTitle",(realm.displayName!''))}</title>
 
-    <#-- Custom favicon: try custom branding first, fallback to default -->
+    <#-- Custom favicon: use Launchpad API URL if configured, otherwise default -->
     <#if properties.favIcons?has_content>
         <#list properties.favIcons?split(' ') as favicon>
             <link rel="${favicon?split('==')[0]}" href="${url.resourcesPath}/${favicon?split('==')[1]}" />
         </#list>
+    <#elseif properties.brandingFaviconUrl?has_content>
+        <link rel="icon" href="${properties.brandingFaviconUrl}" />
     <#else>
-        <#-- Favicon is mounted with its original extension so Keycloak infers the correct Content-Type -->
-        <#assign faviconFile = "branding/favicon" + properties.brandingFaviconType!>
-        <link id="favicon" rel="icon" href="${url.resourcesPath}/${faviconFile}" />
-        <script>
-            (function() {
-                fetch("${url.resourcesPath}/${faviconFile}", {method: "HEAD"})
-                    .then(function(r) {
-                        if (!r.ok) {
-                            document.getElementById("favicon").href = "${url.resourcesPath}/img/lauchpand-logo-icon.svg";
-                        }
-                    })
-                    .catch(function() {
-                        document.getElementById("favicon").href = "${url.resourcesPath}/img/lauchpand-logo-icon.svg";
-                    });
-            })();
-        </script>
+        <link rel="icon" type="image/svg+xml" href="${url.resourcesPath}/img/lauchpand-logo-icon.svg" />
     </#if>
 
     <#if properties.styles?has_content>

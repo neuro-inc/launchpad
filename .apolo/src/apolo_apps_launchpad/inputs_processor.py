@@ -53,9 +53,8 @@ PASSWORD_CHAR_POOL = string.ascii_letters + string.digits
 PASSWORD_DEFAULT_LENGTH = 12
 PASSWORD_MIN_LENGTH = 4
 
-# Branding paths
+# Branding path on the Launchpad pod — files served from here via the API
 BRANDING_DIR_LAUNCHPAD = "/etc/launchpad/branding"
-BRANDING_DIR_KEYCLOAK = "/opt/bitnami/keycloak/themes/apolo/login/resources/branding"
 
 # Init container script for fetching the Keycloak theme.
 # When APOLO_APP_GIT_REPO + APOLO_APP_GIT_REVISION are set (injected by this
@@ -275,18 +274,8 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 }
             )
 
-        # Derive the favicon file extension from the storage path so Keycloak's static
-        # server can serve the correct Content-Type (it infers MIME type from extension).
-        # Extensionless files get application/octet-stream which browsers reject.
-        favicon_ext = ""
-        if input_.branding and input_.branding.favicon_file:
-            path = input_.branding.favicon_file.path
-            dot_idx = path.rfind(".")
-            slash_idx = path.rfind("/")
-            if dot_idx > slash_idx:  # dot is in the filename, not a parent directory
-                favicon_ext = path[dot_idx:].lower()
-
-        # Add storage integration labels to lauchpad deployment if branding files provided
+        # Mount branding files to the Launchpad pod only — the Launchpad API serves them
+        # with correct MIME types, and Keycloak references them via external URLs.
         needs_branding_mounts = False
         if input_.branding and (
             input_.branding.logo_file
@@ -299,7 +288,6 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             needs_branding_mounts = True
 
         lauchpad_file_mounts = []
-        kc_file_mounts = []
 
         if needs_branding_mounts:
             if input_.branding.logo_file:
@@ -307,12 +295,6 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     ApoloFilesMount(
                         storage_uri=t.cast(ApoloFilesPath, input_.branding.logo_file),
                         mount_path=MountPath(path=f"{BRANDING_DIR_LAUNCHPAD}/logo"),
-                    )
-                )
-                kc_file_mounts.append(
-                    ApoloFilesMount(
-                        storage_uri=t.cast(ApoloFilesPath, input_.branding.logo_file),
-                        mount_path=MountPath(path=f"{BRANDING_DIR_KEYCLOAK}/logo"),
                     )
                 )
 
@@ -325,16 +307,6 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                         mount_path=MountPath(path=f"{BRANDING_DIR_LAUNCHPAD}/favicon"),
                     )
                 )
-                kc_file_mounts.append(
-                    ApoloFilesMount(
-                        storage_uri=t.cast(
-                            ApoloFilesPath, input_.branding.favicon_file
-                        ),
-                        mount_path=MountPath(
-                            path=f"{BRANDING_DIR_KEYCLOAK}/favicon{favicon_ext}"
-                        ),
-                    )
-                )
 
             if input_.branding.background and isinstance(
                 input_.branding.background, ApoloFilesImagePath
@@ -344,14 +316,6 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                         storage_uri=t.cast(ApoloFilesPath, input_.branding.background),
                         mount_path=MountPath(
                             path=f"{BRANDING_DIR_LAUNCHPAD}/background"
-                        ),
-                    )
-                )
-                kc_file_mounts.append(
-                    ApoloFilesMount(
-                        storage_uri=t.cast(ApoloFilesPath, input_.branding.background),
-                        mount_path=MountPath(
-                            path=f"{BRANDING_DIR_KEYCLOAK}/background"
                         ),
                     )
                 )
@@ -480,43 +444,47 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             ],
         }
 
-        if kc_file_mounts:
-            if "podLabels" not in keycloak_values:
-                keycloak_values["podLabels"] = {}
-            keycloak_values["podLabels"].update(
-                gen_apolo_storage_integration_labels(
-                    client=self.client, inject_storage=True
-                )
-            )
-            keycloak_values["podAnnotations"] = (
-                append_apolo_storage_integration_annotations(
-                    current_annotations={},  # ignore annotations from lauchpad
-                    files_mounts=kc_file_mounts,
-                    client=self.client,
-                )
-            )
+        if "podAnnotations" in keycloak_values:
+            keycloak_values["podAnnotations"] = {}
+        if "podLabels" in keycloak_values:
+            pod_labels = keycloak_values["podLabels"].copy()
+            pod_labels.pop("platform.apolo.us/inject-storage", None)
+            keycloak_values["podLabels"] = pod_labels
 
+        # Pass branding asset URLs to Keycloak so the theme can reference them directly.
+        # All files are served by the Launchpad API which returns correct MIME types.
         kc_extra_env_vars = []
-        if input_.branding and input_.branding.background:
-            if isinstance(input_.branding.background, ColorPicker):
+        if input_.branding:
+            launchpad_api_base = f"https://launchpad-{app_id}-api.{domain}"
+            if input_.branding.logo_file:
                 kc_extra_env_vars.append(
                     {
-                        "name": "BRANDING_BACKGROUND_COLOR",
-                        "value": input_.branding.background.hex_code,
+                        "name": "BRANDING_LOGO_URL",
+                        "value": f"{launchpad_api_base}/branding/logo",
                     }
                 )
-            elif isinstance(input_.branding.background, ApoloFilesImagePath):
-                launchpad_api_base = f"https://launchpad-{app_id}-api.{domain}"
+            if input_.branding.favicon_file:
                 kc_extra_env_vars.append(
                     {
-                        "name": "BRANDING_BACKGROUND_URL",
-                        "value": f"{launchpad_api_base}/branding/background",
+                        "name": "BRANDING_FAVICON_URL",
+                        "value": f"{launchpad_api_base}/branding/favicon",
                     }
                 )
-        if favicon_ext:
-            kc_extra_env_vars.append(
-                {"name": "BRANDING_FAVICON_TYPE", "value": favicon_ext}
-            )
+            if input_.branding.background:
+                if isinstance(input_.branding.background, ColorPicker):
+                    kc_extra_env_vars.append(
+                        {
+                            "name": "BRANDING_BACKGROUND_COLOR",
+                            "value": input_.branding.background.hex_code,
+                        }
+                    )
+                elif isinstance(input_.branding.background, ApoloFilesImagePath):
+                    kc_extra_env_vars.append(
+                        {
+                            "name": "BRANDING_BACKGROUND_URL",
+                            "value": f"{launchpad_api_base}/branding/background",
+                        }
+                    )
         if kc_extra_env_vars:
             keycloak_values["extraEnvVars"] = kc_extra_env_vars
 

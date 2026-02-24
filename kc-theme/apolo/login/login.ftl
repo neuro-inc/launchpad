@@ -28,10 +28,12 @@
         </style>
         </#if>
     <#elseif section = "header">
-        <#-- Try to use custom logo first, fallback to default -->
-        <#assign customLogo = "${url.resourcesPath}/branding/logo">
-        <#assign defaultLogo = "${url.resourcesPath}/img/launchpad-logo.svg">
-        <img src="${customLogo}" alt="Launchpad" class="kc-logo" onerror="this.onerror=null; this.src='${defaultLogo}';" />
+        <#if properties.brandingLogoUrl?has_content>
+            <img src="${properties.brandingLogoUrl}" alt="Launchpad" class="kc-logo"
+                 onerror="this.onerror=null; this.src='${url.resourcesPath}/img/launchpad-logo.svg';" />
+        <#else>
+            <img src="${url.resourcesPath}/img/launchpad-logo.svg" alt="Launchpad" class="kc-logo" />
+        </#if>
     <#elseif section = "form">
         <div id="kc-form">
           <div id="kc-form-wrapper">
