@@ -923,6 +923,10 @@ async def test_launchpad_values_generation__brand(apolo_client):
         "service": {"extraLabels": {"service": "keycloak"}},
         "extraEnvVars": [
             {
+                "name": "BRANDING_BACKGROUND_URL",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/background",
+            },
+            {
                 "name": "BRANDING_FAVICON_TYPE",
                 "value": ".ico",
             },

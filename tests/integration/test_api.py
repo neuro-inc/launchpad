@@ -23,6 +23,7 @@ def test_config_endpoint(app_client: TestClient, config: Config) -> None:
         "branding": {
             "logo_url": f"{app_client.base_url}/branding/logo",
             "favicon_url": f"{app_client.base_url}/branding/favicon",
+            "background_url": f"{app_client.base_url}/branding/background",
             "title": "Test Title",
             "background": "12345",
         },

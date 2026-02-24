@@ -7,8 +7,18 @@
 <!-- template: login.ftl -->
 
     <#if section = "head">
-        <#-- Inject custom background color from environment variable if available -->
-        <#if properties.brandingBackgroundColor?has_content>
+        <#-- Inject custom background (image takes priority over color) -->
+        <#if properties.brandingBackgroundUrl?has_content>
+        <style>
+            body,
+            .pf-c-login,
+            .pf-v5-c-login {
+                background-image: url('${properties.brandingBackgroundUrl}') !important;
+                background-size: cover !important;
+                background-position: center !important;
+            }
+        </style>
+        <#elseif properties.brandingBackgroundColor?has_content>
         <style>
             body,
             .pf-c-login,

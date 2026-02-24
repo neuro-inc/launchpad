@@ -505,6 +505,14 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                         "value": input_.branding.background.hex_code,
                     }
                 )
+            elif isinstance(input_.branding.background, ApoloFilesImagePath):
+                launchpad_api_base = f"https://launchpad-{app_id}-api.{domain}"
+                kc_extra_env_vars.append(
+                    {
+                        "name": "BRANDING_BACKGROUND_URL",
+                        "value": f"{launchpad_api_base}/branding/background",
+                    }
+                )
         if favicon_ext:
             kc_extra_env_vars.append(
                 {"name": "BRANDING_FAVICON_TYPE", "value": favicon_ext}
