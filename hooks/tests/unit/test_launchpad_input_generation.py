@@ -921,6 +921,12 @@ async def test_launchpad_values_generation__brand(apolo_client):
             "application": "launchpad",
         },
         "service": {"extraLabels": {"service": "keycloak"}},
+        "extraEnvVars": [
+            {
+                "name": "BRANDING_FAVICON_TYPE",
+                "value": "image/x-icon",
+            },
+        ],
         "extraVolumes": [
             {
                 "name": "realm-import",

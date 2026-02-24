@@ -3,6 +3,7 @@ import os
 import random
 import string
 import typing as t
+from pathlib import Path
 
 import apolo_sdk
 from apolo_app_types import LLMInputs, TextEmbeddingsInferenceAppInputs
@@ -77,6 +78,16 @@ mkdir -p "/opt/bitnami/keycloak/themes/apolo"
 cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
 chown -R 1001:0 /opt/bitnami/keycloak/themes
 """
+
+_FAVICON_MIME_TYPES: dict[str, str] = {
+    ".ico": "image/x-icon",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
 
 
 def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
@@ -491,6 +502,15 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                         "name": "BRANDING_BACKGROUND_COLOR",
                         "value": input_.branding.background.hex_code,
                     }
+                )
+        if input_.branding and input_.branding.favicon_file:
+            suffix = input_.branding.favicon_file.path[
+                input_.branding.favicon_file.path.rfind(".") :
+            ]
+            favicon_mime = _FAVICON_MIME_TYPES.get(suffix)
+            if favicon_mime:
+                kc_extra_env_vars.append(
+                    {"name": "BRANDING_FAVICON_TYPE", "value": favicon_mime}
                 )
         if kc_extra_env_vars:
             keycloak_values["extraEnvVars"] = kc_extra_env_vars

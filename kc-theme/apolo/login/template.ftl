@@ -20,9 +20,21 @@
             <link rel="${favicon?split('==')[0]}" href="${url.resourcesPath}/${favicon?split('==')[1]}" />
         </#list>
     <#else>
-        <#-- Try custom favicon first -->
-        <link rel="icon" type="image/x-icon" href="${url.resourcesPath}/branding/favicon"
-              onerror="this.onerror=null; this.href='${url.resourcesPath}/img/lauchpand-logo-icon.svg';" />
+        <#-- brandingFaviconType is set by inputs_processor from the file extension,
+             forcing the browser to treat the file as the correct image type
+             regardless of the server returning application/octet-stream -->
+        <link id="favicon" rel="icon"
+              <#if properties.brandingFaviconType?has_content>type="${properties.brandingFaviconType}"</#if>
+              href="${url.resourcesPath}/branding/favicon" />
+        <script>
+            (function() {
+                var img = new Image();
+                img.onerror = function() {
+                    document.getElementById("favicon").href = "${url.resourcesPath}/img/lauchpand-logo-icon.svg";
+                };
+                img.src = "${url.resourcesPath}/branding/favicon";
+            })();
+        </script>
     </#if>
 
     <#if properties.styles?has_content>
