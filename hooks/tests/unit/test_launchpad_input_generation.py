@@ -904,7 +904,7 @@ async def test_launchpad_values_generation__brand(apolo_client):
                         },
                         {
                             "storage_uri": "storage://cluster/org/project/app-assets/favicon.ico",
-                            "mount_path": "/opt/bitnami/keycloak/themes/apolo/login/resources/branding/favicon",
+                            "mount_path": "/opt/bitnami/keycloak/themes/apolo/login/resources/branding/favicon.ico",
                             "mount_mode": "rw",
                         },
                         {
@@ -924,7 +924,7 @@ async def test_launchpad_values_generation__brand(apolo_client):
         "extraEnvVars": [
             {
                 "name": "BRANDING_FAVICON_TYPE",
-                "value": "image/x-icon",
+                "value": ".ico",
             },
         ],
         "extraVolumes": [

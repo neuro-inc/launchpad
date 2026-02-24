@@ -20,19 +20,20 @@
             <link rel="${favicon?split('==')[0]}" href="${url.resourcesPath}/${favicon?split('==')[1]}" />
         </#list>
     <#else>
-        <#-- brandingFaviconType is set by inputs_processor from the file extension,
-             forcing the browser to treat the file as the correct image type
-             regardless of the server returning application/octet-stream -->
-        <link id="favicon" rel="icon"
-              <#if properties.brandingFaviconType?has_content>type="${properties.brandingFaviconType}"</#if>
-              href="${url.resourcesPath}/branding/favicon" />
+        <#-- Favicon is mounted with its original extension so Keycloak infers the correct Content-Type -->
+        <#assign faviconFile = "branding/favicon" + properties.brandingFaviconType!>
+        <link id="favicon" rel="icon" href="${url.resourcesPath}/${faviconFile}" />
         <script>
             (function() {
-                var img = new Image();
-                img.onerror = function() {
-                    document.getElementById("favicon").href = "${url.resourcesPath}/img/lauchpand-logo-icon.svg";
-                };
-                img.src = "${url.resourcesPath}/branding/favicon";
+                fetch("${url.resourcesPath}/${faviconFile}", {method: "HEAD"})
+                    .then(function(r) {
+                        if (!r.ok) {
+                            document.getElementById("favicon").href = "${url.resourcesPath}/img/lauchpand-logo-icon.svg";
+                        }
+                    })
+                    .catch(function() {
+                        document.getElementById("favicon").href = "${url.resourcesPath}/img/lauchpand-logo-icon.svg";
+                    });
             })();
         </script>
     </#if>

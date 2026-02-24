@@ -3,7 +3,6 @@ import os
 import random
 import string
 import typing as t
-from pathlib import Path
 
 import apolo_sdk
 from apolo_app_types import LLMInputs, TextEmbeddingsInferenceAppInputs
@@ -78,16 +77,6 @@ mkdir -p "/opt/bitnami/keycloak/themes/apolo"
 cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
 chown -R 1001:0 /opt/bitnami/keycloak/themes
 """
-
-_FAVICON_MIME_TYPES: dict[str, str] = {
-    ".ico": "image/x-icon",
-    ".png": "image/png",
-    ".svg": "image/svg+xml",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-}
 
 
 def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
@@ -286,6 +275,17 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 }
             )
 
+        # Derive the favicon file extension from the storage path so Keycloak's static
+        # server can serve the correct Content-Type (it infers MIME type from extension).
+        # Extensionless files get application/octet-stream which browsers reject.
+        favicon_ext = ""
+        if input_.branding and input_.branding.favicon_file:
+            path = input_.branding.favicon_file.path
+            dot_idx = path.rfind(".")
+            slash_idx = path.rfind("/")
+            if dot_idx > slash_idx:  # dot is in the filename, not a parent directory
+                favicon_ext = path[dot_idx:].lower()
+
         # Add storage integration labels to lauchpad deployment if branding files provided
         needs_branding_mounts = False
         if input_.branding and (
@@ -330,7 +330,9 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                         storage_uri=t.cast(
                             ApoloFilesPath, input_.branding.favicon_file
                         ),
-                        mount_path=MountPath(path=f"{BRANDING_DIR_KEYCLOAK}/favicon"),
+                        mount_path=MountPath(
+                            path=f"{BRANDING_DIR_KEYCLOAK}/favicon{favicon_ext}"
+                        ),
                     )
                 )
 
@@ -503,15 +505,10 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                         "value": input_.branding.background.hex_code,
                     }
                 )
-        if input_.branding and input_.branding.favicon_file:
-            suffix = input_.branding.favicon_file.path[
-                input_.branding.favicon_file.path.rfind(".") :
-            ]
-            favicon_mime = _FAVICON_MIME_TYPES.get(suffix)
-            if favicon_mime:
-                kc_extra_env_vars.append(
-                    {"name": "BRANDING_FAVICON_TYPE", "value": favicon_mime}
-                )
+        if favicon_ext:
+            kc_extra_env_vars.append(
+                {"name": "BRANDING_FAVICON_TYPE", "value": favicon_ext}
+            )
         if kc_extra_env_vars:
             keycloak_values["extraEnvVars"] = kc_extra_env_vars
 
