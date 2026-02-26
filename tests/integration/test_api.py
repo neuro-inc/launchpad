@@ -21,8 +21,9 @@ def test_config_endpoint(app_client: TestClient, config: Config) -> None:
             "realm": config.keycloak.realm,
         },
         "branding": {
-            "logo_url": "https://example.com/logo.png",
-            "favicon_url": "https://example.com/favicon.png",
+            "logo_url": f"{app_client.base_url}/branding/logo",
+            "favicon_url": f"{app_client.base_url}/branding/favicon",
+            "background_url": f"{app_client.base_url}/branding/background",
             "title": "Test Title",
             "background": "12345",
         },
@@ -245,7 +246,10 @@ class TestDeleteInstance:
         )
 
         # Delete the instance
-        delete_response = app_client.delete(f"/api/v1/apps/instances/{actual_app_id}")
+        delete_response = app_client.delete(
+            f"/api/v1/apps/instances/{actual_app_id}",
+            params={"uninstall": "true"},
+        )
         assert delete_response.status_code == 204
 
         # Verify it was deleted via Apps API

@@ -873,8 +873,9 @@ class AppService:
             input=import_request.input,
         )
 
-    async def delete(self, app_id: UUID) -> None:
-        await self._apps_api_client.delete_app(app_id)
+    async def delete(self, app_id: UUID, uninstall: bool = False) -> None:
+        if uninstall:
+            await self._apps_api_client.delete_app(app_id)
         async with self._db() as db:
             async with db.begin():
                 await delete_app(db, app_id)

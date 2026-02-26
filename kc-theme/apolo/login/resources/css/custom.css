@@ -1,0 +1,510 @@
+img {
+  max-width: 100%;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  line-height: normal;
+}
+
+#root {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+/**
+ * Hide arrows for input type number
+ */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield; /* Firefox */
+}
+
+:focus {
+  outline: 0;
+}
+
+/* Main body styling - also serves as centering container since pf-v5-c-login
+   may not be present in the DOM depending on the KC template version */
+body {
+  background-color: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.pf-v5-c-login__container {
+  display: flex;
+}
+
+/* Replace brand logo on v2 theme (PatternFly brand element) */
+/* This is overridden by the img tag in login.ftl which handles custom logo with fallback */
+.pf-c-brand,
+.pf-v5-c-brand {
+  height: auto;
+  margin-bottom: 1rem;
+}
+
+/* Custom branding logo - constrain size for both default and custom logos */
+.kc-logo {
+  max-height: 100px;
+  max-width: 100%;
+  width: auto;
+  display: block;
+  margin: 0 auto 1rem;
+}
+
+/* Main container styling */
+.pf-c-login,
+.pf-v5-c-login {
+  background-color: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* Hide Keycloak header */
+#kc-header,
+.kc-header,
+.pf-v5-c-login__header {
+  display: none;
+}
+
+/* Login main container */
+.pf-c-login__main,
+.pf-v5-c-login__main {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 60px 56px;
+  max-width: 584px;
+  width: 100%;
+  margin: 2rem;
+}
+
+/* Header styling */
+.pf-c-login__main-header,
+.pf-v5-c-login__main-header {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding: 0;
+}
+
+.pf-v5-c-login__main-body {
+  padding: 0;
+}
+
+/* Title styling */
+.pf-c-title,
+.pf-v5-c-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.pf-v5-c-form-control {
+  display: contents;
+}
+
+/* Form styling */
+.pf-c-form,
+.pf-v5-c-form,
+#kc-form {
+  width: 100%;
+  gap: 0;
+}
+
+/* Form group styling */
+.pf-c-form__group,
+.pf-v5-c-form__group {
+  margin-bottom: 1.5rem;
+}
+
+/* Label styling - positioned outside/above inputs */
+.pf-c-form__label,
+.pf-v5-c-form__label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.pf-v5-c-form-control:before,
+.pf-v5-c-form-control:after {
+  content: none !important;
+}
+
+/* Input field styling */
+.pf-c-form-control,
+.pf-v5-c-form-control,
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: white;
+  color: black;
+}
+
+/* Enhanced autofill styling removal */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: black !important;
+  background-color: white !important;
+  color: black !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Firefox autofill */
+input:-moz-autofill {
+  background-color: white !important;
+  color: black !important;
+}
+
+/* Additional autofill states for all input types */
+input[type="text"]:-webkit-autofill,
+input[type="email"]:-webkit-autofill,
+input[type="password"]:-webkit-autofill,
+input[type="text"]:-webkit-autofill:hover,
+input[type="email"]:-webkit-autofill:hover,
+input[type="password"]:-webkit-autofill:hover,
+input[type="text"]:-webkit-autofill:focus,
+input[type="email"]:-webkit-autofill:focus,
+input[type="password"]:-webkit-autofill:focus,
+input[type="text"]:-webkit-autofill:active,
+input[type="email"]:-webkit-autofill:active,
+input[type="password"]:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: black !important;
+  background-color: white !important;
+  color: black !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* PatternFly form control autofill */
+.pf-c-form-control:-webkit-autofill,
+.pf-v5-c-form-control:-webkit-autofill,
+.pf-c-form-control:-webkit-autofill:hover,
+.pf-v5-c-form-control:-webkit-autofill:hover,
+.pf-c-form-control:-webkit-autofill:focus,
+.pf-v5-c-form-control:-webkit-autofill:focus,
+.pf-c-form-control:-webkit-autofill:active,
+.pf-v5-c-form-control:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: black !important;
+  background-color: white !important;
+  color: black !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+.pf-v5-c-input-group__item {
+  background: transparent;
+  border: 0;
+}
+
+input[type="text"]:hover,
+input[type="email"]:hover,
+input[type="password"]:hover {
+  background: #d4d4ec;
+}
+
+.pf-c-form-control:focus,
+.pf-v5-c-form-control:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+  outline: none;
+  border-color: #5f5fc4;
+}
+
+/* Input field error state */
+.pf-c-form-control.pf-m-error,
+.pf-v5-c-form-control.pf-m-error,
+input.pf-m-error {
+  border-color: #dc2626;
+}
+
+.pf-c-form-control.pf-m-error:focus,
+.pf-v5-c-form-control.pf-m-error:focus,
+input.pf-m-error:focus {
+  border-color: #dc2626;
+}
+
+/* Hide password toggle button */
+.pf-v5-c-input-group__item button[data-password-toggle] {
+  display: none;
+}
+
+/* Button styling */
+.pf-c-button.pf-m-primary,
+.pf-v5-c-button.pf-m-primary {
+  background-color: #5f5fc4;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  padding: 0.875rem 1.5rem;
+  width: 100%;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin-top: 1rem;
+}
+
+.pf-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary:hover {
+  background-color: #5250b8;
+}
+
+.pf-c-button.pf-m-primary:active,
+.pf-v5-c-button.pf-m-primary:active {
+  background-color: #4742a0;
+}
+
+/* Registration link styling - hidden */
+#kc-registration-container {
+  display: none;
+}
+
+#kc-registration,
+#kc-registration a {
+  color: #5f5fc4;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+#kc-registration a:hover {
+  text-decoration: underline;
+}
+
+/* Remember me checkbox styling - hidden */
+.pf-c-check,
+.pf-c-form__group .pf-c-check {
+  display: none;
+}
+
+.pf-c-check__input {
+  margin-right: 0.5rem;
+}
+
+.pf-c-check__label {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Hidden inputs */
+#id-hidden-input {
+  display: none;
+}
+
+/* Forgot password link - hidden */
+.pf-c-form__helper-text a {
+  display: none;
+}
+
+.pf-c-form__helper-text a:hover {
+  text-decoration: underline;
+}
+
+/* Error messages */
+.pf-c-form__helper-text.pf-m-error,
+.pf-v5-c-form__helper-text,
+.pf-v5-c-helper-text__item.pf-m-error,
+.kc-feedback-text,
+.instruction {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* Hide error icons */
+.pf-v5-c-form-control__icon {
+  display: none;
+}
+
+/* Keycloak specific error classes */
+.kc-feedback-text {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* Alert messages for login errors */
+.pf-c-alert,
+.alert {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background-color: #fef2f2;
+}
+
+.pf-c-alert.pf-m-danger {
+  border-color: #fecaca;
+  background-color: #fef2f2;
+}
+
+.pf-c-alert__title {
+  color: #dc2626;
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.pf-c-alert__description {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Global message display */
+#kc-content .alert {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  background-color: #fef2f2;
+  color: #dc2626;
+  font-size: 0.875rem;
+}
+
+.alert-error {
+  border-color: #fecaca;
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+.alert-warning {
+  border-color: #fed7aa;
+  background-color: #fffbeb;
+  color: #d97706;
+}
+
+.alert-success {
+  border-color: #bbf7d0;
+  background-color: #f0fdf4;
+  color: #16a34a;
+}
+
+.alert-info {
+  border-color: #bfdbfe;
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+/* Social providers section */
+.pf-c-login__main-footer,
+.pf-v5-c-login__main-footer {
+  margin-top: 2rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* Social provider buttons */
+#kc-social-providers ul,
+.pf-v5-c-login__main-footer-band ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+#kc-social-providers li,
+.pf-v5-c-login__main-footer-band li {
+  list-style: none;
+}
+
+/* Social provider links/buttons */
+#kc-social-providers a,
+.pf-v5-c-login__main-footer-band a,
+.pf-v5-c-button.pf-m-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.875rem 1.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: white;
+  color: #333;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+#kc-social-providers a:hover,
+.pf-v5-c-login__main-footer-band a:hover,
+.pf-v5-c-button.pf-m-secondary:hover {
+  background-color: #f5f5f5;
+  border-color: #d0d0d0;
+}
+
+/* Social provider icons */
+#kc-social-providers .kc-social-icon-text,
+.pf-v5-c-login__main-footer-band .kc-social-icon-text {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Constrain social provider icon container */
+.pf-v5-c-button__icon {
+  width: 20px !important;
+  height: 20px !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Constrain social provider icon SVGs and images */
+#kc-social-providers svg,
+#kc-social-providers img,
+.pf-v5-c-login__main-footer-band svg,
+.pf-v5-c-login__main-footer-band img,
+.kc-social-icon-text svg,
+.kc-social-icon-text img,
+.pf-v5-c-button__icon svg,
+.pf-v5-c-button__icon img {
+  width: 20px !important;
+  height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  flex-shrink: 0;
+}
+
+/* Title for social providers section */
+.pf-v5-c-login__main-footer-band-item {
+  text-align: center;
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}

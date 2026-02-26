@@ -43,6 +43,7 @@ class ApoloConfig:
     apps_api_url: str
     token: str
     self_domain: str
+    web_app_domain: str
     base_domain: str
     auth_middleware_name: str
 
@@ -67,10 +68,9 @@ class PostgresConfig:
 
 @dataclass(frozen=True)
 class BrandingConfig:
-    logo_url: str | None = None
-    favicon_url: str | None = None
     title: str | None = None
     background: str | None = None
+    branding_dir: Path = Path("/etc/launchpad/branding")
 
 
 @dataclass(frozen=True)
@@ -172,6 +172,7 @@ class EnvironConfigFactory:
                 apps_api_url=apps_api_url,
                 token=parsed_config["token"],
                 self_domain=self._environ["SELF_DOMAIN"],
+                web_app_domain=self._environ["WEB_DOMAIN"],
                 base_domain=self._environ["BASE_DOMAIN"],
                 auth_middleware_name=self._environ["AUTH_MIDDLEWARE_NAME"],
             )
@@ -226,9 +227,9 @@ class EnvironConfigFactory:
         )
 
     def create_branding(self) -> BrandingConfig:
+        branding_dir = self._environ.get("BRANDING_DIR", "/etc/launchpad/branding")
         return BrandingConfig(
-            logo_url=self._environ.get("BRANDING_LOGO_URL"),
-            favicon_url=self._environ.get("BRANDING_FAVICON_URL"),
             title=self._environ.get("BRANDING_TITLE"),
             background=self._environ.get("BRANDING_BACKGROUND"),
+            branding_dir=Path(branding_dir),
         )

@@ -44,6 +44,7 @@ def mock_environ() -> Iterator[None]:
             ).decode(),
             "SELF_DOMAIN": "https://self.example.com",
             "BASE_DOMAIN": "https://base.example.com",
+            "WEB_DOMAIN": "https://web.example.com",
             "AUTH_MIDDLEWARE_NAME": "test-middleware",
             "LAUNCHPAD_INITIAL_CONFIG": json.dumps(
                 {
@@ -91,6 +92,7 @@ def test_environ_config_factory_create_apolo(mock_environ: None) -> None:
         token="test-token",
         self_domain="https://self.example.com",
         base_domain="https://base.example.com",
+        web_app_domain="https://web.example.com",
         auth_middleware_name="test-middleware",
     )
 

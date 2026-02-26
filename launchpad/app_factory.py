@@ -41,7 +41,12 @@ def create_app(config: Config) -> Launchpad:
     # Configure CORS to allow frontend to access the API
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[f"https://{config.apolo.self_domain}"],
+        allow_origins=[
+            f"https://{config.apolo.self_domain}",
+            f"https://{config.apolo.self_domain}/",
+            f"https://{config.apolo.web_app_domain}",
+            f"https://{config.apolo.web_app_domain}/",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

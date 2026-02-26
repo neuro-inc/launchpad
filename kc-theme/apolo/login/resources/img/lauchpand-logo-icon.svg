@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="currentColor" aria-hidden="true">
+  <!-- green tiles -->
+  <path d="M11 0H21V10L11 0Z" fill="#00F0A5"/>
+  <path d="M11 11H21V21L11 11Z" fill="#00F0A5"/>
+  <path d="M22 0H32V10L22 0Z" fill="#00F0A5"/>
+  <path d="M22 11H32V21L22 11Z" fill="#00F0A5"/>
+  <!-- vertical bar + bottom bar (used to be gradients) -->
+  <path d="M0 0H8V32H0V0Z" fill="currentColor"/>
+  <path d="M8 24H32V32H8V24Z" fill="currentColor"/>
+</svg>

@@ -401,11 +401,12 @@ async def view_delete_instance(
     app_id: UUID,
     app_service: DepAppService,
     user: AdminAuth,
+    uninstall: bool = True,
 ) -> None:
     """
     Delete an app instance by its ID.
 
     This endpoint requires admin authentication.
-    Uninstalls the app from Apps API and removes it from the database.
+    Uninstalls the app from Apps API (if uninstall=True) and removes it from the database.
     """
-    await app_service.delete(app_id)
+    await app_service.delete(app_id, uninstall=uninstall)

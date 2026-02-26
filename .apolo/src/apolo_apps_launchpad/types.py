@@ -10,7 +10,75 @@ from apolo_app_types.protocols.common.preset import Preset
 from apolo_app_types.protocols.common.schema_extra import SchemaExtraMetadata
 from apolo_app_types.protocols.common.secrets_ import ApoloSecret, OptionalSecret
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, create_model
+
+
+ACCEPTED_IMAGE_EXTENSIONS = [
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".svg",
+    ".bmp",
+    ".tiff",
+    ".ico",
+]
+
+
+class FileFilterExtraSchema(SchemaExtraMetadata):
+    accept_ext: list[str] | None = Field(..., alias="x-accept-ext")
+    max_size_kb: float | None = Field(None, alias="x-max-size-kb")
+
+
+class ApoloFilesImagePath(ApoloFilesPath):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Apolo Files Image Path",
+            description="Specify the path within the Apolo Files application to read an image file from.",
+        ).as_json_schema_extra(),
+    )
+    path: str = Field(
+        ...,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Storage Path",
+            description="Provide the Apolo Storage path starting"
+            " with `storage:` to locate your files.",
+        ).as_json_schema_extra(),
+    )
+
+    @classmethod
+    def customize(
+        cls: type["ApoloFilesImagePath"],
+        name_suffix: str = "",
+        accept_ext: list[str] | None = None,
+        max_size_kb: float | None = None,
+    ) -> type["ApoloFilesImagePath"]:
+        extra = FileFilterExtraSchema(
+            title="Storage Path",
+            description="Provide the Apolo Storage path starting"
+            " with `storage:` to locate your files.",
+            accept_ext=accept_ext,
+            max_size_kb=max_size_kb,
+        ).as_json_schema_extra()
+
+        return create_model(
+            f"{cls.__name__}{name_suffix}",
+            __base__=cls,
+            path=(str, Field(..., json_schema_extra=extra)),
+        )
+
+
+class ColorPicker(AbstractAppFieldType):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Color",
+            description=("Select a color"),
+        ).as_json_schema_extra(),
+    )
+    hex_code: str
 
 
 class PreConfiguredLLMModels(enum.StrEnum):
@@ -340,7 +408,28 @@ class LaunchpadAdminApi(AbstractAppFieldType):
     api_url: ServiceAPI[HttpApi]
 
 
-class BrandingConfig(AbstractAppFieldType):
+LogoFileApoloFilesImagePath = ApoloFilesImagePath.customize(
+    name_suffix="Logo",
+    accept_ext=ACCEPTED_IMAGE_EXTENSIONS,
+    max_size_kb=5e03,  # 5 MB
+)
+
+
+FavIconFileApoloFilesImagePath = ApoloFilesImagePath.customize(
+    name_suffix="FavIcon",
+    accept_ext=ACCEPTED_IMAGE_EXTENSIONS,
+    max_size_kb=500,
+)
+
+
+BackgroundApoloFilesImagePath = ApoloFilesImagePath.customize(
+    name_suffix="Background",
+    accept_ext=ACCEPTED_IMAGE_EXTENSIONS,
+    max_size_kb=1e04,  # 10 MB
+)
+
+
+class LauchpadBrandingConfig(AbstractAppFieldType):
     model_config = ConfigDict(
         protected_namespaces=(),
         json_schema_extra=SchemaExtraMetadata(
@@ -349,16 +438,43 @@ class BrandingConfig(AbstractAppFieldType):
         ).as_json_schema_extra(),
         is_advanced_field=True,
     )
-    logo_url: str | None = None
-    favicon_url: str | None = None
-    title: str | None = None
-    background: str | None = None
+    logo_file: LogoFileApoloFilesImagePath | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Logo Image",
+            description="Use custom logo image from Apolo Storage for Lauchpad.",
+        ).as_json_schema_extra(),
+    )
+    favicon_file: FavIconFileApoloFilesImagePath | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Favicon Image",
+            description="Use custom favicon image from Apolo Storage for Lauchpad.",
+        ).as_json_schema_extra(),
+    )
+    title: str | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Launchpad Title",
+            description="Set custom title for the Launchpad.",
+        ).as_json_schema_extra(),
+    )
+    background: ColorPicker | BackgroundApoloFilesImagePath | None = Field(
+        None,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Background",
+            description=(
+                "Customize background for the Launchpad"
+                "(set color or use an image from Apolo Storage)."
+            ),
+        ).as_json_schema_extra(),
+    )
 
 
 class LaunchpadAppInputs(AppInputs):
     launchpad_web_app_config: LaunchpadWebAppConfig
     apps_config: AppsConfig
-    branding: BrandingConfig | None = None
+    branding: LauchpadBrandingConfig | None = None
 
 
 class LaunchpadAppOutputs(AppOutputs):
