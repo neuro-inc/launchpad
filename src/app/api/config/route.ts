@@ -16,11 +16,15 @@ export async function GET() {
 
     // Extract branding data and convert snake_case to camelCase
     const { branding } = response;
+
     const config: LaunchpadConfig = {
       logoUrl: branding?.logo_url ?? DEFAULT_CONFIG.logoUrl,
       faviconUrl: branding?.favicon_url ?? DEFAULT_CONFIG.faviconUrl,
       title: branding?.title ?? DEFAULT_CONFIG.title,
-      background: branding?.background ?? DEFAULT_CONFIG.background,
+      background:
+        branding?.background_url ??
+        branding?.background ??
+        DEFAULT_CONFIG.background,
     };
 
     return NextResponse.json(config);

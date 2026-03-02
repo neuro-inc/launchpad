@@ -2,7 +2,7 @@ export type LaunchpadConfig = {
   logoUrl: string | null;
   faviconUrl: string | null;
   title: string | null;
-  background: string | null; // Hex color
+  background: string | null; // Color value or image URL
 };
 
 // Backend response type with snake_case
@@ -12,6 +12,7 @@ export type LaunchpadConfigResponse = {
     favicon_url: string | null;
     title: string | null;
     background: string | null;
+    background_url: string | null;
   };
 };
 

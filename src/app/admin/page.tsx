@@ -1,8 +1,9 @@
 import { Metadata } from 'next';
 
 import { InstalledApp, Template, WithPagination } from '@typings';
+import { getConfig } from '@actions/server.actions';
 import { formatToCamelCase } from '@utils/formatters';
-import { request } from '@utils/helpers';
+import { getBrighterColor, request } from '@utils/helpers';
 
 import { Layout } from '@components/Ui';
 
@@ -16,6 +17,8 @@ export const metadata: Metadata = {
 };
 
 export default async function Page() {
+  const config = await getConfig();
+
   // Fetch initial data server-side
   // Note: Authentication and admin access are handled by middleware.ts
   let templates: Template[] = [];
@@ -41,10 +44,20 @@ export default async function Page() {
     console.error('Error fetching admin data:', error);
   }
 
+  const surfaceColors = {
+    headerBgColor: getBrighterColor(config.background, 72),
+    rowBgColor: getBrighterColor(config.background, 92),
+    rowAltBgColor: getBrighterColor(config.background, 82),
+  };
+
   return (
     <Layout>
       <Layout.Container className="py-8">
-        <AdminPage initialTemplates={templates} initialInstances={instances} />
+        <AdminPage
+          initialTemplates={templates}
+          initialInstances={instances}
+          surfaceColors={surfaceColors}
+        />
       </Layout.Container>
     </Layout>
   );

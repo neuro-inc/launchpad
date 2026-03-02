@@ -26,7 +26,10 @@ export const getConfig = cache(async (): Promise<LaunchpadConfig> => {
       logoUrl: branding?.logo_url ?? DEFAULT_CONFIG.logoUrl,
       faviconUrl: branding?.favicon_url ?? DEFAULT_CONFIG.faviconUrl,
       title: branding?.title ?? DEFAULT_CONFIG.title,
-      background: branding?.background ?? DEFAULT_CONFIG.background,
+      background:
+        branding?.background_url ??
+        branding?.background ??
+        DEFAULT_CONFIG.background,
     };
   } catch (error) {
     console.error('Error fetching config, using defaults:', error);

@@ -21,16 +21,22 @@ import {
   TemplatesTable,
   TemplateViewEditModal,
 } from '@components/Admin';
-import { Button, Modal, ModalRef } from '@components/Shared';
+import { Button, Field, Modal, ModalRef } from '@components/Shared';
 
 type AdminPageProps = {
   initialTemplates: Template[];
   initialInstances: InstalledApp[];
+  surfaceColors?: {
+    headerBgColor?: string;
+    rowBgColor?: string;
+    rowAltBgColor?: string;
+  };
 };
 
 export const AdminPage: React.FC<AdminPageProps> = ({
   initialTemplates,
   initialInstances,
+  surfaceColors,
 }) => {
   const router = useRouter();
 
@@ -51,6 +57,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [instanceToDelete, setInstanceToDelete] = useState<InstalledApp | null>(
     null,
   );
+  const [uninstallApp, setUninstallApp] = useState(true);
 
   const handleRefresh = () => {
     router.refresh();
@@ -161,16 +168,32 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     }
 
     try {
-      await request(`/api/v1/apps/instances/${appId}`, {
-        method: 'DELETE',
-      });
+      const uninstallValue = uninstallApp ? 'True' : 'False';
+
+      await request(
+        `/api/v1/apps/instances/${appId}?uninstall=${uninstallValue}`,
+        {
+          method: 'DELETE',
+        },
+      );
 
       toast.success('App instance deleted successfully');
       setInstanceToDelete(null);
+      setUninstallApp(true);
       router.refresh();
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete app instance');
     }
+  };
+
+  const handleDeleteInstanceClick = (instance: InstalledApp) => {
+    setUninstallApp(true);
+    setInstanceToDelete(instance);
+  };
+
+  const handleCancelDeleteInstance = () => {
+    setInstanceToDelete(null);
+    setUninstallApp(true);
   };
 
   return (
@@ -214,6 +237,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           onView={handleViewTemplate}
           onEdit={handleEditTemplate}
           onDelete={setTemplateToDelete}
+          headerBgColor={surfaceColors?.headerBgColor}
+          rowBgColor={surfaceColors?.rowBgColor}
+          rowAltBgColor={surfaceColors?.rowAltBgColor}
         />
       </div>
 
@@ -257,7 +283,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
         <InstancesTable
           instances={initialInstances}
-          onDelete={setInstanceToDelete}
+          onDelete={handleDeleteInstanceClick}
+          headerBgColor={surfaceColors?.headerBgColor}
+          rowBgColor={surfaceColors?.rowBgColor}
+          rowAltBgColor={surfaceColors?.rowAltBgColor}
         />
       </div>
 
@@ -287,8 +316,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           cancelLabel="Cancel"
           variant="danger"
           onConfirm={confirmDeleteInstance}
-          onCancel={() => setInstanceToDelete(null)}
-        />
+          onCancel={handleCancelDeleteInstance}
+        >
+          <Field.Checkbox
+            name="uninstallApp"
+            checked={uninstallApp}
+            onChange={(event) => setUninstallApp(event.target.checked)}
+            className="text-neural-06"
+          >
+            uninstall app
+          </Field.Checkbox>
+        </ConfirmationModal>
       )}
     </>
   );

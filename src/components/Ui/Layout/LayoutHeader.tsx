@@ -32,16 +32,22 @@ export const LayoutHeader: React.FC<Props> = async ({ className }) => {
       <Layout.Container className="flex items-center justify-between py-9">
         <Link href="/" className="transition-opacity hover:opacity-75">
           {config.logoUrl ? (
-            <div className="flex items-center">
-              <Image
-                src={config.logoUrl}
-                alt="Logo"
-                height={40}
-                width={0}
-                className="h-10 w-auto object-contain"
-                style={{ width: 'auto', height: '40px' }}
-                priority
-              />
+            <div className="flex items-center gap-4">
+              <div className="flex items-center">
+                <Image
+                  src={config.logoUrl}
+                  alt="Logo"
+                  height={40}
+                  width={0}
+                  className="h-10 w-auto object-contain"
+                  style={{ width: 'auto', height: '40px' }}
+                  priority
+                />
+              </div>
+
+              <Render if={isAuthenticated && Boolean(config.title)}>
+                <p className="text-h6">{config.title}</p>
+              </Render>
             </div>
           ) : (
             <Theme.Logo className="h-10 w-auto text-black" />

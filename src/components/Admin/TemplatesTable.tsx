@@ -7,11 +7,24 @@ import { Template } from '@typings';
 
 import { Button, Icon, Table } from '@components/Shared';
 
+const tableHeaders = [
+  'Logo',
+  'Name',
+  'Template',
+  'Description',
+  'Tags',
+  'Flags',
+  'Actions',
+];
+
 type TemplatesTableProps = {
   templates: Template[];
   onView?: (template: Template) => void;
   onEdit?: (template: Template) => void;
   onDelete?: (template: Template) => void;
+  rowBgColor?: string;
+  rowAltBgColor?: string;
+  headerBgColor?: string;
 };
 
 export const TemplatesTable: React.FC<TemplatesTableProps> = ({
@@ -19,7 +32,14 @@ export const TemplatesTable: React.FC<TemplatesTableProps> = ({
   onView,
   onEdit,
   onDelete,
+  rowBgColor,
+  rowAltBgColor,
+  headerBgColor,
 }) => {
+  const headerStyle = headerBgColor
+    ? { backgroundColor: headerBgColor }
+    : undefined;
+
   if (templates.length === 0) {
     return (
       <div className="py-8 text-center text-neutral-500">
@@ -33,40 +53,36 @@ export const TemplatesTable: React.FC<TemplatesTableProps> = ({
       <Table className="w-full grid-cols-[auto_1.5fr_1fr_2fr_1fr_0.8fr_1.5fr]">
         <Table.Header>
           <Table.Row>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Logo
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Name
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Template
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Description
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Tags
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Flags
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Actions
-            </Table.Head>
+            {tableHeaders.map((header) => (
+              <Table.Head
+                key={header}
+                className="border-b border-neutral-300 bg-neutral-100 text-h6"
+                style={headerStyle}
+              >
+                {header}
+              </Table.Head>
+            ))}
           </Table.Row>
         </Table.Header>
+
         <Table.Body>
           {templates.map((template, index) => {
             const isEven = index % 2 === 0;
             const cellBg = isEven ? 'bg-white' : 'bg-neutral-50';
+            const rowBackgroundColor =
+              (isEven ? rowBgColor : rowAltBgColor) || undefined;
+            const rowStyle = rowBackgroundColor
+              ? { backgroundColor: rowBackgroundColor }
+              : undefined;
 
             return (
               <Table.Row key={template.id}>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   {template.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={template.logo}
                       alt={template.verboseName}
@@ -82,6 +98,7 @@ export const TemplatesTable: React.FC<TemplatesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="text-body font-medium">
                     {template.verboseName}
@@ -92,6 +109,7 @@ export const TemplatesTable: React.FC<TemplatesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="text-body">{template.templateName}</div>
                   <div className="text-caption text-neutral-500">
@@ -100,6 +118,7 @@ export const TemplatesTable: React.FC<TemplatesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="text-body text-neutral-700">
                     {template.descriptionShort || '-'}
@@ -107,6 +126,7 @@ export const TemplatesTable: React.FC<TemplatesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="flex flex-wrap gap-1">
                     {template.tags.length > 0 ? (
@@ -126,6 +146,7 @@ export const TemplatesTable: React.FC<TemplatesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="flex flex-col gap-1">
                     {template.isInternal && (
@@ -142,6 +163,7 @@ export const TemplatesTable: React.FC<TemplatesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="flex flex-wrap gap-1">
                     <Button

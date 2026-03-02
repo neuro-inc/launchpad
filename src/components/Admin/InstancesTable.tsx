@@ -7,14 +7,30 @@ import { InstalledApp } from '@typings';
 
 import { Button, Icon, Table } from '@components/Shared';
 
+const tableHeaders = [
+  'App Name',
+  'Launchpad Name',
+  'Template',
+  'User ID',
+  'URL',
+  'Flags',
+  'Actions',
+];
+
 type InstancesTableProps = {
   instances: InstalledApp[];
   onDelete?: (instance: InstalledApp) => void;
+  rowBgColor?: string;
+  rowAltBgColor?: string;
+  headerBgColor?: string;
 };
 
 export const InstancesTable: React.FC<InstancesTableProps> = ({
   instances,
   onDelete,
+  rowBgColor,
+  rowAltBgColor,
+  headerBgColor,
 }) => {
   if (instances.length === 0) {
     return (
@@ -29,38 +45,35 @@ export const InstancesTable: React.FC<InstancesTableProps> = ({
       <Table className="w-full grid-cols-[2fr_1.5fr_1.2fr_1fr_0.8fr_1fr_1.2fr]">
         <Table.Header>
           <Table.Row>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              App Name
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Launchpad Name
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Template
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              User ID
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              URL
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Flags
-            </Table.Head>
-            <Table.Head className="border-b border-neutral-300 bg-neutral-100 text-h6">
-              Actions
-            </Table.Head>
+            {tableHeaders.map((header) => (
+              <Table.Head
+                key={header}
+                className="border-b border-neutral-300 bg-neutral-100 text-h6"
+                style={
+                  headerBgColor ? { backgroundColor: headerBgColor } : undefined
+                }
+              >
+                {header}
+              </Table.Head>
+            ))}
           </Table.Row>
         </Table.Header>
+
         <Table.Body>
           {instances.map((instance, index) => {
             const isEven = index % 2 === 0;
             const cellBg = isEven ? 'bg-white' : 'bg-neutral-50';
+            const rowBackgroundColor =
+              (isEven ? rowBgColor : rowAltBgColor) || undefined;
+            const rowStyle = rowBackgroundColor
+              ? { backgroundColor: rowBackgroundColor }
+              : undefined;
 
             return (
               <Table.Row key={instance.id || `${instance.appId}-${index}`}>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="text-body font-medium">
                     {instance.appName}
@@ -71,16 +84,19 @@ export const InstancesTable: React.FC<InstancesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="text-body">{instance.launchpadAppName}</div>
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="text-body">{instance.templateName}</div>
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="text-body text-neutral-700">
                     {instance.userId || '-'}
@@ -88,6 +104,7 @@ export const InstancesTable: React.FC<InstancesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   {instance.url ? (
                     <a
@@ -104,6 +121,7 @@ export const InstancesTable: React.FC<InstancesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <div className="flex flex-col gap-1">
                     {instance.isInternal && (
@@ -120,6 +138,7 @@ export const InstancesTable: React.FC<InstancesTableProps> = ({
                 </Table.Cell>
                 <Table.Cell
                   className={clsx('border-b border-neutral-200', cellBg)}
+                  style={rowStyle}
                 >
                   <Button
                     variant="ghost"
