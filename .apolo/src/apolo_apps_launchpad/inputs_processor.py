@@ -488,7 +488,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         if kc_extra_env_vars:
             keycloak_values["extraEnvVars"] = kc_extra_env_vars
 
-        if self.client.config.api_url == "https://api.dev.apolo.us/api/v1":
+        if str(self.client.config.api_url) == "https://api.dev.apolo.us/api/v1":
             values["clientSubdomain"] = True
         return {
             **values,
