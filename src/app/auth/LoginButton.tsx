@@ -52,7 +52,10 @@ export const LoginButton: React.FC = () => {
        * Continue regardless of error
        */
     } finally {
-      setIsLoading(false);
+      // Reset loading state after a delay to allow signIn to process
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 1000);
     }
   };
 

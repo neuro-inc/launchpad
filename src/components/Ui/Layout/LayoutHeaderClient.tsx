@@ -35,7 +35,7 @@ export const LayoutHeaderClient: React.FC<Props> = ({ className }) => {
               src={config.logoUrl}
               alt="Logo"
               height={40}
-              width={0}
+              width={40}
               className="h-10 w-auto object-contain"
               style={{ width: 'auto', height: '40px' }}
               priority

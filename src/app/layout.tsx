@@ -89,7 +89,12 @@ export default async function RootLayout({ children }: Props) {
   const backgroundStyle = getBackgroundStyle(config.background);
 
   return (
-    <html lang="en" className="bg-background" style={backgroundStyle}>
+    <html
+      lang="en"
+      className="bg-background"
+      style={backgroundStyle}
+      suppressHydrationWarning
+    >
       <head>
         {config.faviconUrl && (
           <>
@@ -100,7 +105,11 @@ export default async function RootLayout({ children }: Props) {
           </>
         )}
       </head>
-      <body className={inter.className} style={backgroundStyle}>
+      <body
+        className={inter.className}
+        style={backgroundStyle}
+        suppressHydrationWarning
+      >
         <NuqsAdapter>{children}</NuqsAdapter>
         <ToastContainer />
       </body>
