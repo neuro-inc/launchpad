@@ -10,6 +10,15 @@ image:
 replicas: 1
 port: 8080
 
+# Resource limits and requests for the launchpad deployment
+resources:
+#  limits:
+#    cpu: "2"
+#    memory: "2Gi"
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+
 # passed to lauchpad API deployment
 extraEnv: {}
 
