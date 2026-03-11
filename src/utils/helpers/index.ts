@@ -1,4 +1,6 @@
 export * from './checkIsComponentWithIconChild';
+export * from './getBackgroundStyle';
+export * from './getBrighterColor';
 export * from './getNameInitials';
 export * from './getSiteUrl';
 export * from './getTokenCookieName';

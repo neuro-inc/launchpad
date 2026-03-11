@@ -43,7 +43,6 @@ export const Button = forwardRef<HTMLButtonElement, Props>(
       ? className
       : cn(buttonVariants({ variant, withIcon: isWithIcon, className }), {
           'pointer-events-none': loading || disabled,
-          '!text-transparent': loading,
         });
 
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -89,7 +88,7 @@ export const Button = forwardRef<HTMLButtonElement, Props>(
       >
         {isLoading && (
           <ChaseSpinner
-            className="absolute inset-0 m-auto transition-all"
+            className="absolute right-4 transition-all"
             color={getLoaderColor()}
           />
         )}

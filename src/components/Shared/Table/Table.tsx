@@ -12,7 +12,12 @@ type Props = {
 };
 
 export const Table = ({ className, children }: Props) => (
-  <table className={cn('grid border-collapse rounded-lg bg-white', className)}>
+  <table
+    className={cn(
+      'grid border-collapse overflow-hidden rounded-lg bg-white',
+      className,
+    )}
+  >
     {children}
   </table>
 );

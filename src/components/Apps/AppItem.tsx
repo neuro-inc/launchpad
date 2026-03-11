@@ -11,14 +11,19 @@ import { AppTags } from './AppTags';
 
 type Props = {
   app: App;
+  tileStyle?: React.CSSProperties;
 };
 
 export const AppItem: React.FC<Props> = ({
   app: { title, descriptionShort, logo, tags, launchpadAppName },
   app,
+  tileStyle,
 }) => {
   return (
-    <div className="peer relative z-20 flex min-h-[240px] max-w-full flex-1 flex-col gap-4 overflow-hidden rounded-xl border border-transparent bg-white p-6 transition-colors hover:border-neural-02">
+    <div
+      className="peer relative z-20 flex min-h-[240px] max-w-full flex-1 flex-col gap-4 overflow-hidden rounded-xl border border-transparent bg-white p-6 transition-colors hover:border-neural-02"
+      style={tileStyle}
+    >
       <div className="relative flex min-w-0 gap-3">
         <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neural-02 bg-white">
           <Render if={logo}>

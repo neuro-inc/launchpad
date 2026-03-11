@@ -1,11 +1,13 @@
 import { App, WithPagination } from '@typings';
+import { getConfig } from '@actions/server.actions';
 import { formatToCamelCase } from '@utils/formatters';
-import { request } from '@utils/helpers';
+import { getBrighterColor, request } from '@utils/helpers';
 
 import { AppItem } from '@components/Apps/AppItem';
 import { Layout } from '@components/Ui';
 
 export const AppsPage: React.FC = async () => {
+  const config = await getConfig();
   let apps: App[] = [];
 
   try {
@@ -18,8 +20,14 @@ export const AppsPage: React.FC = async () => {
      */
   }
 
+  const appTileColor = getBrighterColor(config.background, 80);
+
+  const appTileStyle = appTileColor
+    ? ({ backgroundColor: appTileColor } as React.CSSProperties)
+    : undefined;
+
   const makeApp = (app: App) => {
-    return <AppItem key={app.title} app={app} />;
+    return <AppItem key={app.title} app={app} tileStyle={appTileStyle} />;
   };
 
   return (

@@ -9,7 +9,7 @@ type Props = {
   children: React.ReactNode;
 };
 
-export const Layout = ({ className, children }: Props) => {
+export const Layout = async ({ className, children }: Props) => {
   return (
     <LayoutWrapper className="flex flex-1 flex-col">
       <LayoutHeader />

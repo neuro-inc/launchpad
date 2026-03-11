@@ -16,6 +16,7 @@ type ConfirmationModalProps = {
   onConfirm: () => void;
   onCancel: () => void;
   variant?: 'danger' | 'warning' | 'default';
+  children?: React.ReactNode;
 };
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -28,6 +29,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   onConfirm,
   onCancel,
   variant = 'default',
+  children,
 }) => {
   const modalRef = useRef<ModalRef>(null);
 
@@ -64,6 +66,8 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             <p className="text-body text-error-dark">{warningMessage}</p>
           </div>
         )}
+
+        {children}
       </div>
 
       <Modal.Footer>
