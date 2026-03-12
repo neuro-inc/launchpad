@@ -439,7 +439,7 @@
         },
         "llm_preset": {
           "$ref": "#/$defs/Preset",
-          "x-description": "Preset to use for the LLM model. Minimal resources: 1 CPU cores, 2 GiB memory.",
+          "x-description": "Preset to use for the LLM model. Minimal resources: 1 CPU cores, 2 GiB memory, 1 GPU with 12 GiB memory.",
           "x-title": "LLM Preset"
         },
         "ui_preset": {

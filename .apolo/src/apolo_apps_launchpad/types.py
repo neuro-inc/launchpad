@@ -202,7 +202,7 @@ class LLMConfig(AbstractAppFieldType):
         json_schema_extra=SchemaExtraMetadata(
             title="LLM Preset",
             description="Preset to use for the LLM model. "
-            "Minimal resources: 1 CPU cores, 2 GiB memory.",
+            "Minimal resources: 1 CPU cores, 2 GiB memory, 1 GPU with 12 GiB memory.",
         ).as_json_schema_extra(),
     )
     ui_preset: Preset = Field(
