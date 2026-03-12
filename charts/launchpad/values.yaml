@@ -10,19 +10,11 @@ image:
 replicas: 1
 port: 8080
 
-# Resource limits and requests for the launchpad deployment
-resources:
-#  limits:
-#    cpu: "2"
-#    memory: "2Gi"
-  requests:
-    cpu: "500m"
-    memory: "512Mi"
-
 # passed to lauchpad API deployment
 extraEnv: {}
 
 domain: "apps.dev.apolo.us"
+clientSubdomain: false  # when true, client is served at {name}.launchpad.{domain} instead of {name}.{domain}
 netlifyDomain: "launchpad-web-ui-dev-apolo-us.netlify.app"
 netlifySecretName: launchpad-secrets
 
