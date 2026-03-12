@@ -29,21 +29,25 @@ export const LayoutHeaderClient: React.FC<Props> = ({ className }) => {
   return (
     <header className={className}>
       <Layout.Container className="flex items-center justify-between py-9">
-        {config.logoUrl ? (
-          <div className="flex items-center">
+        <div className="flex items-center gap-3">
+          {config.logoUrl ? (
             <Image
               src={config.logoUrl}
               alt="Logo"
               height={40}
-              width={0}
+              width={40}
               className="h-10 w-auto object-contain"
               style={{ width: 'auto', height: '40px' }}
               priority
             />
-          </div>
-        ) : (
-          <Theme.Logo className="h-10 w-auto text-black" />
-        )}
+          ) : (
+            <Theme.Logo className="h-10 w-auto text-black" />
+          )}
+
+          <Render if={!!config.title}>
+            <p className="text-h6">{config.title}</p>
+          </Render>
+        </div>
 
         <Render if={isAuthenticated}>
           <UserPanel user={data?.user} isAdmin={userIsAdmin} />
