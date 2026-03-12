@@ -439,12 +439,12 @@
         },
         "llm_preset": {
           "$ref": "#/$defs/Preset",
-          "x-description": "Preset to use for the LLM model.",
+          "x-description": "Preset to use for the LLM model. Minimal resources: 1 CPU cores, 2 GiB memory.",
           "x-title": "LLM Preset"
         },
         "ui_preset": {
           "$ref": "#/$defs/Preset",
-          "x-description": "Preset to use for OpenWebUI.",
+          "x-description": "Preset to use for OpenWebUI. Minimal resources: 0.5 CPU cores, 1 GiB memory.",
           "x-title": "OpenWebUI Preset"
         }
       },
@@ -546,7 +546,7 @@
       "properties": {
         "preset": {
           "$ref": "#/$defs/Preset",
-          "x-description": "Preset to use for the Launchpad application.",
+          "x-description": "Preset to use for the Launchpad application. Minimal resources: 0.5 CPU cores, 1 GiB memory.",
           "x-title": "Launchpad Preset"
         }
       },
@@ -618,7 +618,7 @@
       "properties": {
         "preset": {
           "$ref": "#/$defs/Preset",
-          "x-description": "Preset to use for the Postgres database.",
+          "x-description": "Preset to use for the Postgres database. Minimal resources: 0.5 CPU cores, 1 GiB memory.",
           "x-title": "Postgres Preset"
         },
         "replicas": {
@@ -737,7 +737,7 @@
       "properties": {
         "preset": {
           "$ref": "#/$defs/Preset",
-          "x-description": "Preset to use for the text embeddings service.",
+          "x-description": "Preset to use for the text embeddings service. Minimal resources: 1 CPU cores, 2 GiB memory.",
           "x-title": "Text Embeddings Preset"
         },
         "model": {
