@@ -880,7 +880,7 @@ class AppService:
             async with db.begin():
                 await delete_app(db, app_id)
 
-    async def delete_template_by_id(self, template_id: UUID) -> None:
+    async def delete_template_by_id(self, template_id: UUID, uninstall: bool) -> None:
         """
         Delete a template by its ID.
 
@@ -920,17 +920,20 @@ class AppService:
 
         # Uninstall each app instance via Apps API and delete from DB
         for app in installed_apps:
-            logger.info(
-                f"Uninstalling app instance {app.app_id} "
-                f"(launchpad_app_name={app.launchpad_app_name})"
-            )
-            try:
-                await self._apps_api_client.delete_app(app.app_id)
-            except AppsApiError as e:
-                logger.warning(
-                    f"Failed to uninstall app {app.app_id} from Apps API: {e}. "
-                    "Continuing with deletion from database."
+            if uninstall:
+                logger.info(
+                    f"Uninstalling app instance {app.app_id} "
+                    f"(launchpad_app_name={app.launchpad_app_name})"
                 )
+                try:
+                    await self._apps_api_client.delete_app(app.app_id)
+                except AppsApiError as e:
+                    logger.warning(
+                        f"Failed to uninstall app {app.app_id} from Apps API: {e}. "
+                        "Continuing with deletion from database."
+                    )
+            else:
+                logger.info(f"Skip uninstallation of app instance {app.app_id}")
 
             # Delete from database
             async with self._db() as db:

@@ -42,7 +42,11 @@ platform.apolo.us/component: app
 {{- end }}
 
 {{- define "launchpad.domain" -}}
+{{- if .Values.clientSubdomain }}
+{{- printf "%s.launchpad.%s" (include "launchpad.name" .) .Values.domain }}
+{{- else }}
 {{- printf "%s.%s" (include "launchpad.name" .) .Values.domain }}
+{{- end }}
 {{- end }}
 
 {{- define "launchpad.apiDomain" -}}
@@ -58,7 +62,11 @@ platform.apolo.us/component: app
 {{- end }}
 
 {{- define "launchpad.domainWithProtocol" -}}
+{{- if .Values.clientSubdomain }}
+{{- printf "https://%s.launchpad.%s" (include "launchpad.name" .) .Values.domain }}
+{{- else }}
 {{- printf "https://%s.%s" (include "launchpad.name" .) .Values.domain }}
+{{- end }}
 {{- end }}
 
 {{- define "launchpad.admin-secret" -}}

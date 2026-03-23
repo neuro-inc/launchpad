@@ -386,14 +386,16 @@ async def view_delete_template(
     template_id: UUID,
     app_service: DepAppService,
     user: AdminAuth,
+    uninstall: bool = True,
 ) -> None:
     """
     Delete a template by its ID.
 
     This endpoint requires admin authentication.
     Deletes the template from the AppTemplate table.
+    Uninstalls app from Apps API if uninstall=True.
     """
-    await app_service.delete_template_by_id(template_id)
+    await app_service.delete_template_by_id(template_id, uninstall)
 
 
 @apps_router.delete("/instances/{app_id}", status_code=HTTP_204_NO_CONTENT)

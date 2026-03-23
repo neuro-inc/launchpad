@@ -14,6 +14,7 @@ port: 8080
 extraEnv: {}
 
 domain: "apps.dev.apolo.us"
+clientSubdomain: false  # when true, client is served at {name}.launchpad.{domain} instead of {name}.{domain}
 netlifyDomain: "launchpad-web-ui-dev-apolo-us.netlify.app"
 netlifySecretName: launchpad-secrets
 

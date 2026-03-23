@@ -201,14 +201,16 @@ class LLMConfig(AbstractAppFieldType):
         ...,
         json_schema_extra=SchemaExtraMetadata(
             title="LLM Preset",
-            description="Preset to use for the LLM model.",
+            description="Preset to use for the LLM model. "
+            "Minimal resources: 1 CPU cores, 2 GiB memory, 1 GPU with 12 GiB memory.",
         ).as_json_schema_extra(),
     )
     ui_preset: Preset = Field(
         ...,
         json_schema_extra=SchemaExtraMetadata(
             title="OpenWebUI Preset",
-            description="Preset to use for OpenWebUI.",
+            description="Preset to use for OpenWebUI. "
+            "Minimal resources: 0.5 CPU cores, 1 GiB memory.",
         ).as_json_schema_extra(),
     )
 
@@ -225,7 +227,8 @@ class PostgresConfig(AbstractAppFieldType):
         ...,
         json_schema_extra=SchemaExtraMetadata(
             title="Postgres Preset",
-            description="Preset to use for the Postgres database.",
+            description="Preset to use for the Postgres database. "
+            "Minimal resources: 0.5 CPU cores, 1 GiB memory.",
         ).as_json_schema_extra(),
     )
     replicas: int = Field(
@@ -279,7 +282,8 @@ class TextEmbeddingsConfig(AbstractAppFieldType):
         ...,
         json_schema_extra=SchemaExtraMetadata(
             title="Text Embeddings Preset",
-            description="Preset to use for the text embeddings service.",
+            description="Preset to use for the text embeddings service. "
+            "Minimal resources: 1 CPU cores, 2 GiB memory.",
         ).as_json_schema_extra(),
     )
     model: PreConfiguredEmbeddingsModels | HuggingFaceEmbeddingsModel = Field(
@@ -341,7 +345,8 @@ class LaunchpadWebAppConfig(AbstractAppFieldType):
         ...,
         json_schema_extra=SchemaExtraMetadata(
             title="Launchpad Preset",
-            description="Preset to use for the Launchpad application.",
+            description="Preset to use for the Launchpad application. "
+            "Minimal resources: 0.5 CPU cores, 1 GiB memory.",
         ).as_json_schema_extra(),
     )
 
