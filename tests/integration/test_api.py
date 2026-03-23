@@ -410,3 +410,51 @@ class TestDeleteTemplate:
             item["launchpad_app_name"] for item in pool_response.json()["items"]
         }
         assert "multi-instance" not in pool_apps
+
+    def test_delete_template_with_single_instance_no_uninstall(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        # Import a template
+        import_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "cascade-test",
+                "template_version": "1.0.0",
+                "verbose_name": "Cascade Test",
+            },
+        )
+        assert import_response.status_code == 200
+        template_data = import_response.json()
+        template_id = template_data["id"]
+
+        # Install an app from this template
+        install_response = app_client.post("/api/v1/apps/cascade-test")
+        assert install_response.status_code == 200
+
+        # Verify instance exists
+        instances_response = app_client.get("/api/v1/apps/instances")
+        instances = instances_response.json()["items"]
+        non_internal = [item for item in instances if not item["is_internal"]]
+        assert len(non_internal) == 1
+        assert non_internal[0]["launchpad_app_name"] == "cascade-test"
+
+        # Delete the template
+        delete_response = app_client.delete(
+            f"/api/v1/apps/templates/{template_id}", params={"uninstall": False}
+        )
+        assert delete_response.status_code == 204
+
+        # Verify Apps API delete was called for the instance
+        mock_apps_api_client.delete_app.assert_not_called()
+
+        # Verify both template and instance are gone
+        pool_response = app_client.get("/api/v1/apps")
+        pool_apps = {
+            item["launchpad_app_name"] for item in pool_response.json()["items"]
+        }
+        assert "cascade-test" not in pool_apps
+
+        instances_response = app_client.get("/api/v1/apps/instances")
+        instances = instances_response.json()["items"]
+        non_internal = [item for item in instances if not item["is_internal"]]
+        assert len(non_internal) == 0
