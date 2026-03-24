@@ -57,6 +57,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [instanceToDelete, setInstanceToDelete] = useState<InstalledApp | null>(
     null,
   );
+  const [uninstallTemplate, setUninstallTemplate] = useState(true);
   const [uninstallApp, setUninstallApp] = useState(true);
 
   const handleRefresh = () => {
@@ -145,12 +146,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
     if (!templateToDelete) return;
 
     try {
-      await request(`/api/v1/apps/templates/${templateToDelete.id}`, {
-        method: 'DELETE',
-      });
+      const uninstallValue = uninstallTemplate ? 'True' : 'False';
+
+      await request(
+        `/api/v1/apps/templates/${templateToDelete.id}?uninstall=${uninstallValue}`,
+        {
+          method: 'DELETE',
+        },
+      );
 
       toast.success('Template deleted successfully');
       setTemplateToDelete(null);
+      setUninstallTemplate(true);
       router.refresh();
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete template');
@@ -189,6 +196,16 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const handleDeleteInstanceClick = (instance: InstalledApp) => {
     setUninstallApp(true);
     setInstanceToDelete(instance);
+  };
+
+  const handleDeleteTemplateClick = (template: Template) => {
+    setUninstallTemplate(true);
+    setTemplateToDelete(template);
+  };
+
+  const handleCancelDeleteTemplate = () => {
+    setTemplateToDelete(null);
+    setUninstallTemplate(true);
   };
 
   const handleCancelDeleteInstance = () => {
@@ -236,7 +253,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           templates={initialTemplates}
           onView={handleViewTemplate}
           onEdit={handleEditTemplate}
-          onDelete={setTemplateToDelete}
+          onDelete={handleDeleteTemplateClick}
           headerBgColor={surfaceColors?.headerBgColor}
           rowBgColor={surfaceColors?.rowBgColor}
           rowAltBgColor={surfaceColors?.rowAltBgColor}
@@ -296,13 +313,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           isOpen
           title="Delete Template"
           message={`Are you sure you want to delete the template "${templateToDelete.verboseName || templateToDelete.name}"?`}
-          warningMessage="WARNING: All app instances using this template will be deleted and uninstalled. This action cannot be undone."
+          warningMessage={`WARNING: All app instances using this template will be deleted${uninstallTemplate ? ' and uninstalled' : ''}. This action cannot be undone.`}
           confirmLabel="Delete Template"
           cancelLabel="Cancel"
           variant="danger"
           onConfirm={confirmDeleteTemplate}
-          onCancel={() => setTemplateToDelete(null)}
-        />
+          onCancel={handleCancelDeleteTemplate}
+        >
+          <Field.Checkbox
+            name="uninstallTemplate"
+            checked={uninstallTemplate}
+            onChange={(event) => setUninstallTemplate(event.target.checked)}
+            className="text-neural-06"
+          >
+            uninstall related apps
+          </Field.Checkbox>
+        </ConfirmationModal>
       )}
 
       {/* Delete Instance Confirmation Modal */}
