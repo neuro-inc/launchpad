@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 
 import { getConfig } from '@actions/server.actions';
+import { cn } from '@utils';
 import { getBackgroundStyle } from '@utils/helpers';
 
 import { ToastContainer } from '@components/Ui/Toast';
@@ -106,7 +107,7 @@ export default async function RootLayout({ children }: Props) {
         )}
       </head>
       <body
-        className={inter.className}
+        className={cn(inter.className, 'overflow-hidden')}
         style={backgroundStyle}
         suppressHydrationWarning
       >

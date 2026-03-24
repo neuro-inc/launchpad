@@ -13,7 +13,10 @@ export const LayoutWrapper: React.FC<Props> = ({
 }) => {
   return (
     <div
-      className={cn('flex size-full min-h-full flex-1 flex-col', className)}
+      className={cn(
+        'flex size-full min-h-full flex-1 flex-col overflow-auto',
+        className,
+      )}
       style={style}
     >
       {children}
