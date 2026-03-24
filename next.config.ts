@@ -1,8 +1,6 @@
 import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 
-import { IS_LOCAL } from './src/constants/app.constants';
-
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
@@ -16,26 +14,6 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
-  },
-  async rewrites() {
-    if (!IS_LOCAL) {
-      return [];
-    }
-
-    // In local development, proxy API requests to avoid CORS issues
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || '';
-    const url = new URL(siteUrl);
-    const parts = url.hostname.split('.');
-    parts[0] = `${parts[0]}-api`;
-    url.hostname = parts.join('.');
-    const apiUrl = url.toString().replace(/\/$/, '');
-
-    return [
-      {
-        source: '/api/v1/:path*',
-        destination: `${apiUrl}/api/v1/:path*`,
-      },
-    ];
   },
 } satisfies NextConfig;
 
