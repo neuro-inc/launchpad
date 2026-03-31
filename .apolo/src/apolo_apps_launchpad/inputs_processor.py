@@ -488,8 +488,10 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         if kc_extra_env_vars:
             keycloak_values["extraEnvVars"] = kc_extra_env_vars
 
-        if str(self.client.config.api_url) == "https://api.dev.apolo.us/api/v1":
+        cluster_config = self.client.config.clusters[self.client.config.cluster_name]
+        if cluster_config.apps.launchpad_use_subdomain:
             values["clientSubdomain"] = True
+
         return {
             **values,
             "image": {"tag": os.getenv("APP_IMAGE_TAG", "latest")},
