@@ -488,7 +488,9 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         if kc_extra_env_vars:
             keycloak_values["extraEnvVars"] = kc_extra_env_vars
 
-        cluster_config = self.client.config.clusters[self.client.config.cluster_name]
+        cluster_config = await self.client._clusters.get_cluster(
+            self.client.config.cluster_name
+        )
         if cluster_config.apps.launchpad_use_subdomain:
             values["clientSubdomain"] = True
 
