@@ -2,6 +2,7 @@ import json
 import os
 
 import pytest
+from apolo_sdk import Cluster
 
 from apolo_app_types import ApoloSecret, HuggingFaceToken
 from apolo_app_types.protocols.common import Preset
@@ -1002,3 +1003,29 @@ async def test_launchpad_values_generation__brand(apolo_client):
     }
 
     assert helm_params == expected_helm_values
+
+
+async def test_launchpad_values_generation__subdomain(
+    apolo_client, apolo_cluster_config: Cluster
+):
+    object.__setattr__(
+        apolo_cluster_config.apps, "launchpad_use_subdomain", True
+    )  # monkeypatch-like
+
+    processor = LaunchpadInputsProcessor(client=apolo_client)
+    helm_params = await processor.gen_extra_values(
+        input_=LaunchpadAppInputs(
+            launchpad_web_app_config=LaunchpadWebAppConfig(
+                preset=Preset(name="cpu-medium"),
+            ),
+            apps_config=AppsConfig(
+                quick_start_config=NoQuickStartConfig(no_quickstart=True),
+            ),
+        ),
+        app_name="launchpad-app",
+        namespace="default-namespace",
+        app_secrets_name=APP_SECRETS_NAME,
+        app_id=APP_ID,
+    )
+
+    assert helm_params["clientSubdomain"] is True
