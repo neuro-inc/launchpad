@@ -142,6 +142,8 @@ const ModalComponent = forwardRef<ModalRef, Props>(
   },
 );
 
+ModalComponent.displayName = 'Modal';
+
 export const Modal = Object.assign(ModalComponent, {
   Content: ModalContent,
   Header: ModalHeader,

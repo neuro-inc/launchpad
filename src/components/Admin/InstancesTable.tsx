@@ -143,10 +143,10 @@ export const InstancesTable: React.FC<InstancesTableProps> = ({
                   <Button
                     variant="ghost"
                     onClick={() => onDelete?.(instance)}
-                    className="px-2 py-1 text-caption text-error hover:bg-error-subtle"
+                    className="h-auto justify-start gap-1 px-0 py-1 text-caption text-error hover:bg-error-subtle"
                     title="Delete instance"
                   >
-                    <Icon icon={faTrash} className="mr-1" />
+                    <Icon size="lg" icon={faTrash} />
                     Delete
                   </Button>
                 </Table.Cell>

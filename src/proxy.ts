@@ -4,7 +4,7 @@ import { getToken } from 'next-auth/jwt';
 import { NEXTAUTH_SECRET, PATH } from '@constants';
 import { getTokenCookieName } from '@utils/helpers/getTokenCookieName';
 
-export const middleware = async (request: NextRequest) => {
+export const proxy = async (request: NextRequest) => {
   const { headers } = request;
   const { pathname } = request.nextUrl;
 
@@ -22,9 +22,6 @@ export const middleware = async (request: NextRequest) => {
 
   requestHeaders.set('x-origin', origin);
 
-  /**
-   * Skip authentication checks for logout endpoint
-   */
   if (pathname === '/api/auth/logout') {
     return NextResponse.next({
       request: {
@@ -54,9 +51,7 @@ export const middleware = async (request: NextRequest) => {
     return NextResponse.redirect(url);
   }
 
-  // Check admin access for admin routes
   if (token && isAdminRoute) {
-    // Check client_roles first (what backend uses), then fall back to realm_roles
     const clientRoles = (token.client_roles as string[]) || [];
     const realmRoles = (token.realm_roles as string[]) || [];
     const roles = clientRoles.length > 0 ? clientRoles : realmRoles;
@@ -78,13 +73,6 @@ export const middleware = async (request: NextRequest) => {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes);
-     * - _next/static (static files);
-     * - _next/image (image optimization files);
-     * - favicon.ico, sitemap.xml, robots.txt (metadata files);
-     */
     '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
   ],
 };
