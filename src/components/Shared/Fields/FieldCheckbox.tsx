@@ -4,7 +4,12 @@ import clsx from 'clsx';
 
 import { cn, getSlots } from '@utils';
 
-import { Field, Icon, Slot } from '@components';
+import { Icon } from '../Icon';
+import { Slot } from '../Slot';
+
+import { FieldContainer } from './FieldContainer';
+import { FieldError } from './FieldError';
+import { FieldNote } from './FieldNote';
 
 type Props = React.InputHTMLAttributes<HTMLInputElement> & {
   label?: string;
@@ -30,7 +35,7 @@ export const FieldCheckbox = forwardRef<HTMLInputElement, Props>(
     const { content, ...slots } = getSlots<'note' | 'error'>(children);
 
     return (
-      <Field.Container className={containerClassName}>
+      <FieldContainer className={containerClassName}>
         <label
           htmlFor={name}
           className={cn(
@@ -57,12 +62,12 @@ export const FieldCheckbox = forwardRef<HTMLInputElement, Props>(
           <span>{content}</span>
         </label>
         <Slot slot={slots.error}>
-          <Field.Error>{error}</Field.Error>
+          <FieldError>{error}</FieldError>
         </Slot>
         <Slot slot={slots.note}>
-          <Field.Note>{note}</Field.Note>
+          <FieldNote>{note}</FieldNote>
         </Slot>
-      </Field.Container>
+      </FieldContainer>
     );
   },
 );

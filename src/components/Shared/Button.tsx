@@ -8,7 +8,8 @@ import { cn } from '@utils';
 import { checkIsComponentWithIconChild } from '@utils/helpers';
 import { buttonVariants } from '@utils/variants';
 
-import { ChaseSpinner, Icon } from '@components';
+import { ChaseSpinner } from './ChaseSpinner';
+import { Icon } from './Icon';
 
 type Props = VariantProps<typeof buttonVariants> &
   ButtonHTMLAttributes<HTMLButtonElement> & {

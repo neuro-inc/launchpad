@@ -6,7 +6,13 @@ import { FieldProps } from '@typings';
 import { getSlots } from '@utils';
 import { fieldVariants } from '@utils/variants';
 
-import { Field, Icon, Render, Slot } from '@components';
+import { Icon } from '../../Icon';
+import { Render } from '../../Render';
+import { Slot } from '../../Slot';
+import { FieldContainer } from '../FieldContainer';
+import { FieldError } from '../FieldError';
+import { FieldLabel } from '../FieldLabel';
+import { FieldNote } from '../FieldNote';
 
 type Props = Omit<SelectHTMLAttributes<HTMLSelectElement>, 'size'> &
   FieldProps & {
@@ -54,7 +60,7 @@ export const FieldSelect = React.forwardRef<HTMLSelectElement, Props>(
     };
 
     return (
-      <Field.Container className={containerClassName}>
+      <FieldContainer className={containerClassName}>
         <select
           {...props}
           className={fieldVariants({
@@ -71,14 +77,14 @@ export const FieldSelect = React.forwardRef<HTMLSelectElement, Props>(
         >
           {getSelectItems()}
         </select>
-        <Field.Label
+        <FieldLabel
           variant={variant}
           for={id}
           required={required}
           disabled={disabled}
         >
           {label}
-        </Field.Label>
+        </FieldLabel>
         <Icon
           icon={faCaretDown}
           className={clsx(
@@ -88,15 +94,15 @@ export const FieldSelect = React.forwardRef<HTMLSelectElement, Props>(
         />
         <Render if={showError}>
           <Slot slot={slots.error}>
-            <Field.Error>{error}</Field.Error>
+            <FieldError>{error}</FieldError>
           </Slot>
         </Render>
         <Render if={!error}>
           <Slot slot={slots.note}>
-            <Field.Note>{note}</Field.Note>
+            <FieldNote>{note}</FieldNote>
           </Slot>
         </Render>
-      </Field.Container>
+      </FieldContainer>
     );
   },
 );

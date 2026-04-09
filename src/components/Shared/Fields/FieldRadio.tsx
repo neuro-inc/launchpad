@@ -3,7 +3,12 @@ import React, { InputHTMLAttributes, useId } from 'react';
 import { FieldProps } from '@typings';
 import { cn, getSlots } from '@utils';
 
-import { Field, Render, Slot } from '@components';
+import { Render } from '../Render';
+import { Slot } from '../Slot';
+
+import { FieldContainer } from './FieldContainer';
+import { FieldError } from './FieldError';
+import { FieldNote } from './FieldNote';
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> &
   FieldProps & {
@@ -30,7 +35,7 @@ export const FieldRadio = React.forwardRef<HTMLInputElement, Props>(
     const { content, ...slots } = getSlots<'note' | 'error'>(children);
 
     return (
-      <Field.Container className={containerClassName}>
+      <FieldContainer className={containerClassName}>
         <label
           htmlFor={id}
           className={cn(
@@ -53,16 +58,16 @@ export const FieldRadio = React.forwardRef<HTMLInputElement, Props>(
 
         <Render if={!!error}>
           <Slot slot={slots.error}>
-            <Field.Error>{error}</Field.Error>
+            <FieldError>{error}</FieldError>
           </Slot>
         </Render>
 
         <Render if={!error}>
           <Slot slot={slots.note}>
-            <Field.Note>{note}</Field.Note>
+            <FieldNote>{note}</FieldNote>
           </Slot>
         </Render>
-      </Field.Container>
+      </FieldContainer>
     );
   },
 );
