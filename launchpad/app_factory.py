@@ -22,6 +22,51 @@ class AppConfig(TypedDict):
     redirect_slashes: bool
 
 
+def _get_allowed_cors_origins(config: Config) -> list[str]:
+    """Generate list of allowed CORS origins from Apolo config.
+
+    Includes:
+    - Frontend domain (self_domain) - where the app is hosted
+    - Web app domain (web_app_domain) - alternative UI domain
+    - API domain ({self_domain}-api.{base_domain}) - the API endpoint
+
+    Args:
+        config: Launchpad configuration
+
+    Returns:
+        List of HTTPS origins allowed to access the API
+    """
+    origins: list[str] = []
+
+    # Frontend domain (the app itself)
+    origins.extend(
+        [
+            f"https://{config.apolo.self_domain}",
+            f"https://{config.apolo.self_domain}/",
+        ]
+    )
+
+    # Web app domain (UI/web dashboard)
+    if config.apolo.web_app_domain:
+        origins.extend(
+            [
+                f"https://{config.apolo.web_app_domain}",
+                f"https://{config.apolo.web_app_domain}/",
+            ]
+        )
+
+    # API domain (self_domain-api.base_domain)
+    api_domain = f"{config.apolo.self_domain}-api.{config.apolo.base_domain}"
+    origins.extend(
+        [
+            f"https://{api_domain}",
+            f"https://{api_domain}/",
+        ]
+    )
+
+    return origins
+
+
 def create_app(config: Config) -> Launchpad:
     # keep db up to date by running migrations
     sync_db(dsn=config.postgres.dsn)
@@ -39,14 +84,10 @@ def create_app(config: Config) -> Launchpad:
     app.config = config
 
     # Configure CORS to allow frontend to access the API
+    allowed_origins = _get_allowed_cors_origins(config)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            f"https://{config.apolo.self_domain}",
-            f"https://{config.apolo.self_domain}/",
-            f"https://{config.apolo.web_app_domain}",
-            f"https://{config.apolo.web_app_domain}/",
-        ],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
