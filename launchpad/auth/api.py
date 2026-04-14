@@ -14,7 +14,7 @@ from launchpad.auth import (
     HEADER_X_FORWARDED_HOST,
 )
 from launchpad.auth.dependencies import token_from_string
-from launchpad.auth.oauth import DepOauth, OauthError
+from launchpad.auth.oauth import COOKIE_TOKEN, DepOauth, OauthError
 from launchpad.db.dependencies import Db
 from launchpad.errors import Forbidden, Unauthorized
 
@@ -97,7 +97,34 @@ async def get_token(
             # Success case
             response.raise_for_status()
             token_data = await response.json()
-            return JSONResponse(content=token_data)
+
+            # Return token payload and set access token cookie for browser-based
+            # logins so the frontend receives the cookie immediately after
+            # login. Domain must match how Oauth constructs cookie domain.
+            json_response = JSONResponse(content=token_data)
+            try:
+                base_domain = request.app.config.apolo.base_domain
+            except Exception:
+                base_domain = ""
+
+            if base_domain:
+                cookie_domain = f".{base_domain}"
+                json_response.set_cookie(
+                    key=COOKIE_TOKEN,
+                    value=token_data.get("access_token", ""),
+                    domain=cookie_domain,
+                    secure=True,
+                    httponly=True,
+                )
+                logger.info(
+                    f"Direct login successful for user '{token_request.username}'. Cookie '{COOKIE_TOKEN}' set with domain='{cookie_domain}'"
+                )
+            else:
+                logger.warning(
+                    f"Direct login successful for user '{token_request.username}', but no base_domain configured. Cookie not set."
+                )
+
+            return json_response
 
     except (Unauthorized, HTTPException):
         # Re-raise our custom exceptions
