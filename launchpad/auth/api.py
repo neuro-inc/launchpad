@@ -98,20 +98,33 @@ async def get_token(
             response.raise_for_status()
             token_data = await response.json()
 
+            # Extract access token - fail if missing or empty
+            access_token = token_data.get("access_token")
+            if not access_token:
+                logger.error("Keycloak response missing or empty access_token")
+                raise HTTPException(
+                    status_code=502,
+                    detail="Invalid authentication service response",
+                )
+
             # Return token payload and set access token cookie for browser-based
             # logins so the frontend receives the cookie immediately after
             # login. Domain must match how Oauth constructs cookie domain.
             json_response = JSONResponse(content=token_data)
             try:
                 base_domain = request.app.config.apolo.base_domain
-            except Exception:
-                base_domain = ""
+            except AttributeError as e:
+                logger.error(f"Configuration error: missing required apolo config: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Server configuration error",
+                ) from e
 
             if base_domain:
                 cookie_domain = f".{base_domain}"
                 json_response.set_cookie(
                     key=COOKIE_TOKEN,
-                    value=token_data.get("access_token", ""),
+                    value=access_token,
                     domain=cookie_domain,
                     secure=True,
                     httponly=True,
@@ -121,7 +134,7 @@ async def get_token(
                 )
             else:
                 logger.warning(
-                    f"Direct login successful for user '{token_request.username}', but no base_domain configured. Cookie not set."
+                    f"Direct login successful for user '{token_request.username}', but base_domain is empty. Cookie not set."
                 )
 
             return json_response

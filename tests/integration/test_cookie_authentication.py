@@ -4,7 +4,7 @@ Tests the end-to-end flow with actual HTTP requests to verify
 that cookies are properly set and sent across the authentication lifecycle.
 """
 
-from typing import Any, Coroutine
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -25,9 +25,7 @@ class TestCookieAuthenticationFlow:
         """Test that POST /token sets launchpad-token cookie after successful authentication"""
 
         # Mock Keycloak response
-        async def mock_post(
-            *args: Any, **kwargs: Any
-        ) -> Coroutine[Any, Any, MagicMock]:
+        def mock_post(*args: Any, **kwargs: Any) -> MagicMock:
             response = MagicMock()
             response.status = 200
             response.json = AsyncMock(
@@ -73,9 +71,7 @@ class TestCookieAuthenticationFlow:
     ) -> None:
         """Test that POST /token cookie includes the correct domain from config"""
 
-        async def mock_post(
-            *args: Any, **kwargs: Any
-        ) -> Coroutine[Any, Any, MagicMock]:
+        def mock_post(*args: Any, **kwargs: Any) -> MagicMock:
             response = MagicMock()
             response.status = 200
             response.json = AsyncMock(
@@ -109,9 +105,7 @@ class TestCookieAuthenticationFlow:
     ) -> None:
         """Test that failed authentication does not set cookie"""
 
-        async def mock_post(
-            *args: Any, **kwargs: Any
-        ) -> Coroutine[Any, Any, MagicMock]:
+        def mock_post(*args: Any, **kwargs: Any) -> MagicMock:
             response = MagicMock()
             response.status = 401
             response.json = AsyncMock(
@@ -202,9 +196,7 @@ class TestCookieSecurityAttributes:
     ) -> None:
         """Test that all cookies have the secure flag (HTTPS only)"""
 
-        async def mock_post(
-            *args: Any, **kwargs: Any
-        ) -> Coroutine[Any, Any, MagicMock]:
+        def mock_post(*args: Any, **kwargs: Any) -> MagicMock:
             response = MagicMock()
             response.status = 200
             response.json = AsyncMock(
@@ -236,9 +228,7 @@ class TestCookieSecurityAttributes:
     ) -> None:
         """Test that all cookies have the httponly flag (not accessible to JavaScript)"""
 
-        async def mock_post(
-            *args: Any, **kwargs: Any
-        ) -> Coroutine[Any, Any, MagicMock]:
+        def mock_post(*args: Any, **kwargs: Any) -> MagicMock:
             response = MagicMock()
             response.status = 200
             response.json = AsyncMock(
@@ -274,9 +264,7 @@ class TestCookieNameAndContent:
     ) -> None:
         """Test that cookie name is exactly 'launchpad-token'"""
 
-        async def mock_post(
-            *args: Any, **kwargs: Any
-        ) -> Coroutine[Any, Any, MagicMock]:
+        def mock_post(*args: Any, **kwargs: Any) -> MagicMock:
             response = MagicMock()
             response.status = 200
             response.json = AsyncMock(
@@ -309,9 +297,7 @@ class TestCookieNameAndContent:
         """Test that cookie value contains the JWT access token"""
         test_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test"
 
-        async def mock_post(
-            *args: Any, **kwargs: Any
-        ) -> Coroutine[Any, Any, MagicMock]:
+        def mock_post(*args: Any, **kwargs: Any) -> MagicMock:
             response = MagicMock()
             response.status = 200
             response.json = AsyncMock(
