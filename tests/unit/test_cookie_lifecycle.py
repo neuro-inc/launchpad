@@ -111,7 +111,7 @@ class TestCookieLogging:
         mock_token = "test-jwt-token-12345"
         mock_request.cookies = {COOKIE_TOKEN: mock_token}
 
-        with caplog.at_level(logging.DEBUG):
+        with caplog.at_level(logging.DEBUG, logger="launchpad.auth.oauth"):
             token = oauth_instance.get_token_from_cookie(mock_request)
 
         assert token == mock_token
@@ -128,7 +128,7 @@ class TestCookieLogging:
 
         mock_request.cookies = {}
 
-        with caplog.at_level(logging.DEBUG):
+        with caplog.at_level(logging.DEBUG, logger="launchpad.auth.oauth"):
             token = oauth_instance.get_token_from_cookie(mock_request)
 
         assert token is None

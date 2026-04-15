@@ -81,7 +81,6 @@ class Oauth:
 
         response = RedirectResponse(url=auth_url)
         self._set_cookie(response, key=COOKIE_CODE_VERIFIER, value=code_verifier)
-        logger.debug(f"OAuth redirect initiated: redirecting to Keycloak auth endpoint")
         return response
 
     def get_token_from_cookie(self, request: Request) -> str | None:
@@ -98,9 +97,6 @@ class Oauth:
             state = request.query_params["state"]
             code_verifier = request.cookies["code_verifier"]
         except KeyError:
-            logger.warning(
-                "OAuth callback failed: missing required params (code, state, or code_verifier cookie)"
-            )
             raise OauthError("missing required params")
 
         original_url = base64.urlsafe_b64decode(state.encode()).decode()
@@ -116,19 +112,14 @@ class Oauth:
 
         response = RedirectResponse(original_url)
         self._set_cookie(response, key=COOKIE_TOKEN, value=access_token)
-        logger.info(
-            f"OAuth callback completed successfully. Cookie '{COOKIE_TOKEN}' set for redirect to {original_url}"
-        )
         return response
 
     def logout(self, response: Response) -> None:
         """Cleanup of cookies on logout"""
         for cookie in (COOKIE_TOKEN, COOKIE_CODE_VERIFIER):
-            logger.debug(f"Deleting cookie '{cookie}' on logout")
             response.delete_cookie(
                 key=cookie, domain=self._cookie_domain, secure=True, httponly=True
             )
-        logger.info("User logged out: all authentication cookies deleted")
 
     @backoff.on_exception(
         wait_gen=backoff.expo,
@@ -140,18 +131,14 @@ class Oauth:
                 response.raise_for_status()
             except ClientResponseError as e:
                 if e.status >= 500:
-                    logger.error(
-                        f"Keycloak server error (status {e.status}) during token fetch"
-                    )
                     raise Retry()
-                logger.error(f"Failed to fetch token: HTTP {e.status}")
+                logger.error("unable to fetch token")
                 raise OauthError()
             try:
                 token_data = await response.json()
-                logger.debug("Token successfully fetched from Keycloak")
                 return typing.cast(str, token_data["access_token"])
             except (TypeError, ValueError, KeyError):
-                logger.error("Failed to extract access_token from Keycloak response")
+                logger.error("unable to extract access token")
                 raise OauthError()
 
     def _set_cookie(
@@ -166,9 +153,6 @@ class Oauth:
             domain=self._cookie_domain,
             secure=True,
             httponly=True,
-        )
-        logger.debug(
-            f"Cookie set: key='{key}', domain='{self._cookie_domain}', secure=True, httponly=True"
         )
 
 
