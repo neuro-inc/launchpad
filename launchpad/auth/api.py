@@ -98,7 +98,13 @@ async def get_token(
             response.raise_for_status()
             token_data = await response.json()
 
-            # Extract access token - fail if missing or empty
+            if not isinstance(token_data, dict):
+                logger.error("Keycloak token response is not a JSON object")
+                raise HTTPException(
+                    status_code=502,
+                    detail="Invalid authentication service response",
+                )
+
             access_token = token_data.get("access_token")
             if not access_token:
                 logger.error("Keycloak response missing or empty access_token")
@@ -107,34 +113,34 @@ async def get_token(
                     detail="Invalid authentication service response",
                 )
 
-            # Return token payload and set access token cookie for browser-based
-            # logins so the frontend receives the cookie immediately after
-            # login. Domain must match how Oauth constructs cookie domain.
             json_response = JSONResponse(content=token_data)
-            try:
-                base_domain = request.app.config.apolo.base_domain
-            except AttributeError as e:
-                logger.error(f"Configuration error: missing required apolo config: {e}")
+
+            apolo_cfg = getattr(request.app.config, "apolo", None)
+            if apolo_cfg is None:
+                logger.error("Configuration error: missing required 'apolo' config")
                 raise HTTPException(
                     status_code=500,
                     detail="Server configuration error",
-                ) from e
+                )
 
+            base_domain = getattr(apolo_cfg, "base_domain", None)
             if base_domain:
                 cookie_domain = f".{base_domain}"
                 json_response.set_cookie(
                     key=COOKIE_TOKEN,
-                    value=access_token,
+                    value=str(access_token),
                     domain=cookie_domain,
                     secure=True,
                     httponly=True,
                 )
                 logger.info(
-                    f"Direct login successful for user '{token_request.username}'. Cookie '{COOKIE_TOKEN}' set with domain='{cookie_domain}'"
+                    f"Direct login successful for user '{token_request.username}'. "
+                    f"Cookie '{COOKIE_TOKEN}' set with domain='{cookie_domain}'"
                 )
             else:
                 logger.warning(
-                    f"Direct login successful for user '{token_request.username}', but base_domain is empty. Cookie not set."
+                    f"Direct login successful for user '{token_request.username}', "
+                    "but base_domain is empty. Cookie not set."
                 )
 
             return json_response
@@ -236,11 +242,10 @@ async def view_post_authorize(
         logger.info(f"permission denied for user {email}")
         raise Forbidden()
 
-    response_headers = {
-        # pass headers to a downstream app via traefik auth middleware
-        HEADER_X_AUTH_REQUEST_EMAIL: email,
-        HEADER_X_AUTH_REQUEST_USERNAME: username,
-        HEADER_X_AUTH_REQUEST_GROUPS: groups_str,
+    response_headers: dict[str, str] = {
+        HEADER_X_AUTH_REQUEST_EMAIL: str(email),
+        HEADER_X_AUTH_REQUEST_USERNAME: str(username),
+        HEADER_X_AUTH_REQUEST_GROUPS: str(groups_str),
     }
 
     logger.debug(f"Returning auth headers: {response_headers}")
@@ -267,3 +272,60 @@ async def callback(
 async def logout(response: Response, oauth: DepOauth) -> Response:
     oauth.logout(response)
     return Response()
+
+
+class SetCookieRequest(BaseModel):
+    access_token: str
+
+
+@auth_router.post("/cookie", status_code=200)
+async def set_auth_cookie(
+    request: Request,
+    cookie_request: SetCookieRequest,
+    oauth: DepOauth,
+) -> Response:
+    """
+    Set the launchpad-token cookie after receiving a valid access token.
+    This endpoint is useful for frontend apps (e.g., NextAuth.js) that already
+    have a token and need it set as a cookie for downstream applications.
+    """
+    # Validate the token by decoding it
+    try:
+        await token_from_string(
+            http=request.app.http,
+            keycloak_config=request.app.config.keycloak,
+            access_token=cookie_request.access_token,
+        )
+    except Unauthorized:
+        logger.warning("Invalid token provided for cookie setting")
+        raise Unauthorized("Invalid token")
+
+    # Get the cookie domain from config
+    apolo_cfg = getattr(request.app.config, "apolo", None)
+    if apolo_cfg is None:
+        logger.error("Configuration error: missing required 'apolo' config")
+        raise HTTPException(
+            status_code=500,
+            detail="Server configuration error",
+        )
+
+    base_domain = getattr(apolo_cfg, "base_domain", None)
+    if not base_domain:
+        logger.warning("base_domain is empty. Cookie not set.")
+        raise HTTPException(
+            status_code=500,
+            detail="Server configuration error: base_domain not configured",
+        )
+
+    cookie_domain = f".{base_domain}"
+
+    response = Response(status_code=200)
+    response.set_cookie(
+        key=COOKIE_TOKEN,
+        value=cookie_request.access_token,
+        domain=cookie_domain,
+        secure=True,
+        httponly=True,
+    )
+    logger.info(f"launchpad-token cookie set successfully for domain '{cookie_domain}'")
+    return response

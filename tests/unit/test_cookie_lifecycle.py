@@ -157,6 +157,229 @@ class TestCookieCreationOnDirectLogin:
         assert "httponly" in set_cookie_header.lower()
         assert ".example.com" in set_cookie_header
 
+    def test_post_token_endpoint_sets_cookie_with_domain(
+        self,
+        oauth_instance: Oauth,
+    ) -> None:
+        """Test that _set_cookie properly sets cookie attributes via OAuth instance"""
+        from starlette.responses import Response
+
+        response = Response()
+        test_token = "test-jwt-token-12345"
+
+        # Use the oauth instance to set the cookie
+        oauth_instance._set_cookie(response, key=COOKIE_TOKEN, value=test_token)
+
+        # Verify set-cookie header is in response
+        set_cookie_header = response.headers.get("set-cookie", "")
+        assert COOKIE_TOKEN in set_cookie_header
+        assert test_token in set_cookie_header
+        assert "secure" in set_cookie_header.lower()
+        assert "httponly" in set_cookie_header.lower()
+        assert ".example.com" in set_cookie_header
+
+
+class TestSetAuthCookieEndpoint:
+    """Tests for POST /auth/cookie endpoint"""
+
+    def test_set_auth_cookie_with_valid_token(
+        self,
+    ) -> None:
+        """Test that POST /auth/cookie sets the launchpad-token cookie"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from fastapi import FastAPI
+        from starlette.testclient import TestClient
+
+        from launchpad.auth.api import auth_router
+        from launchpad.auth.oauth import Oauth
+        from launchpad.config import KeycloakConfig
+
+        # Create mock app config
+        mock_keycloak_config = KeycloakConfig(
+            url=URL("http://mock-keycloak.com"),
+            realm="mock-realm",
+            client_id="mock-client-id",
+        )
+
+        mock_apolo_config = MagicMock()
+        mock_apolo_config.base_domain = "example.com"
+
+        # Create mock decoded token response
+        mock_decoded_token: dict[str, object] = {
+            "email": "test@example.com",
+            "preferred_username": "testuser",
+            "realm_access": {"roles": ["user"]},
+        }
+
+        # Create mock JWT validation function
+        async def mock_token_from_string(
+            **kwargs: dict[str, object],
+        ) -> dict[str, object]:
+            return mock_decoded_token
+
+        # Create a minimal FastAPI app for testing
+        app = FastAPI()
+        app.config = MagicMock()  # type: ignore[attr-defined]
+        app.config.keycloak = mock_keycloak_config  # type: ignore[attr-defined]
+        app.config.apolo = mock_apolo_config  # type: ignore[attr-defined]
+        app.http = MagicMock()  # type: ignore[attr-defined]
+        app.oauth = MagicMock(spec=Oauth)  # type: ignore[attr-defined]
+
+        # Include the auth router directly (not root_router to avoid libmagic import)
+        app.include_router(auth_router, prefix="/auth")
+
+        # Create test client
+        client = TestClient(app)
+
+        # Mock the token validation
+        with patch(
+            "launchpad.auth.api.token_from_string",
+            side_effect=mock_token_from_string,
+        ):
+            # Make the request
+            response = client.post(
+                "/auth/cookie",
+                json={
+                    "access_token": "mock-access-token-12345",
+                },
+            )
+
+            # Verify response status
+            assert response.status_code == 200
+
+            # Verify cookie is set in the Set-Cookie header
+            set_cookie_header = response.headers.get("set-cookie", "")
+            assert COOKIE_TOKEN in set_cookie_header
+            assert "mock-access-token-12345" in set_cookie_header
+            assert ".example.com" in set_cookie_header
+            assert "secure" in set_cookie_header.lower()
+            assert "httponly" in set_cookie_header.lower()
+
+    def test_set_auth_cookie_with_invalid_token(
+        self,
+    ) -> None:
+        """Test that POST /auth/cookie rejects invalid tokens"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from fastapi import FastAPI
+        from starlette.testclient import TestClient
+
+        from launchpad.auth.api import auth_router
+        from launchpad.auth.oauth import Oauth
+        from launchpad.config import KeycloakConfig
+        from launchpad.errors import Unauthorized
+
+        # Create mock app config
+        mock_keycloak_config = KeycloakConfig(
+            url=URL("http://mock-keycloak.com"),
+            realm="mock-realm",
+            client_id="mock-client-id",
+        )
+
+        mock_apolo_config = MagicMock()
+        mock_apolo_config.base_domain = "example.com"
+
+        # Create a minimal FastAPI app for testing
+        app = FastAPI()
+        app.config = MagicMock()  # type: ignore[attr-defined]
+        app.config.keycloak = mock_keycloak_config  # type: ignore[attr-defined]
+        app.config.apolo = mock_apolo_config  # type: ignore[attr-defined]
+        app.http = MagicMock()  # type: ignore[attr-defined]
+        app.oauth = MagicMock(spec=Oauth)  # type: ignore[attr-defined]
+
+        # Include the auth router directly
+        app.include_router(auth_router, prefix="/auth")
+
+        # Create test client
+        client = TestClient(app)
+
+        # Mock the token validation to raise Unauthorized
+        async def mock_token_from_string(**kwargs: dict[str, object]) -> None:
+            raise Unauthorized("Invalid token")
+
+        # Mock the token validation
+        with patch(
+            "launchpad.auth.api.token_from_string",
+            side_effect=mock_token_from_string,
+        ):
+            # Make the request with invalid token
+            response = client.post(
+                "/auth/cookie",
+                json={
+                    "access_token": "invalid-token",
+                },
+            )
+
+            # Verify response status is 401
+            assert response.status_code == 401
+
+    def test_set_auth_cookie_without_base_domain(
+        self,
+    ) -> None:
+        """Test that POST /auth/cookie fails gracefully when base_domain is not set"""
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from fastapi import FastAPI
+        from starlette.testclient import TestClient
+
+        from launchpad.auth.api import auth_router
+        from launchpad.auth.oauth import Oauth
+        from launchpad.config import KeycloakConfig
+
+        # Create mock app config
+        mock_keycloak_config = KeycloakConfig(
+            url=URL("http://mock-keycloak.com"),
+            realm="mock-realm",
+            client_id="mock-client-id",
+        )
+
+        mock_apolo_config = MagicMock()
+        mock_apolo_config.base_domain = None  # No base domain
+
+        # Create mock decoded token response
+        mock_decoded_token: dict[str, object] = {
+            "email": "test@example.com",
+            "preferred_username": "testuser",
+            "realm_access": {"roles": ["user"]},
+        }
+
+        # Create mock JWT validation function
+        async def mock_token_from_string(
+            **kwargs: dict[str, object],
+        ) -> dict[str, object]:
+            return mock_decoded_token
+
+        # Create a minimal FastAPI app for testing
+        app = FastAPI()
+        app.config = MagicMock()  # type: ignore[attr-defined]
+        app.config.keycloak = mock_keycloak_config  # type: ignore[attr-defined]
+        app.config.apolo = mock_apolo_config  # type: ignore[attr-defined]
+        app.http = MagicMock()  # type: ignore[attr-defined]
+        app.oauth = MagicMock(spec=Oauth)  # type: ignore[attr-defined]
+
+        # Include the auth router directly
+        app.include_router(auth_router, prefix="/auth")
+
+        # Create test client
+        client = TestClient(app)
+
+        # Mock the token validation
+        with patch(
+            "launchpad.auth.api.token_from_string",
+            side_effect=mock_token_from_string,
+        ):
+            # Make the request
+            response = client.post(
+                "/auth/cookie",
+                json={
+                    "access_token": "mock-access-token-12345",
+                },
+            )
+
+            # Verify response status is 500
+            assert response.status_code == 500
+
 
 class TestCookieDeletion:
     """Tests for cookie deletion on logout"""
