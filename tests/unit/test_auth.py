@@ -1,3 +1,4 @@
+import base64
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -203,3 +204,40 @@ async def test_oauth_fetch_token_key_error(
     data = {"grant_type": "authorization_code"}
     with pytest.raises(OauthError):
         await oauth_instance._fetch_token(data)
+
+
+async def test_oauth_start_method(
+    oauth_instance: Oauth, mock_request: MagicMock
+) -> None:
+    """Oauth.start_auth should redirect to Keycloak and preserve original URL
+    in the state parameter."""
+    mock_request.url = URL("https://original.com/path")
+
+    response = oauth_instance.start_auth(mock_request)
+
+    assert isinstance(response, RedirectResponse)
+
+    redirect_url = URL(response.headers["location"])
+    assert redirect_url.host == "mock-keycloak.com"
+    assert redirect_url.path == "/realms/mock-realm/protocol/openid-connect/auth"
+
+    # state should decode to the original URL
+    state = redirect_url.query["state"]
+    decoded = base64.urlsafe_b64decode(state.encode()).decode()
+    assert decoded == "https://original.com/path"
+
+
+async def test_auth_api_start_handler(
+    oauth_instance: Oauth, mock_request: MagicMock
+) -> None:
+    """auth.api.start_auth handler delegates to Oauth.start_auth and
+    returns a RedirectResponse."""
+    from launchpad.auth.api import start_auth as start_auth_route
+
+    mock_request.url = URL("https://example.com/foo")
+
+    response = await start_auth_route(mock_request, oauth_instance)
+    assert isinstance(response, RedirectResponse)
+    redirect_url = URL(response.headers["location"])
+    # ensure we were redirected to Keycloak authorize endpoint
+    assert redirect_url.path.endswith("/auth")

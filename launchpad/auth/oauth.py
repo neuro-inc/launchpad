@@ -83,6 +83,10 @@ class Oauth:
         self._set_cookie(response, key=COOKIE_CODE_VERIFIER, value=code_verifier)
         return response
 
+    def start_auth(self, request: Request) -> RedirectResponse:
+        original_url = str(request.url)
+        return self.redirect(original_url)
+
     def get_token_from_cookie(self, request: Request) -> str | None:
         return request.cookies.get(COOKIE_TOKEN)
 

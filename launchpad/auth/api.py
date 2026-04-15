@@ -1,10 +1,16 @@
 import logging
+import typing
 
 import aiohttp
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from starlette.requests import Request
-from starlette.responses import JSONResponse, PlainTextResponse, Response
+from starlette.responses import (
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 
 from launchpad.apps.storage import select_app_by_any_url
 from launchpad.auth import (
@@ -120,6 +126,11 @@ async def get_token(
             status_code=500,
             detail="An unexpected error occurred during authentication.",
         )
+
+
+@auth_router.get("/start")
+async def start_auth(request: Request, oauth: DepOauth) -> RedirectResponse:
+    return oauth.start_auth(request)
 
 
 @auth_router.get("/authorize", status_code=200)
