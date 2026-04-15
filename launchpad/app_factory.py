@@ -8,6 +8,7 @@ from starlette.responses import JSONResponse
 
 from launchpad.api import root_router
 from launchpad.app import Launchpad
+from launchpad.auth.middleware import TokenCookieMiddleware
 from launchpad.config import Config
 from launchpad.db.sync import sync_db
 from launchpad.lifespan import lifespan
@@ -51,6 +52,8 @@ def create_app(config: Config) -> Launchpad:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    app.add_middleware(TokenCookieMiddleware)
 
     app.include_router(root_router)
     add_pagination(app)
