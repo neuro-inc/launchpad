@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "prepare": "husky",
-    "dev": "next dev --turbopack",
+    "start": "next dev --turbopack",
     "build": "next build",
-    "start": "next start",
+    "start:build": "next start",
     "lint:eslint": "eslint ./src --ext .js,.jsx,.ts,.tsx",
     "lint:ts": "tsc --noEmit",
     "lint": "npm run lint:ts && npm run lint:eslint"

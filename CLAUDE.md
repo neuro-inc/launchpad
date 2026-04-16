@@ -10,7 +10,7 @@ This is **Apolo Launchpad**, a Next.js 16 application that serves as a web-based
 
 ```bash
 # Development
-npm run dev          # Start development server with Turbopack (http://localhost:3000)
+npm run start          # Start development server with Turbopack (http://localhost:3000)
 
 # Building
 npm run build        # Production build
@@ -21,7 +21,7 @@ npm run lint:ts      # TypeScript type checking only (tsc --noEmit)
 npm run lint:eslint  # ESLint only (checks ./src directory)
 
 # Production
-npm run start        # Start production server
+npm run start:build        # Start production server
 ```
 
 ## Architecture Overview

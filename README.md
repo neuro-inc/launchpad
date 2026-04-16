@@ -82,7 +82,7 @@ NEXT_PUBLIC_ENVIRONMENT=local
 ### 5. Run Development Server
 
 ```bash
-npm run dev
+npm run start
 ```
 
 The application will be available at [http://localhost:3000](http://localhost:3000).
@@ -93,13 +93,13 @@ The development server uses Turbopack for faster builds and hot module replaceme
 
 ```bash
 # Development
-npm run dev           # Start dev server with Turbopack
+npm run start           # Start dev server with Turbopack
 
 # Building
 npm run build         # Build production bundle
 
 # Production
-npm run start         # Start production server
+npm run start:prod         # Start production server
 
 # Linting
 npm run lint          # Run both TypeScript and ESLint checks

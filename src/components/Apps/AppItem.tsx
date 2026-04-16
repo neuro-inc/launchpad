@@ -64,6 +64,8 @@ export const AppItem: React.FC<Props> = ({
         </Modal>
 
         <Link
+          blank
+          external
           className="h-10 flex-1 capitalize"
           href={path.app(launchpadAppName)}
         >
