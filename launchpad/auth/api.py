@@ -20,7 +20,7 @@ from launchpad.auth import (
     HEADER_X_FORWARDED_HOST,
 )
 from launchpad.auth.dependencies import token_from_string
-from launchpad.auth.oauth import DepOauth, OauthError
+from launchpad.auth.oauth import COOKIE_TOKEN, DepOauth, OauthError
 from launchpad.db.dependencies import Db
 from launchpad.errors import Forbidden, Unauthorized
 
@@ -128,11 +128,6 @@ async def get_token(
         )
 
 
-@auth_router.get("/start")
-async def start_auth(request: Request, oauth: DepOauth) -> RedirectResponse:
-    return oauth.start_auth(request)
-
-
 @auth_router.get("/authorize", status_code=200)
 async def view_post_authorize(
     request: Request,
@@ -221,6 +216,38 @@ async def view_post_authorize(
         status_code=200,
         headers=response_headers,
     )
+
+
+@auth_router.post("/set-cookie", status_code=200)
+async def set_auth_cookie(
+    request: Request,
+    oauth: DepOauth,
+) -> Response:
+    """
+    Set the launchpad-token cookie from a Bearer token provided by the frontend.
+
+    The frontend (e.g. NextAuth) calls this endpoint right after login,
+    passing the Keycloak access_token via Authorization header. This ensures
+    the cookie is available from the start of the session, without waiting
+    for the first Traefik ForwardAuth trigger.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise Unauthorized("Missing or invalid Authorization header")
+    access_token = auth_header[len("Bearer ") :]
+
+    try:
+        await token_from_string(
+            http=request.app.http,
+            keycloak_config=request.app.config.keycloak,
+            access_token=access_token,
+        )
+    except Unauthorized:
+        raise Unauthorized("Invalid or expired token")
+
+    response = Response("OK", status_code=200)
+    oauth._set_cookie(response, key=COOKIE_TOKEN, value=access_token)
+    return response
 
 
 @auth_router.get("/callback", status_code=200)
