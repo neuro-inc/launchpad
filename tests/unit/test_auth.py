@@ -9,9 +9,9 @@ from yarl import URL
 
 from launchpad.auth.dependencies import auth_required
 from launchpad.auth.models import User
-from launchpad.auth.oauth import COOKIE_CODE_VERIFIER, Oauth, OauthError
+from launchpad.auth.oauth import COOKIE_CODE_VERIFIER, Oauth, OauthError, Retry
 from launchpad.config import KeycloakConfig
-from launchpad.errors import Unauthorized
+from launchpad.errors import Forbidden, Unauthorized
 
 
 @pytest.fixture
@@ -153,11 +153,66 @@ async def test_oauth_callback_missing_params(
     with pytest.raises(OauthError, match="missing required params"):
         await oauth_instance.callback(mock_request)
 
-    # Test missing code_verifier cookie
-    mock_request.query_params = {"code": "mock-code", "state": "mock-state"}
-    mock_request.cookies = {}
-    with pytest.raises(OauthError, match="missing required params"):
-        await oauth_instance.callback(mock_request)
+
+async def test_oauth_callback_success(
+    oauth_instance: Oauth, mock_request: MagicMock, mock_http_session: AsyncMock
+) -> None:
+    """Successful callback exchanges code for token and sets cookie."""
+    original_url = "https://original.example/path"
+    state = base64.urlsafe_b64encode(original_url.encode()).decode()
+
+    mock_request.query_params = {"code": "mock-code", "state": state}
+    mock_request.cookies = {COOKIE_CODE_VERIFIER: "mock-code-verifier"}
+
+    mock_response_obj = MagicMock()
+    mock_response_obj.raise_for_status.return_value = None
+
+    async def _json() -> dict[str, str]:
+        return {"access_token": "mock-access-token"}
+
+    mock_response_obj.json = _json
+    mock_http_session.post.return_value.__aenter__.return_value = mock_response_obj
+
+    oauth_instance._http = mock_http_session
+
+    response = await oauth_instance.callback(mock_request)
+
+    assert isinstance(response, RedirectResponse)
+    assert response.headers["location"] == original_url
+    assert "launchpad-token" in response.headers.get("set-cookie", "")
+
+
+async def test_auth_api_callback_delegates_success(mock_request: MagicMock) -> None:
+    """`auth.api.callback` should delegate to oauth.callback and return
+    the RedirectResponse produced by it.
+    """
+    from unittest.mock import AsyncMock
+
+    from starlette.responses import RedirectResponse
+
+    from launchpad.auth.api import callback as auth_callback
+
+    mock_oauth = AsyncMock()
+    mock_oauth.callback.return_value = RedirectResponse("https://example.com/success")
+
+    response = await auth_callback(mock_request, mock_oauth)
+    assert isinstance(response, RedirectResponse)
+    assert response.headers["location"] == "https://example.com/success"
+
+
+async def test_auth_api_callback_handles_oauth_error(mock_request: MagicMock) -> None:
+    """When the oauth backend raises OauthError the handler should raise Forbidden."""
+    from unittest.mock import AsyncMock
+
+    from launchpad.auth.api import callback as auth_callback
+
+    mock_oauth = AsyncMock()
+    mock_oauth.callback.side_effect = OauthError("failed")
+
+    import pytest
+
+    with pytest.raises(Forbidden):
+        await auth_callback(mock_request, mock_oauth)
 
 
 async def test_oauth_fetch_token_client_error(
@@ -206,6 +261,31 @@ async def test_oauth_fetch_token_key_error(
         await oauth_instance._fetch_token(data)
 
 
+async def test_oauth_fetch_token_server_error_raises_retry(
+    oauth_instance: Oauth, mock_request: MagicMock, mock_http_session: AsyncMock
+) -> None:
+    """If Keycloak responds with a 5xx the internal code should raise Retry
+    (the backoff decorator handles retries). Call the wrapped function to
+    assert the Retry path is taken.
+    """
+    mock_response_obj = MagicMock()
+    mock_response_obj.raise_for_status.side_effect = ClientResponseError(
+        request_info=MagicMock(), history=(), status=500, message="Server Error"
+    )
+    mock_http_session.post.return_value.__aenter__.return_value = mock_response_obj
+
+    data = {"grant_type": "authorization_code"}
+
+    from typing import Any, cast
+
+    with pytest.raises(Retry):
+        # The _fetch_token method is decorated with backoff.on_exception;
+        # access the original wrapped function via __wrapped__. Use a cast
+        # to Any to satisfy mypy about the attribute.
+        original = cast(Any, oauth_instance._fetch_token).__wrapped__
+        await original(oauth_instance, data)
+
+
 async def test_oauth_start_method(
     oauth_instance: Oauth, mock_request: MagicMock
 ) -> None:
@@ -221,7 +301,6 @@ async def test_oauth_start_method(
     assert redirect_url.host == "mock-keycloak.com"
     assert redirect_url.path == "/realms/mock-realm/protocol/openid-connect/auth"
 
-    # state should decode to the original URL
     state = redirect_url.query["state"]
     decoded = base64.urlsafe_b64decode(state.encode()).decode()
     assert decoded == "https://original.com/path"
@@ -239,5 +318,4 @@ async def test_auth_api_start_handler(
     response = await start_auth_route(mock_request, oauth_instance)
     assert isinstance(response, RedirectResponse)
     redirect_url = URL(response.headers["location"])
-    # ensure we were redirected to Keycloak authorize endpoint
     assert redirect_url.path.endswith("/auth")

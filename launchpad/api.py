@@ -13,7 +13,6 @@ from launchpad.app import Launchpad
 from launchpad.apps.api import apps_router
 from launchpad.auth.api import auth_router
 from launchpad.auth.dependencies import auth_required
-from launchpad.auth.oauth import DepOauth
 
 
 logger = logging.getLogger(__name__)
@@ -55,11 +54,6 @@ async def ping() -> Response:
 def root() -> RedirectResponse:
     """Redirect root to the interactive auth start endpoint."""
     return RedirectResponse(url="/auth/start")
-
-
-@root_router.get("/auth/start")
-async def start_auth(request: Request, oauth: DepOauth) -> RedirectResponse:
-    return oauth.start_auth(request)
 
 
 @root_router.get("/config")

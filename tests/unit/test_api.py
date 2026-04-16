@@ -65,9 +65,9 @@ async def test_root_auth_start_delegates() -> None:
     mock_request = MagicMock(spec=Request)
     mock_request.url = URL("https://example.com/foo")
 
-    from launchpad.api import start_auth as root_start
+    from launchpad.auth.api import start_auth as auth_start
 
-    response = await root_start(mock_request, oauth_instance)
+    response = await auth_start(mock_request, oauth_instance)
     assert isinstance(response, RedirectResponse)
     redirect_url = URL(response.headers["location"])
     assert redirect_url.path.endswith("/auth")
