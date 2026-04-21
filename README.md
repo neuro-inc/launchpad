@@ -41,6 +41,16 @@ ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
 REFRESH_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.refresh_token')
 ```
 
+#### Bootstrap Launchpad cookie (recommended for web clients)
+
+After obtaining an access token, web clients should explicitly call `/auth/set-cookie`
+to set the `launchpad-token` cookie before opening apps behind ForwardAuth.
+
+```bash
+curl -i -X POST "${LAUNCHPAD_URL}/auth/set-cookie" \
+    -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
 ### Managing App Templates
 
 App templates define the configuration and metadata for applications that can be installed.

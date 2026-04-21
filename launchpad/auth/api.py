@@ -246,7 +246,7 @@ async def set_auth_cookie(
         raise Unauthorized("Invalid or expired token")
 
     response = Response("OK", status_code=200)
-    oauth._set_cookie(response, key=COOKIE_TOKEN, value=access_token)
+    oauth.set_auth_cookie(response, access_token)
     return response
 
 
