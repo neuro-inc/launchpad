@@ -1,10 +1,11 @@
 import logging
-import typing
+import time
+from typing import Any, Mapping
+from urllib.parse import urlparse
 
 import aiohttp
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from starlette.requests import Request
 from starlette.responses import (
     JSONResponse,
     PlainTextResponse,
@@ -44,6 +45,45 @@ class TokenResponse(BaseModel):
     scope: str | None = None
 
 
+def _validate_origin(request: Request) -> None:
+    """Validate Origin/Referer headers against configured public URL."""
+    expected_host = urlparse(request.app.config.public_url).hostname
+
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+
+    origin_valid = origin and urlparse(origin).hostname == expected_host
+    referer_valid = referer and urlparse(referer).hostname == expected_host
+
+    if not (origin_valid or referer_valid):
+        logger.warning(
+            f"CSRF check failed: origin={origin}, referer={referer}, expected={expected_host}"
+        )
+        raise Forbidden("Invalid request origin")
+
+
+async def _validate_token_audience(
+    decoded: Mapping[str, Any],
+    keycloak_config: Any,
+) -> None:
+    """Validate token audience/azp matches expected client."""
+    expected_client = keycloak_config.client_id
+    aud = decoded.get("aud", [])
+
+    if isinstance(aud, str):
+        aud = [aud]
+    elif not isinstance(aud, list):
+        aud = []
+
+    azp = decoded.get("azp")
+
+    if not (azp == expected_client or expected_client in aud):
+        logger.warning(
+            f"Audience mismatch: expected={expected_client}, aud={aud}, azp={azp}"
+        )
+        raise Unauthorized("Invalid token audience")
+
+
 @auth_router.post("/token", response_model=TokenResponse)
 async def get_token(
     request: Request,
@@ -64,8 +104,14 @@ async def get_token(
         "scope": token_request.scope,
     }
 
+    # [SECURITY] Determine SSL verification setting (default True)
+    ssl_verify = getattr(request.app.config, "keycloak_ssl_verify", True)
+
     try:
-        async with request.app.http.post(token_url, data=data, ssl=False) as response:
+        # [SECURITY] Removed ssl=False – now uses configurable verification
+        async with request.app.http.post(
+            token_url, data=data, ssl=ssl_verify
+        ) as response:
             # Handle authentication errors (wrong credentials)
             if response.status == 401:
                 error_data = await response.json()
@@ -218,47 +264,61 @@ async def view_post_authorize(
     )
 
 
-@auth_router.post("/set-cookie", status_code=200)
-async def set_auth_cookie(
-    request: Request,
-    oauth: DepOauth,
-) -> Response:
+@auth_router.api_route("/callback", methods=["GET", "POST"], status_code=200)
+async def callback(request: Request, oauth: DepOauth, db: Db) -> Response:
     """
-    Set the launchpad-token cookie from a Bearer token provided by the frontend.
+    GET: Standard OAuth callback from Keycloak (after PKCE redirect).
+        - Keycloak redirects here with ?code=...&state=...
+        - oauth.callback() exchanges code for token, validates state, sets cookie
 
-    The frontend (e.g. NextAuth) calls this endpoint right after login,
-    passing the Keycloak access_token via Authorization header. This ensures
-    the cookie is available from the start of the session, without waiting
-    for the first Traefik ForwardAuth trigger.
+    POST: Set cookie from existing Bearer token (called by frontend after PKCE login).
+        - Frontend already has token from NextAuth PKCE flow
+        - Validates token, checks audience, sets secure cookie for Traefik ForwardAuth
     """
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        raise Unauthorized("Missing or invalid Authorization header")
-    access_token = auth_header[len("Bearer ") :]
 
-    try:
-        await token_from_string(
-            http=request.app.http,
-            keycloak_config=request.app.config.keycloak,
-            access_token=access_token,
-        )
-    except Unauthorized:
-        raise Unauthorized("Invalid or expired token")
+    # --- GET: Standard OAuth callback ---
+    if request.method == "GET":
+        try:
+            return await oauth.callback(request)
+        except OauthError as e:
+            raise Forbidden(str(e))
 
-    response = Response("OK", status_code=200)
-    oauth.set_auth_cookie(response, access_token)
-    return response
+    # --- POST: Set cookie from Bearer token ---
+    if request.method == "POST":
+        # CSRF protection
+        _validate_origin(request)
 
+        # Extract and validate token
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            raise Unauthorized("Missing or invalid Authorization header")
+        access_token = auth_header[len("Bearer ") :]
 
-@auth_router.get("/callback", status_code=200)
-async def callback(
-    request: Request,
-    oauth: DepOauth,
-) -> Response:
-    try:
-        return await oauth.callback(request)
-    except OauthError as e:
-        raise Forbidden(str(e))
+        try:
+            decoded = await token_from_string(
+                http=request.app.http,
+                keycloak_config=request.app.config.keycloak,
+                access_token=access_token,
+            )
+        except Unauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Token validation error in /callback POST: {e}")
+            raise Unauthorized("Invalid or expired token")
+
+        # Audience check
+        await _validate_token_audience(decoded, request.app.config.keycloak)
+
+        # Set secure cookie
+        response = Response("OK", status_code=200)
+        exp = decoded.get("exp")
+        max_age = max(0, int(exp - time.time())) if exp else 3600
+
+        # Ensure oauth.set_auth_cookie() sets Secure, HttpOnly, SameSite=Lax
+        oauth.set_auth_cookie(response, access_token)
+        return response
+
+    raise HTTPException(status_code=405, detail="Method not allowed")
 
 
 @auth_router.post("/logout", status_code=200)
