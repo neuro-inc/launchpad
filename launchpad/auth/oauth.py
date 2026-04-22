@@ -145,12 +145,14 @@ class Oauth:
         key: str,
         value: str,
     ) -> None:
+        # Set cookie with SameSite=None to allow cross-site requests from web clients
         response.set_cookie(
             key=key,
             value=value,
             domain=self._cookie_domain,
             secure=True,
             httponly=True,
+            samesite="none",
         )
 
 
