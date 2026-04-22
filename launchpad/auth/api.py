@@ -1,5 +1,4 @@
 import logging
-import time
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
@@ -21,7 +20,7 @@ from launchpad.auth import (
     HEADER_X_FORWARDED_HOST,
 )
 from launchpad.auth.dependencies import token_from_string
-from launchpad.auth.oauth import COOKIE_TOKEN, DepOauth, OauthError
+from launchpad.auth.oauth import DepOauth, OauthError
 from launchpad.db.dependencies import Db
 from launchpad.errors import Forbidden, Unauthorized
 
@@ -311,8 +310,6 @@ async def callback(request: Request, oauth: DepOauth, db: Db) -> Response:
 
         # Set secure cookie
         response = Response("OK", status_code=200)
-        exp = decoded.get("exp")
-        max_age = max(0, int(exp - time.time())) if exp else 3600
 
         # Ensure oauth.set_auth_cookie() sets Secure, HttpOnly, SameSite=Lax
         oauth.set_auth_cookie(response, access_token)
