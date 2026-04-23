@@ -46,7 +46,7 @@ class TokenResponse(BaseModel):
 
 def _validate_origin(request: Request) -> None:
     """Validate Origin/Referer headers against configured public URL."""
-    expected_host = urlparse(request.app.config.public_url).hostname
+    expected_host = urlparse(request.app.config.apolo.self_domain).hostname
 
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
@@ -264,7 +264,7 @@ async def view_post_authorize(
 
 
 @auth_router.api_route("/callback", methods=["GET", "POST"], status_code=200)
-async def callback(request: Request, oauth: DepOauth, db: Db) -> Response:
+async def callback(request: Request, oauth: DepOauth) -> Response:
     """
     GET: Standard OAuth callback from Keycloak (after PKCE redirect).
         - Keycloak redirects here with ?code=...&state=...

@@ -35,7 +35,7 @@ def _make_config() -> Config:
             project_name="proj",
             apps_api_url="http://mock-apps",
             token="tok",
-            self_domain="mock-launchpad.com",
+            self_domain="https://mock-launchpad.com",
             web_app_domain="mock-web.com",
             base_domain="mock-base.com",
             auth_middleware_name="middleware",
@@ -79,10 +79,16 @@ def _make_app() -> tuple[TestClient, AsyncMock]:
 def test_set_cookie_sets_launchpad_token_cookie() -> None:
     client, _ = _make_app()
 
-    with patch("launchpad.auth.api.token_from_string", new=AsyncMock(return_value={})):
+    with patch(
+        "launchpad.auth.api.token_from_string",
+        new=AsyncMock(return_value={"aud": ["frontend"], "azp": "frontend"}),
+    ):
         response = client.post(
-            "/auth/set-cookie",
-            headers={"Authorization": "Bearer mock-access-token"},
+            "/auth/callback",
+            headers={
+                "Authorization": "Bearer mock-access-token",
+                "Origin": "https://mock-launchpad.com",
+            },
         )
 
     assert response.status_code == 200
@@ -92,6 +98,9 @@ def test_set_cookie_sets_launchpad_token_cookie() -> None:
 def test_set_cookie_rejects_missing_authorization_header() -> None:
     client, _ = _make_app()
 
-    response = client.post("/auth/set-cookie")
+    response = client.post(
+        "/auth/callback",
+        headers={"Origin": "https://mock-launchpad.com"},
+    )
 
     assert response.status_code == 401
