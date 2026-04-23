@@ -7,7 +7,7 @@ import magic
 from fastapi import APIRouter, HTTPException
 from fastapi.params import Depends
 from starlette.requests import Request
-from starlette.responses import FileResponse, RedirectResponse, Response
+from starlette.responses import FileResponse, Response
 
 from launchpad.app import Launchpad
 from launchpad.apps.api import apps_router
@@ -48,12 +48,6 @@ root_router.include_router(
 @root_router.get("/ping")
 async def ping() -> Response:
     return Response("Pong", status_code=200)
-
-
-@root_router.get("/")
-def root() -> RedirectResponse:
-    """Redirect root to the interactive auth start endpoint."""
-    return RedirectResponse(url="/auth/start")
 
 
 @root_router.get("/config")
