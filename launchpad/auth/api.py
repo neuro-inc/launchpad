@@ -44,9 +44,40 @@ class TokenResponse(BaseModel):
     scope: str | None = None
 
 
+def _token_from_request(
+    request: Request, oauth: DepOauth, allow_cookie: bool = True
+) -> str | None:
+    """Extract access token from request.
+
+    If ``allow_cookie`` is True, the function will first try to read the
+    token using ``oauth.get_token_from_cookie(request)``. If that fails or
+    returns no token, the Authorization header (Bearer) is checked.
+
+    Returns the raw token string or ``None`` when not present.
+    """
+    # try cookie first
+    if allow_cookie:
+        try:
+            token = oauth.get_token_from_cookie(request)
+            if token:
+                return token
+        except Exception:
+            logger.debug("oauth.get_token_from_cookie raised", exc_info=True)
+
+    # fall back to Authorization header
+    try:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            return auth_header.split(" ", 1)[1]
+    except Exception:
+        logger.debug("error while reading Authorization header", exc_info=True)
+
+    return None
+
+
 def _validate_origin(request: Request) -> None:
     """Validate Origin/Referer headers against configured public URL."""
-    expected_host = urlparse(request.app.config.apolo.self_domain).hostname
+    expected_host = urlparse(request.app.config.apolo.web_app_domain).hostname
 
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
@@ -103,11 +134,10 @@ async def get_token(
         "scope": token_request.scope,
     }
 
-    # [SECURITY] Determine SSL verification setting (default True)
-    ssl_verify = getattr(request.app.config, "keycloak_ssl_verify", True)
+    # Determine SSL verification setting (default True).
+    ssl_verify = keycloak_config.ssl_verify
 
     try:
-        # [SECURITY] Removed ssl=False – now uses configurable verification
         async with request.app.http.post(
             token_url, data=data, ssl=ssl_verify
         ) as response:
@@ -190,19 +220,7 @@ async def view_post_authorize(
     #     logger.info("access to an internal app is forbidden")
     #     raise Forbidden()
 
-    # Try to get token from cookie first
-    access_token = oauth.get_token_from_cookie(request)
-
-    # If no cookie, try to get it from Authorization header
-    if not access_token:
-        try:
-            auth_header = request.headers.get("Authorization", "")
-            if auth_header.startswith("Bearer "):
-                access_token = auth_header.split(" ", 1)[1]
-                logger.info("access token obtained from Authorization header")
-        except Exception:
-            pass  # Will be handled below
-
+    access_token = _token_from_request(request, oauth)
     # If still no token, redirect to keycloak
     if not access_token:
         logger.info("no access token present. redirecting to keycloak")
@@ -287,11 +305,10 @@ async def callback(request: Request, oauth: DepOauth) -> Response:
         # CSRF protection
         _validate_origin(request)
 
-        # Extract and validate token
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
+        # Extract and validate token (require Authorization header)
+        access_token = _token_from_request(request, oauth, allow_cookie=False)
+        if not access_token:
             raise Unauthorized("Missing or invalid Authorization header")
-        access_token = auth_header[len("Bearer ") :]
 
         try:
             decoded = await token_from_string(

@@ -18,7 +18,10 @@ def make_request(
     """
     app = SimpleNamespace()
     app.config = SimpleNamespace()
-    app.config.apolo = SimpleNamespace(self_domain="https://example.com")
+    # Provide both self_domain and web_app_domain to match production config
+    app.config.apolo = SimpleNamespace(
+        self_domain="https://example.com", web_app_domain="https://example.com"
+    )
     app.config.keycloak = SimpleNamespace(client_id=client_id)
     # http is passed to token_from_string; tests patch token_from_string so
     # this can be a dummy object.

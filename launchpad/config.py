@@ -33,6 +33,7 @@ class KeycloakConfig:
     url: URL
     realm: str
     client_id: str = "frontend"
+    ssl_verify: bool = True
 
 
 @dataclass
@@ -151,9 +152,12 @@ class EnvironConfigFactory:
 
     def create_keycloak(self) -> KeycloakConfig:
         try:
+            raw_ssl = self._environ.get("KEYCLOAK_SSL_VERIFY", "true").lower()
+            ssl_verify = raw_ssl in ("1", "true", "yes", "on")
             return KeycloakConfig(
                 url=URL(f"https://{self._environ['KEYCLOAK_URL']}"),
                 realm=self._environ["KEYCLOAK_REALM"],
+                ssl_verify=ssl_verify,
             )
         except KeyError as e:
             logger.exception("Missing required Keycloak environment variable: %s", e)
