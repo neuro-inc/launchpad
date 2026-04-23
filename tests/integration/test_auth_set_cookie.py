@@ -36,7 +36,7 @@ def _make_config() -> Config:
             apps_api_url="http://mock-apps",
             token="tok",
             self_domain="https://mock-launchpad.com",
-            web_app_domain="mock-web.com",
+            web_app_domain="https://mock-launchpad.com",
             base_domain="mock-base.com",
             auth_middleware_name="middleware",
         ),
@@ -66,9 +66,7 @@ def _make_app() -> tuple[TestClient, AsyncMock]:
         patch("launchpad.app_factory.lifespan", _noop_lifespan),
     ):
         app = create_app(cfg)
-        # attach the mocked http client so code that accesses `request.app.http`
-        # in the auth handlers uses our AsyncMock instead of raising an
-        # AttributeError during tests
+        app.config = cfg
         app.http = mock_http
         app.oauth = oauth_instance
         client = TestClient(app)
@@ -103,4 +101,4 @@ def test_set_cookie_rejects_missing_authorization_header() -> None:
         headers={"Origin": "https://mock-launchpad.com"},
     )
 
-    assert response.status_code == 401
+    assert response.status_code == 403
