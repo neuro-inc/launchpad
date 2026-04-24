@@ -34,7 +34,6 @@ def make_request(
     return req
 
 
-@pytest.mark.asyncio
 async def test_post_callback_missing_origin_rejected() -> None:
     """If Origin/Referer are missing the POST should be rejected (CSRF)."""
     req = make_request("POST", headers={}, client_id="client-id")
@@ -44,7 +43,6 @@ async def test_post_callback_missing_origin_rejected() -> None:
         await callback(req, oauth)  # type: ignore[arg-type]
 
 
-@pytest.mark.asyncio
 async def test_post_callback_invalid_authorization_rejected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -59,7 +57,6 @@ async def test_post_callback_invalid_authorization_rejected(
         await callback(req, oauth)  # type: ignore[arg-type]
 
 
-@pytest.mark.asyncio
 async def test_post_callback_sets_cookie_on_valid_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

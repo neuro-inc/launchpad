@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 import aiohttp
 import backoff
@@ -45,15 +45,99 @@ async def auth_required(
     return User(id=email, email=email, name=name, groups=groups)
 
 
-async def _token_from_request(request: Request) -> dict[str, Any]:
+def _extract_bearer_token(auth_header: Optional[str]) -> Optional[str]:
+    """Extract bearer token from Authorization header.
+
+    Returns the token string or None if header is missing/invalid.
+    """
+    if not auth_header:
+        return None
+
+    parts = auth_header.split(" ", 1)
+    if len(parts) != 2:
+        return None
+
+    scheme, token = parts
+    if scheme.lower() != "bearer":
+        return None
+
+    token = token.strip()
+    return token or None
+
+
+def get_raw_token_from_request(
+    request: Request, oauth: Any | None = None, allow_cookie: bool = True
+) -> Optional[str]:
+    """Return raw access token from cookie or Authorization header.
+
+    Preference: cookie (if allowed and oauth provided) -> Authorization header.
+
+    Args:
+        request: Starlette request.
+        oauth: Optional oauth helper providing `get_token_from_cookie`.
+        allow_cookie: Whether to check cookie first.
+
+    Returns:
+        The raw token string if present, otherwise None.
+    """
+    if allow_cookie and oauth is not None:
+        try:
+            token = oauth.get_token_from_cookie(request)
+            if token is not None:
+                # Ensure we return a str (oauth implementations may return Any)
+                return token if isinstance(token, str) else str(token)
+        except Exception:
+            logger.debug("oauth.get_token_from_cookie raised", exc_info=True)
+
+    auth_header = request.headers.get("Authorization")
     try:
-        _, access_token = request.headers["Authorization"].split(" ")
+        token = _extract_bearer_token(auth_header)
+        if token:
+            return token
     except Exception:
-        raise Unauthorized()
+        logger.debug("error while parsing Authorization header", exc_info=True)
+
+    return None
+
+
+async def decode_token_from_request(
+    request: Request, oauth: Any | None = None, allow_cookie: bool = True
+) -> dict[str, Any]:
+    """Extract and decode token from request.
+
+    Args:
+        request: Starlette request.
+        oauth: Optional oauth helper.
+        allow_cookie: Whether to check cookie first.
+
+    Returns:
+        Decoded token payload.
+
+    Raises:
+        Unauthorized: If token is missing or invalid.
+    """
+    raw_token = get_raw_token_from_request(
+        request, oauth=oauth, allow_cookie=allow_cookie
+    )
+    if not raw_token:
+        raise Unauthorized("Unauthorized")
+
     return await token_from_string(
         http=request.app.http,
         keycloak_config=request.app.config.keycloak,
-        access_token=access_token,
+        access_token=raw_token,
+    )
+
+
+async def _token_from_request(request: Request) -> dict[str, Any]:
+    """Extract bearer token from Authorization header and return decoded payload."""
+    raw_token = _extract_bearer_token(request.headers.get("Authorization"))
+    if not raw_token:
+        raise Unauthorized("Unathorized")
+    return await token_from_string(
+        http=request.app.http,
+        keycloak_config=request.app.config.keycloak,
+        access_token=raw_token,
     )
 
 

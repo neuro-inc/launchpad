@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping
 from urllib.parse import urlparse
 
 import aiohttp
@@ -19,7 +19,15 @@ from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_USERNAME,
     HEADER_X_FORWARDED_HOST,
 )
-from launchpad.auth.dependencies import token_from_string
+from launchpad.auth.dependencies import (
+    _extract_bearer_token,
+    decode_token_from_request,
+    get_raw_token_from_request,
+    token_from_string,
+)
+
+
+_token_from_request = get_raw_token_from_request
 from launchpad.auth.oauth import DepOauth, OauthError
 from launchpad.db.dependencies import Db
 from launchpad.errors import Forbidden, Unauthorized
@@ -42,56 +50,6 @@ class TokenResponse(BaseModel):
     expires_in: int
     refresh_token: str | None = None
     scope: str | None = None
-
-
-def _extract_bearer_token(auth_header: Optional[str]) -> Optional[str]:
-    if not auth_header:
-        return None
-
-    parts = auth_header.split(" ", 1)
-    if len(parts) != 2:
-        return None
-
-    scheme, token = parts
-    if scheme.lower() != "bearer":
-        return None
-
-    token = token.strip()
-    return token or None
-
-
-def _token_from_request(
-    request: Request, oauth: DepOauth, allow_cookie: bool = True
-) -> str | None:
-    """Extract access token from request.
-
-    Priority:
-      1. Cookie (if allowed)
-      2. Authorization: Bearer <token>
-    """
-    if allow_cookie:
-        try:
-            token = oauth.get_token_from_cookie(request)
-            if token:
-                return token
-        except Exception:
-            logger.debug(
-                "oauth.get_token_from_cookie raised",
-                exc_info=True,
-            )
-
-    auth_header = request.headers.get("Authorization")
-    try:
-        token = _extract_bearer_token(auth_header)
-        if token:
-            return token
-    except Exception:
-        logger.debug(
-            "error while parsing Authorization header",
-            exc_info=True,
-        )
-
-    return None
 
 
 def _validate_origin(request: Request) -> None:
@@ -239,20 +197,13 @@ async def view_post_authorize(
     #     logger.info("access to an internal app is forbidden")
     #     raise Forbidden()
 
-    access_token = _token_from_request(request, oauth)
-    # If still no token, redirect to keycloak
-    if not access_token:
-        logger.info("no access token present. redirecting to keycloak")
-        return oauth.redirect(original_redirect_uri=app_url)
-
+    # Attempt to decode token (prefers cookie when oauth provided)
     try:
-        decoded_token = await token_from_string(
-            http=request.app.http,
-            keycloak_config=request.app.config.keycloak,
-            access_token=access_token,
-        )
+        decoded_token = await decode_token_from_request(request, oauth)
     except Unauthorized:
-        logger.info("unable to decode token. redirecting to keycloak")
+        logger.info(
+            "no access token present or unable to decode. redirecting to keycloak"
+        )
         return oauth.redirect(original_redirect_uri=app_url)
 
     logger.debug(f"Decoded token keys: {list(decoded_token.keys())}")
@@ -325,7 +276,7 @@ async def callback(request: Request, oauth: DepOauth) -> Response:
         _validate_origin(request)
 
         # Extract and validate token (require Authorization header)
-        access_token = _token_from_request(request, oauth, allow_cookie=False)
+        access_token = _extract_bearer_token(request.headers.get("Authorization"))
         if not access_token:
             raise Unauthorized("Missing or invalid Authorization header")
 

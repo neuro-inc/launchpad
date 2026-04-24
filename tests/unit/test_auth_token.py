@@ -5,7 +5,9 @@ from typing import Callable, Iterable, Optional
 import pytest
 from starlette.requests import Request
 
-from launchpad.auth.api import _token_from_request
+from launchpad.auth.dependencies import (
+    get_raw_token_from_request as _token_from_request,
+)
 from launchpad.auth.oauth import COOKIE_TOKEN, Oauth
 
 
