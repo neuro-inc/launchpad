@@ -101,4 +101,4 @@ def test_set_cookie_rejects_missing_authorization_header() -> None:
         headers={"Origin": "https://mock-launchpad.com"},
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 401
