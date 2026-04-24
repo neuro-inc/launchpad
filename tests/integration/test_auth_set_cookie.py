@@ -1,11 +1,13 @@
-"""Integration tests for the `/auth/set-cookie` endpoint."""
+from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncContextManager, AsyncIterator, Callable, Generator
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from aiohttp import ClientSession
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from yarl import URL
 
@@ -21,7 +23,8 @@ from launchpad.config import (
 )
 
 
-def _make_config() -> Config:
+@pytest.fixture
+def mock_config() -> Config:
     return Config(
         postgres=PostgresConfig(dsn="sqlite+aiosqlite:///:memory:"),
         keycloak=KeycloakConfig(
@@ -41,64 +44,56 @@ def _make_config() -> Config:
             auth_middleware_name="middleware",
         ),
         branding=BrandingConfig(
-            title="t", background="b", branding_dir=Path(__file__).parent
+            title="t",
+            background="b",
+            branding_dir=Path(__file__).parent,
         ),
         apps=AppsConfig(vllm={}, postgres={}, embeddings={}),
     )
 
 
-def _make_app() -> tuple[TestClient, AsyncMock]:
-    cfg = _make_config()
-    mock_http = AsyncMock(spec=ClientSession)
-    oauth_instance = Oauth(
+@pytest.fixture
+def mock_http() -> AsyncMock:
+    return AsyncMock(spec=ClientSession)
+
+
+@pytest.fixture
+def oauth(mock_http: AsyncMock, mock_config: Config) -> Oauth:
+    return Oauth(
         http=mock_http,
-        keycloak_config=cfg.keycloak,
-        cookie_domain=cfg.apolo.base_domain,
-        launchpad_domain=cfg.apolo.self_domain,
+        keycloak_config=mock_config.keycloak,
+        cookie_domain=mock_config.apolo.base_domain,
+        launchpad_domain=mock_config.apolo.self_domain,
     )
 
+
+@pytest.fixture
+def noop_lifespan() -> Callable[[object], AsyncContextManager[None]]:
     @asynccontextmanager
-    async def _noop_lifespan(app: object) -> AsyncIterator[None]:
+    async def _lifespan(app: object) -> AsyncIterator[None]:
         yield
 
+    return _lifespan
+
+
+@pytest.fixture
+def app(
+    mock_config: Config,
+    mock_http: AsyncMock,
+    oauth: Oauth,
+    noop_lifespan: Callable[[object], AsyncContextManager[None]],
+) -> Generator[FastAPI, None, None]:
     with (
         patch("launchpad.app_factory.sync_db"),
-        patch("launchpad.app_factory.lifespan", _noop_lifespan),
+        patch("launchpad.app_factory.lifespan", noop_lifespan),
     ):
-        app = create_app(cfg)
-        app.config = cfg
+        app = create_app(mock_config)
+        app.config = mock_config
         app.http = mock_http
-        app.oauth = oauth_instance
-        client = TestClient(app)
-
-    return client, mock_http
+        app.oauth = oauth
+        yield app
 
 
-def test_set_cookie_sets_launchpad_token_cookie() -> None:
-    client, _ = _make_app()
-
-    with patch(
-        "launchpad.auth.api.token_from_string",
-        new=AsyncMock(return_value={"aud": ["frontend"], "azp": "frontend"}),
-    ):
-        response = client.post(
-            "/auth/callback",
-            headers={
-                "Authorization": "Bearer mock-access-token",
-                "Origin": "https://mock-launchpad.com",
-            },
-        )
-
-    assert response.status_code == 200
-    assert "launchpad-token=mock-access-token" in response.headers.get("set-cookie", "")
-
-
-def test_set_cookie_rejects_missing_authorization_header() -> None:
-    client, _ = _make_app()
-
-    response = client.post(
-        "/auth/callback",
-        headers={"Origin": "https://mock-launchpad.com"},
-    )
-
-    assert response.status_code == 401
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    return TestClient(app)

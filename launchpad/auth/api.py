@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 from urllib.parse import urlparse
 
 import aiohttp
@@ -44,33 +44,52 @@ class TokenResponse(BaseModel):
     scope: str | None = None
 
 
+def _extract_bearer_token(auth_header: Optional[str]) -> Optional[str]:
+    if not auth_header:
+        return None
+
+    parts = auth_header.split(" ", 1)
+    if len(parts) != 2:
+        return None
+
+    scheme, token = parts
+    if scheme.lower() != "bearer":
+        return None
+
+    token = token.strip()
+    return token or None
+
+
 def _token_from_request(
     request: Request, oauth: DepOauth, allow_cookie: bool = True
 ) -> str | None:
     """Extract access token from request.
 
-    If ``allow_cookie`` is True, the function will first try to read the
-    token using ``oauth.get_token_from_cookie(request)``. If that fails or
-    returns no token, the Authorization header (Bearer) is checked.
-
-    Returns the raw token string or ``None`` when not present.
+    Priority:
+      1. Cookie (if allowed)
+      2. Authorization: Bearer <token>
     """
-    # try cookie first
     if allow_cookie:
         try:
             token = oauth.get_token_from_cookie(request)
             if token:
                 return token
         except Exception:
-            logger.debug("oauth.get_token_from_cookie raised", exc_info=True)
+            logger.debug(
+                "oauth.get_token_from_cookie raised",
+                exc_info=True,
+            )
 
-    # fall back to Authorization header
+    auth_header = request.headers.get("Authorization")
     try:
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            return auth_header.split(" ", 1)[1]
+        token = _extract_bearer_token(auth_header)
+        if token:
+            return token
     except Exception:
-        logger.debug("error while reading Authorization header", exc_info=True)
+        logger.debug(
+            "error while parsing Authorization header",
+            exc_info=True,
+        )
 
     return None
 
