@@ -1,11 +1,14 @@
 import logging
 from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
+from aiohttp import ClientSession
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -18,6 +21,7 @@ from launchpad.auth.dependencies import (
     auth_required,
 )
 from launchpad.auth.models import User
+from launchpad.auth.oauth import Oauth
 from launchpad.config import (
     ApoloConfig,
     AppsConfig,
@@ -205,8 +209,6 @@ def app_client(
     This approach creates tables once (session-scoped) and uses TRUNCATE
     to clean data between tests, which is much faster than CREATE/DROP.
     """
-    from launchpad.db.dependencies import get_db
-
     # Patch sync_db to skip alembic migrations (tables already exist)
     with patch("launchpad.app_factory.sync_db"):
         # Patch AppsApiClient to return our mock
@@ -238,3 +240,78 @@ def app_client(
                     trans.rollback()
                     raise
             sync_engine.dispose()
+
+
+@pytest.fixture
+def mock_config_auth() -> Config:
+    """Mock configuration for auth-specific tests (in-memory SQLite)."""
+    return Config(
+        postgres=PostgresConfig(dsn="sqlite+aiosqlite:///:memory:"),
+        keycloak=KeycloakConfig(
+            url=URL("http://mock-keycloak.test"),
+            realm="mock-realm",
+            client_id="frontend",
+        ),
+        apolo=ApoloConfig(
+            cluster="test",
+            org_name="org",
+            project_name="proj",
+            apps_api_url="http://mock-apps",
+            token="tok",
+            self_domain="https://mock-launchpad.com",
+            web_app_domain="https://mock-launchpad.com",
+            base_domain="mock-base.com",
+            auth_middleware_name="middleware",
+        ),
+        branding=BrandingConfig(
+            title="t",
+            background="b",
+            branding_dir=Path(__file__).parent,
+        ),
+        apps=AppsConfig(vllm={}, postgres={}, embeddings={}),
+    )
+
+
+@pytest.fixture
+def mock_http_and_oauth(
+    mock_config_auth: Config,
+) -> tuple[AsyncMock, Oauth]:
+    """Create mock HTTP client and Oauth instance."""
+    mock_http = AsyncMock(spec=ClientSession)
+
+    oauth = Oauth(
+        http=mock_http,
+        keycloak_config=mock_config_auth.keycloak,
+        cookie_domain=mock_config_auth.apolo.base_domain,
+        launchpad_domain=mock_config_auth.apolo.self_domain,
+    )
+
+    return mock_http, oauth
+
+
+@pytest.fixture
+def app(
+    mock_config_auth: Config, mock_http_and_oauth: tuple[AsyncMock, Oauth]
+) -> Generator[FastAPI, None, None]:
+    """Create a FastAPI app for auth-specific tests."""
+    mock_http, oauth = mock_http_and_oauth
+
+    @asynccontextmanager
+    async def _noop_lifespan(app: object) -> AsyncIterator[None]:
+        yield
+
+    with (
+        patch("launchpad.app_factory.sync_db"),
+        patch("launchpad.app_factory.lifespan", _noop_lifespan),
+    ):
+        app = create_app(mock_config_auth)
+        app.config = mock_config_auth
+        app.http = mock_http
+        app.oauth = oauth
+        yield app
+
+
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    """Create TestClient for auth-specific tests."""
+    return TestClient(app)

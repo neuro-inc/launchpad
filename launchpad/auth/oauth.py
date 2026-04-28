@@ -106,8 +106,11 @@ class Oauth:
         access_token = await self._fetch_token(data)
 
         response = RedirectResponse(original_url)
-        self._set_cookie(response, key=COOKIE_TOKEN, value=access_token)
+        self.set_auth_cookie(response, access_token)
         return response
+
+    def set_auth_cookie(self, response: Response, access_token: str) -> None:
+        self._set_cookie(response, key=COOKIE_TOKEN, value=access_token)
 
     def logout(self, response: Response) -> None:
         """Cleanup of cookies on logout"""

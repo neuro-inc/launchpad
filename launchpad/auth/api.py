@@ -1,10 +1,16 @@
 import logging
+from typing import Any, Mapping
+from urllib.parse import urlparse
 
 import aiohttp
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from starlette.requests import Request
-from starlette.responses import JSONResponse, PlainTextResponse, Response
+from starlette.responses import (
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 
 from launchpad.apps.storage import select_app_by_any_url
 from launchpad.auth import (
@@ -13,7 +19,15 @@ from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_USERNAME,
     HEADER_X_FORWARDED_HOST,
 )
-from launchpad.auth.dependencies import token_from_string
+from launchpad.auth.dependencies import (
+    _extract_bearer_token,
+    decode_token_from_request,
+    get_raw_token_from_request,
+    token_from_string,
+)
+
+
+_token_from_request = get_raw_token_from_request
 from launchpad.auth.oauth import DepOauth, OauthError
 from launchpad.db.dependencies import Db
 from launchpad.errors import Forbidden, Unauthorized
@@ -38,6 +52,45 @@ class TokenResponse(BaseModel):
     scope: str | None = None
 
 
+def _validate_origin(request: Request) -> None:
+    """Validate Origin/Referer headers against configured public URL."""
+    expected_host = urlparse(request.app.config.apolo.web_app_domain).hostname
+
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+
+    origin_valid = origin and urlparse(origin).hostname == expected_host
+    referer_valid = referer and urlparse(referer).hostname == expected_host
+
+    if not (origin_valid or referer_valid):
+        logger.warning(
+            f"CSRF check failed: origin={origin}, referer={referer}, expected={expected_host}"
+        )
+        raise Forbidden("Invalid request origin")
+
+
+async def _validate_token_audience(
+    decoded: Mapping[str, Any],
+    keycloak_config: Any,
+) -> None:
+    """Validate token audience/azp matches expected client."""
+    expected_client = keycloak_config.client_id
+    aud = decoded.get("aud", [])
+
+    if isinstance(aud, str):
+        aud = [aud]
+    elif not isinstance(aud, list):
+        aud = []
+
+    azp = decoded.get("azp")
+
+    if not (azp == expected_client or expected_client in aud):
+        logger.warning(
+            f"Audience mismatch: expected={expected_client}, aud={aud}, azp={azp}"
+        )
+        raise Unauthorized("Invalid token audience")
+
+
 @auth_router.post("/token", response_model=TokenResponse)
 async def get_token(
     request: Request,
@@ -58,8 +111,13 @@ async def get_token(
         "scope": token_request.scope,
     }
 
+    # Determine SSL verification setting (default True).
+    ssl_verify = keycloak_config.ssl_verify
+
     try:
-        async with request.app.http.post(token_url, data=data, ssl=False) as response:
+        async with request.app.http.post(
+            token_url, data=data, ssl=ssl_verify
+        ) as response:
             # Handle authentication errors (wrong credentials)
             if response.status == 401:
                 error_data = await response.json()
@@ -139,32 +197,13 @@ async def view_post_authorize(
     #     logger.info("access to an internal app is forbidden")
     #     raise Forbidden()
 
-    # Try to get token from cookie first
-    access_token = oauth.get_token_from_cookie(request)
-
-    # If no cookie, try to get it from Authorization header
-    if not access_token:
-        try:
-            auth_header = request.headers.get("Authorization", "")
-            if auth_header.startswith("Bearer "):
-                access_token = auth_header.split(" ", 1)[1]
-                logger.info("access token obtained from Authorization header")
-        except Exception:
-            pass  # Will be handled below
-
-    # If still no token, redirect to keycloak
-    if not access_token:
-        logger.info("no access token present. redirecting to keycloak")
-        return oauth.redirect(original_redirect_uri=app_url)
-
+    # Attempt to decode token (prefers cookie when oauth provided)
     try:
-        decoded_token = await token_from_string(
-            http=request.app.http,
-            keycloak_config=request.app.config.keycloak,
-            access_token=access_token,
-        )
+        decoded_token = await decode_token_from_request(request, oauth)
     except Unauthorized:
-        logger.info("unable to decode token. redirecting to keycloak")
+        logger.info(
+            "no access token present or unable to decode. redirecting to keycloak"
+        )
         return oauth.redirect(original_redirect_uri=app_url)
 
     logger.debug(f"Decoded token keys: {list(decoded_token.keys())}")
@@ -212,15 +251,58 @@ async def view_post_authorize(
     )
 
 
-@auth_router.get("/callback", status_code=200)
-async def callback(
-    request: Request,
-    oauth: DepOauth,
-) -> Response:
-    try:
-        return await oauth.callback(request)
-    except OauthError as e:
-        raise Forbidden(str(e))
+@auth_router.api_route("/callback", methods=["GET", "POST"], status_code=200)
+async def callback(request: Request, oauth: DepOauth) -> Response:
+    """
+    GET: Standard OAuth callback from Keycloak (after PKCE redirect).
+        - Keycloak redirects here with ?code=...&state=...
+        - oauth.callback() exchanges code for token, validates state, sets cookie
+
+    POST: Set cookie from existing Bearer token (called by frontend after PKCE login).
+        - Frontend already has token from NextAuth PKCE flow
+        - Validates token, checks audience, sets secure cookie for Traefik ForwardAuth
+    """
+
+    # --- GET: Standard OAuth callback ---
+    if request.method == "GET":
+        try:
+            return await oauth.callback(request)
+        except OauthError as e:
+            raise Forbidden(str(e))
+
+    # --- POST: Set cookie from Bearer token ---
+    if request.method == "POST":
+        # CSRF protection
+        _validate_origin(request)
+
+        # Extract and validate token (require Authorization header)
+        access_token = _extract_bearer_token(request.headers.get("Authorization"))
+        if not access_token:
+            raise Unauthorized("Missing or invalid Authorization header")
+
+        try:
+            decoded = await token_from_string(
+                http=request.app.http,
+                keycloak_config=request.app.config.keycloak,
+                access_token=access_token,
+            )
+        except Unauthorized:
+            raise
+        except Exception as e:
+            logger.error(f"Token validation error in /callback POST: {e}")
+            raise Unauthorized("Invalid or expired token")
+
+        # Audience check
+        await _validate_token_audience(decoded, request.app.config.keycloak)
+
+        # Set secure cookie
+        response = Response("OK", status_code=200)
+
+        # Ensure oauth.set_auth_cookie() sets Secure, HttpOnly, SameSite=Lax
+        oauth.set_auth_cookie(response, access_token)
+        return response
+
+    raise HTTPException(status_code=405, detail="Method not allowed")
 
 
 @auth_router.post("/logout", status_code=200)
