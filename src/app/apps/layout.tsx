@@ -1,3 +1,4 @@
+import SetCookieClient from '@components/Auth/SetCookieClient';
 import { Layout } from '@components/Ui';
 
 type Props = {
@@ -5,7 +6,12 @@ type Props = {
 };
 
 const PageLayout: React.FC<Props> = ({ children }) => {
-  return <Layout.Wrapper>{children}</Layout.Wrapper>;
+  return (
+    <Layout.Wrapper>
+      <SetCookieClient />
+      {children}
+    </Layout.Wrapper>
+  );
 };
 
 export default PageLayout;

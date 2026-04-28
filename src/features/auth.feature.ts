@@ -3,6 +3,7 @@ import KeycloakProvider from 'next-auth/providers/keycloak';
 
 import { KeycloakConfig } from '@typings';
 import { NEXTAUTH_SECRET } from '@constants';
+import { setLaunchpadCookie } from '@services/auth.services';
 import { getKeycloakIssuer, getServerApiUrl, getSiteUrl } from '@utils/helpers';
 
 type AuthConfig = KeycloakConfig;
@@ -267,6 +268,14 @@ export async function getAuthOptions(): Promise<AuthOptions> {
               token.client_roles = [];
               token.groups = [];
             }
+          }
+
+          // After extracting token, call backend to set launchpad cookie
+          try {
+            await setLaunchpadCookie(account.access_token);
+          } catch (e) {
+            // don't block login on cookie set failure
+            console.error('Failed to set launchpad cookie', e);
           }
         }
 
