@@ -6,7 +6,6 @@ import { getConfig } from '@actions/server.actions';
 import { cn } from '@utils';
 import { getBackgroundStyle } from '@utils/helpers';
 
-import ResetLaunchpadCookieClient from '@components/Auth/ResetLaunchpadCookieClient';
 import { ToastContainer } from '@components/Ui/Toast';
 
 import '@features/dayjs.feature';
@@ -114,7 +113,6 @@ export default async function RootLayout({ children }: Props) {
         style={backgroundStyle}
         suppressHydrationWarning
       >
-        <ResetLaunchpadCookieClient />
         <NuqsAdapter>{children}</NuqsAdapter>
         <ToastContainer />
       </body>
