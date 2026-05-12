@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 from typing import Annotated, Any, Optional
@@ -20,6 +21,10 @@ from launchpad.errors import Unauthorized
 
 
 logger = logging.getLogger(__name__)
+
+
+def _token_fingerprint(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:12]
 
 
 async def auth_required(
@@ -170,8 +175,14 @@ async def token_from_string(
             break
     else:
         logger.error(
-            "unable to match a KID between a token and a JWKS",
-            extra={"jwks": jwks, "access_token": access_token},
+            "jwt_kid_not_found_in_jwks",
+            extra={
+                "event_name": "launchpad.auth.jwt.decode.failed",
+                "reason_code": "KID_NOT_FOUND",
+                "kid": kid,
+                "jwks_key_count": len(jwks.get("keys", [])),
+                "token_fingerprint": _token_fingerprint(access_token),
+            },
         )
         raise Unauthorized()
 
@@ -225,8 +236,14 @@ async def admin_role_required(
     """
     user = await auth_required(request)
     if "admin" not in user.groups:
+        subject_hash = hashlib.sha256(user.email.encode("utf-8")).hexdigest()[:12]
         logger.warning(
-            f"User {user.email} attempted to access admin endpoint without admin role"
+            "admin_role_required_denied",
+            extra={
+                "event_name": "launchpad.auth.admin.reject",
+                "reason_code": "MISSING_ADMIN_ROLE",
+                "subject_hash": subject_hash,
+            },
         )
         raise Unauthorized("Admin role required")
     return user

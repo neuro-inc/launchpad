@@ -1,8 +1,11 @@
+import hashlib
 import logging
+import time
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
 import aiohttp
+import jwt
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from starlette.responses import (
@@ -52,6 +55,49 @@ class TokenResponse(BaseModel):
     scope: str | None = None
 
 
+def _request_id(request: Request) -> str | None:
+    return request.headers.get("x-request-id")
+
+
+def _correlation_id(request: Request) -> str | None:
+    return request.headers.get("x-correlation-id") or request.headers.get(
+        "x-amzn-trace-id"
+    )
+
+
+def _classify_launch_url(host: str) -> str:
+    if host.startswith("localhost") or host.startswith("127.0.0.1"):
+        return "local"
+    if host.endswith(".internal"):
+        return "internal"
+    return "public"
+
+
+def _safe_token_meta(raw_token: str | None) -> dict[str, Any]:
+    if not raw_token:
+        return {"token_present": False}
+    meta: dict[str, Any] = {"token_present": True}
+    try:
+        payload = jwt.decode(raw_token, options={"verify_signature": False})
+    except jwt.PyJWTError:
+        meta["token_claims_parse"] = "failed"
+        return meta
+    exp = payload.get("exp")
+    now = int(time.time())
+    if isinstance(exp, int):
+        meta["token_exp_unix"] = exp
+        meta["token_ttl_s"] = max(exp - now, 0)
+    if isinstance(payload.get("iss"), str):
+        meta["token_issuer_present"] = True
+    if payload.get("aud") is not None:
+        meta["token_audience_present"] = True
+    return meta
+
+
+def _mask_subject(subject: str) -> str:
+    return hashlib.sha256(subject.encode("utf-8")).hexdigest()[:12]
+
+
 def _validate_origin(request: Request) -> None:
     """Validate Origin/Referer headers against configured public URL."""
     expected_host = urlparse(request.app.config.apolo.web_app_domain).hostname
@@ -63,8 +109,17 @@ def _validate_origin(request: Request) -> None:
     referer_valid = referer and urlparse(referer).hostname == expected_host
 
     if not (origin_valid or referer_valid):
+        origin_host = urlparse(origin).hostname if origin else None
+        referer_host = urlparse(referer).hostname if referer else None
         logger.warning(
-            f"CSRF check failed: origin={origin}, referer={referer}, expected={expected_host}"
+            "csrf_origin_validation_failed",
+            extra={
+                "event_name": "launchpad.auth.csrf.reject",
+                "reason_code": "INVALID_ORIGIN_OR_REFERER",
+                "origin_host": origin_host,
+                "referer_host": referer_host,
+                "expected_host": expected_host,
+            },
         )
         raise Forbidden("Invalid request origin")
 
@@ -125,7 +180,12 @@ async def get_token(
                     "error_description", "Invalid credentials"
                 )
                 logger.warning(
-                    f"Authentication failed for user '{token_request.username}': {error_description}"
+                    "auth_token_password_grant_rejected",
+                    extra={
+                        "event_name": "launchpad.auth.password_grant.reject",
+                        "reason_code": "INVALID_CREDENTIALS",
+                        "subject_hash": _mask_subject(token_request.username),
+                    },
                 )
                 raise Unauthorized("Invalid username or password")
 
@@ -134,7 +194,12 @@ async def get_token(
                 error_data = await response.json()
                 error_description = error_data.get("error_description", "Client error")
                 logger.warning(
-                    f"Client error during token request (status {response.status}): {error_description}"
+                    "auth_token_client_error",
+                    extra={
+                        "event_name": "launchpad.auth.password_grant.error",
+                        "reason_code": "UPSTREAM_4XX",
+                        "upstream_status": response.status,
+                    },
                 )
                 raise HTTPException(
                     status_code=response.status,
@@ -145,7 +210,13 @@ async def get_token(
             elif response.status >= 500:
                 error_text = await response.text()
                 logger.error(
-                    f"Keycloak server error (status {response.status}): {error_text}"
+                    "auth_token_keycloak_server_error",
+                    extra={
+                        "event_name": "launchpad.auth.password_grant.error",
+                        "reason_code": "UPSTREAM_5XX",
+                        "upstream_status": response.status,
+                        "error_text_present": bool(error_text),
+                    },
                 )
                 raise HTTPException(
                     status_code=503,
@@ -186,10 +257,34 @@ async def view_post_authorize(
     db: Db,
     oauth: DepOauth,
 ) -> Response:
-    app_url = f"https://{request.headers[HEADER_X_FORWARDED_HOST]}"
+    forwarded_host = request.headers[HEADER_X_FORWARDED_HOST]
+    app_url = f"https://{forwarded_host}"
+    req_id = _request_id(request)
+    corr_id = _correlation_id(request)
+    logger.info(
+        "launch_authorize_started",
+        extra={
+            "event_name": "launchpad.auth.launch.authorize.start",
+            "reason_code": "START",
+            "request_id": req_id,
+            "correlation_id": corr_id,
+            "target_host": forwarded_host,
+            "launch_url_category": _classify_launch_url(forwarded_host),
+        },
+    )
+
     installed_app = await select_app_by_any_url(db=db, url=app_url)
     if installed_app is None:
-        logger.info(f"Unable to find installed app by url: {app_url}")
+        logger.info(
+            "launch_authorize_app_not_found",
+            extra={
+                "event_name": "launchpad.auth.launch.authorize.reject",
+                "reason_code": "APP_NOT_FOUND_BY_URL",
+                "request_id": req_id,
+                "correlation_id": corr_id,
+                "target_host": forwarded_host,
+            },
+        )
         raise Forbidden()
 
     # make internal apps accessible for apps that only expose an api, not a web page
@@ -198,22 +293,51 @@ async def view_post_authorize(
     #     raise Forbidden()
 
     # Attempt to decode token (prefers cookie when oauth provided)
+    raw_token = _token_from_request(request, oauth, allow_cookie=True)
+    token_meta = _safe_token_meta(raw_token)
+    logger.info(
+        "launch_authorize_token_presence_checked",
+        extra={
+            "event_name": "launchpad.auth.launch.token.checked",
+            "reason_code": "TOKEN_PRESENCE_CHECKED",
+            "request_id": req_id,
+            "correlation_id": corr_id,
+            "app_name": installed_app.launchpad_app_name,
+            "app_id": str(installed_app.app_id),
+            **token_meta,
+        },
+    )
     try:
         decoded_token = await decode_token_from_request(request, oauth)
     except Unauthorized:
         logger.info(
-            "no access token present or unable to decode. redirecting to keycloak"
+            "launch_authorize_redirect_to_idp",
+            extra={
+                "event_name": "launchpad.auth.launch.redirect",
+                "reason_code": "TOKEN_MISSING_OR_INVALID",
+                "request_id": req_id,
+                "correlation_id": corr_id,
+                "app_name": installed_app.launchpad_app_name,
+                "app_id": str(installed_app.app_id),
+                **token_meta,
+            },
         )
         return oauth.redirect(original_redirect_uri=app_url)
-
-    logger.debug(f"Decoded token keys: {list(decoded_token.keys())}")
-    logger.debug(f"Token realm_access: {decoded_token.get('realm_access')}")
-    logger.debug(f"Token groups: {decoded_token.get('groups')}")
 
     try:
         email = decoded_token["email"]
     except KeyError:
-        logger.error("malformed token. forbidden")
+        logger.error(
+            "launch_authorize_missing_email_claim",
+            extra={
+                "event_name": "launchpad.auth.launch.authorize.reject",
+                "reason_code": "MISSING_EMAIL_CLAIM",
+                "request_id": req_id,
+                "correlation_id": corr_id,
+                "app_name": installed_app.launchpad_app_name,
+                "app_id": str(installed_app.app_id),
+            },
+        )
         raise Forbidden()
 
     # extract username from token
@@ -226,13 +350,21 @@ async def view_post_authorize(
         groups = decoded_token.get("realm_access", {}).get("roles", [])
     groups_str = ",".join(groups) if groups else ""
 
-    logger.debug(
-        f"Authorizing user - Email: {email}, Username: {username}, Groups: {groups_str}"
-    )
-
     # check permissions for individual apps
     if not installed_app.is_shared and email != installed_app.user_id:
-        logger.info(f"permission denied for user {email}")
+        logger.info(
+            "launch_authorize_permission_denied",
+            extra={
+                "event_name": "launchpad.auth.launch.authorize.reject",
+                "reason_code": "APP_ACCESS_DENIED",
+                "request_id": req_id,
+                "correlation_id": corr_id,
+                "app_name": installed_app.launchpad_app_name,
+                "app_id": str(installed_app.app_id),
+                "is_shared": installed_app.is_shared,
+                "subject_hash": _mask_subject(email),
+            },
+        )
         raise Forbidden()
 
     response_headers = {
@@ -242,7 +374,18 @@ async def view_post_authorize(
         HEADER_X_AUTH_REQUEST_GROUPS: groups_str,
     }
 
-    logger.debug(f"Returning auth headers: {response_headers}")
+    logger.info(
+        "launch_authorize_success",
+        extra={
+            "event_name": "launchpad.auth.launch.authorize.success",
+            "reason_code": "AUTHORIZED",
+            "request_id": req_id,
+            "correlation_id": corr_id,
+            "app_name": installed_app.launchpad_app_name,
+            "app_id": str(installed_app.app_id),
+            "is_shared": installed_app.is_shared,
+        },
+    )
 
     return PlainTextResponse(
         "OK",
@@ -289,7 +432,14 @@ async def callback(request: Request, oauth: DepOauth) -> Response:
         except Unauthorized:
             raise
         except Exception as e:
-            logger.error(f"Token validation error in /callback POST: {e}")
+            logger.error(
+                "auth_callback_post_token_validation_failed",
+                extra={
+                    "event_name": "launchpad.auth.callback.reject",
+                    "reason_code": "TOKEN_VALIDATION_ERROR",
+                    "error_type": type(e).__name__,
+                },
+            )
             raise Unauthorized("Invalid or expired token")
 
         # Audience check
