@@ -18,9 +18,7 @@ export const LayoutCookieSync: React.FC<Props> = ({ token }) => {
       return;
     }
 
-    void setLaunchpadCookie(token).catch(() => {
-      clearLaunchpadCookie();
-    });
+    setLaunchpadCookie(token);
   }, [token]);
 
   return null;
