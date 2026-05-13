@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from starlette.responses import (
     JSONResponse,
     PlainTextResponse,
-    RedirectResponse,
     Response,
 )
 
@@ -16,6 +15,7 @@ from launchpad.apps.storage import select_app_by_any_url
 from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_EMAIL,
     HEADER_X_AUTH_REQUEST_GROUPS,
+    HEADER_X_AUTH_REQUEST_ROLES,
     HEADER_X_AUTH_REQUEST_USERNAME,
     HEADER_X_FORWARDED_HOST,
 )
@@ -211,23 +211,22 @@ async def view_post_authorize(
     logger.debug(f"Token groups: {decoded_token.get('groups')}")
 
     try:
-        email = decoded_token["email"]
+        email = str(decoded_token["email"])
     except KeyError:
-        logger.error("malformed token. forbidden")
-        raise Forbidden()
+        logger.error("Token missing required 'email' claim; denying access")
+        raise Forbidden("Token is missing required 'email' claim")
 
     # extract username from token
-    username = decoded_token.get("preferred_username", email)
+    username = str(decoded_token.get("preferred_username", email))
 
-    # extract groups from token (can be in "groups" or "realm_access.roles")
+    # groups and realm roles are forwarded separately to downstream apps.
     groups = decoded_token.get("groups", [])
-    if not groups:
-        # fallback to roles if no groups claim exists
-        groups = decoded_token.get("realm_access", {}).get("roles", [])
+    realm_roles = decoded_token.get("realm_access", {}).get("roles", [])
     groups_str = ",".join(groups) if groups else ""
+    roles_str = ",".join(realm_roles) if realm_roles else ""
 
     logger.debug(
-        f"Authorizing user - Email: {email}, Username: {username}, Groups: {groups_str}"
+        f"Authorizing user - Email: {email}, Username: {username}, Groups: {groups_str}, Roles: {roles_str}"
     )
 
     # check permissions for individual apps
@@ -235,11 +234,12 @@ async def view_post_authorize(
         logger.info(f"permission denied for user {email}")
         raise Forbidden()
 
-    response_headers = {
+    response_headers: dict[str, str] = {
         # pass headers to a downstream app via traefik auth middleware
         HEADER_X_AUTH_REQUEST_EMAIL: email,
         HEADER_X_AUTH_REQUEST_USERNAME: username,
         HEADER_X_AUTH_REQUEST_GROUPS: groups_str,
+        HEADER_X_AUTH_REQUEST_ROLES: roles_str,
     }
 
     logger.debug(f"Returning auth headers: {response_headers}")
