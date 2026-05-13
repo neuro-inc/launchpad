@@ -223,7 +223,7 @@ async def _get_jwks(
     Therefore, we cache the response by a token `kid`.
     """
     url = f"{keycloak_config.url}/realms/{keycloak_config.realm}/protocol/openid-connect/certs"
-    response = await http.get(url, ssl=False)  # todo: see what we can do here with cert
+    response = await http.get(url, ssl=keycloak_config.ssl_verify)
     response.raise_for_status()
     return await response.json()
 

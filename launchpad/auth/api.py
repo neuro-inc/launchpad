@@ -309,6 +309,7 @@ async def view_post_authorize(
     )
     try:
         decoded_token = await decode_token_from_request(request, oauth)
+        await _validate_token_audience(decoded_token, request.app.config.keycloak)
     except Unauthorized:
         logger.info(
             "launch_authorize_redirect_to_idp",

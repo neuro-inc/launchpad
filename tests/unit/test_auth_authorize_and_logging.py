@@ -103,7 +103,12 @@ async def test_authorize_denies_access_for_private_app_non_owner(
     async def fake_decode_token_from_request(
         request: object, oauth: object
     ) -> dict[str, str]:
-        return {"email": "attacker@example.com", "preferred_username": "attacker"}
+        return {
+            "email": "attacker@example.com",
+            "preferred_username": "attacker",
+            "azp": "frontend",
+            "aud": "account",
+        }
 
     monkeypatch.setattr(
         "launchpad.auth.api.select_app_by_any_url", fake_select_app_by_any_url
