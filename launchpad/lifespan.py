@@ -92,3 +92,10 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
                 await output_processing_task
             except asyncio.CancelledError:
                 pass
+
+            if "launchpad_init_task" in locals():
+                try:
+                    launchpad_init_task.cancel()
+                    await launchpad_init_task
+                except asyncio.CancelledError:
+                    pass

@@ -45,6 +45,7 @@ class Oauth:
         self._url = keycloak_config.url
         self._realm = keycloak_config.realm
         self._client_id = keycloak_config.client_id
+        self._ssl_verify = keycloak_config.ssl_verify
         self._cookie_domain = f".{cookie_domain}"
         self._launchpad_domain = launchpad_domain
         self._callback_url = f"https://{self._launchpad_domain}/auth/callback"
@@ -124,7 +125,9 @@ class Oauth:
         exception=(ClientConnectionError, Retry),
     )
     async def _fetch_token(self, data: dict[str, str]) -> str:
-        async with self._http.post(self._token_url, data=data, ssl=False) as response:
+        async with self._http.post(
+            self._token_url, data=data, ssl=self._ssl_verify
+        ) as response:
             try:
                 response.raise_for_status()
             except ClientResponseError as e:
