@@ -14,7 +14,6 @@ from pydantic import BaseModel
 from starlette.responses import (
     JSONResponse,
     PlainTextResponse,
-    RedirectResponse,
     Response,
 )
 
@@ -22,6 +21,7 @@ from launchpad.apps.storage import select_app_by_any_url
 from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_EMAIL,
     HEADER_X_AUTH_REQUEST_GROUPS,
+    HEADER_X_AUTH_REQUEST_ROLES,
     HEADER_X_AUTH_REQUEST_USERNAME,
     HEADER_X_FORWARDED_HOST,
 )
@@ -663,92 +663,25 @@ async def view_post_authorize(
     )
 
     try:
-        email = decoded_token["email"]
+        email = str(decoded_token["email"])
     except KeyError:
-        _log_auth_decision(
-            logging.WARNING,
-            "launchpad.auth.claims.checked",
-            decision="deny",
-            reason_code="USER_NOT_FOUND",
-            branch="launchpad.auth.api.view_post_authorize.email_claim_missing",
-            request=request,
-            forwarded_host=forwarded_host,
-            installed_app=installed_app,
-            token_meta=token_meta,
-            token_valid=True,
-            issuer_valid=True,
-            audience_valid=True,
-            authorized_party_valid=True,
-            session_present=raw_token is not None,
-            session_valid=True,
-            app_access_granted=None,
-            redirect_required=False,
-            forwardauth_result="deny",
-        )
-        _log_auth_decision(
-            logging.WARNING,
-            "launchpad.auth.forwardauth.denied",
-            decision="deny",
-            reason_code="USER_NOT_FOUND",
-            branch="launchpad.auth.api.view_post_authorize.email_claim_missing",
-            request=request,
-            forwarded_host=forwarded_host,
-            installed_app=installed_app,
-            token_meta=token_meta,
-            token_valid=True,
-            issuer_valid=True,
-            audience_valid=True,
-            authorized_party_valid=True,
-            session_present=raw_token is not None,
-            session_valid=True,
-            redirect_required=False,
-            forwardauth_result="deny",
-        )
-        _log_auth_decision(
-            logging.WARNING,
-            "launchpad.auth.authorize.completed",
-            decision="deny",
-            reason_code="USER_NOT_FOUND",
-            branch="launchpad.auth.api.view_post_authorize.email_claim_missing",
-            request=request,
-            forwarded_host=forwarded_host,
-            installed_app=installed_app,
-            token_meta=token_meta,
-            token_valid=True,
-            session_present=raw_token is not None,
-            session_valid=True,
-            redirect_required=False,
-            forwardauth_result="deny",
-        )
-        raise Forbidden()
+        logger.error("Token missing required 'email' claim; denying access")
+        raise Forbidden("Token is missing required 'email' claim")
 
-    user_id_hash = _mask_subject(email)
-    _log_auth_decision(
-        logging.INFO,
-        "launchpad.auth.claims.checked",
-        decision="evaluate",
-        reason_code="CLAIMS_VALID",
-        branch="launchpad.auth.api.view_post_authorize.claims_checked",
-        request=request,
-        forwarded_host=forwarded_host,
-        installed_app=installed_app,
-        token_meta=token_meta,
-        token_valid=True,
-        issuer_valid=True,
-        audience_valid=True,
-        authorized_party_valid=True,
-        session_present=raw_token is not None,
-        session_valid=True,
-        user_id_hash=user_id_hash,
-        redirect_required=False,
+    # extract username from token
+    username = str(decoded_token.get("preferred_username", email))
+
+    # groups and realm roles are forwarded separately to downstream apps.
+    groups = decoded_token.get("groups", [])
+    realm_roles = decoded_token.get("realm_access", {}).get("roles", [])
+    groups_str = ",".join(groups) if groups else ""
+    roles_str = ",".join(realm_roles) if realm_roles else ""
+
+    logger.debug(
+        f"Authorizing user - Email: {email}, Username: {username}, Groups: {groups_str}, Roles: {roles_str}"
     )
 
-    username = decoded_token.get("preferred_username", email)
-    groups = decoded_token.get("groups", [])
-    if not groups:
-        groups = decoded_token.get("realm_access", {}).get("roles", [])
-    groups_str = ",".join(groups) if groups else ""
-
+    # check permissions for individual apps
     if not installed_app.is_shared and email != installed_app.user_id:
         _log_auth_decision(
             logging.WARNING,
@@ -812,32 +745,12 @@ async def view_post_authorize(
         )
         raise Forbidden()
 
-    _log_auth_decision(
-        logging.INFO,
-        "launchpad.auth.app_access.checked",
-        decision="allow",
-        reason_code="APP_ACCESS_GRANTED",
-        branch="launchpad.auth.api.view_post_authorize.app_access",
-        request=request,
-        forwarded_host=forwarded_host,
-        installed_app=installed_app,
-        token_meta=token_meta,
-        token_valid=True,
-        issuer_valid=True,
-        audience_valid=True,
-        authorized_party_valid=True,
-        session_present=raw_token is not None,
-        session_valid=True,
-        user_id_hash=user_id_hash,
-        app_access_granted=True,
-        redirect_required=False,
-        forwardauth_result="allow",
-    )
-
-    response_headers = {
+    response_headers: dict[str, str] = {
+        # pass headers to a downstream app via traefik auth middleware
         HEADER_X_AUTH_REQUEST_EMAIL: email,
         HEADER_X_AUTH_REQUEST_USERNAME: username,
         HEADER_X_AUTH_REQUEST_GROUPS: groups_str,
+        HEADER_X_AUTH_REQUEST_ROLES: roles_str,
     }
 
     _log_auth_decision(
