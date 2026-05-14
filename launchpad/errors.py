@@ -31,8 +31,19 @@ class BadRequest(LaunchpadApiError):
 
 
 class Unauthorized(LaunchpadApiError):
-    def __init__(self, message: str = "Unathorized", **kwargs: Any):
+    def __init__(
+        self,
+        message: str = "Unathorized",
+        *,
+        reason_code: str | None = None,
+        branch: str | None = None,
+        safe_meta: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ):
         super().__init__(status_code=HTTP_401_UNAUTHORIZED, message=message, **kwargs)
+        self.reason_code = reason_code
+        self.branch = branch
+        self.safe_meta = safe_meta or {}
 
 
 class Forbidden(LaunchpadApiError):

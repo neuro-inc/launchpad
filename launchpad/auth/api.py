@@ -1,8 +1,11 @@
 import hashlib
+import hmac
 import logging
+import os
 import time
 from typing import Any, Mapping
 from urllib.parse import urlparse
+from uuid import uuid4
 
 import aiohttp
 import jwt
@@ -28,15 +31,13 @@ from launchpad.auth.dependencies import (
     get_raw_token_from_request,
     token_from_string,
 )
-
-
-_token_from_request = get_raw_token_from_request
 from launchpad.auth.oauth import DepOauth, OauthError
 from launchpad.db.dependencies import Db
 from launchpad.errors import Forbidden, Unauthorized
 
 
 logger = logging.getLogger(__name__)
+_LOG_HASH_KEY = os.urandom(32)
 
 auth_router = APIRouter()
 
@@ -56,12 +57,16 @@ class TokenResponse(BaseModel):
 
 
 def _request_id(request: Request) -> str | None:
-    return request.headers.get("x-request-id")
+    return request.headers.get("x-request-id") or getattr(
+        getattr(request, "state", None), "request_id", None
+    )
 
 
 def _correlation_id(request: Request) -> str | None:
-    return request.headers.get("x-correlation-id") or request.headers.get(
-        "x-amzn-trace-id"
+    return (
+        request.headers.get("x-correlation-id")
+        or request.headers.get("x-amzn-trace-id")
+        or getattr(getattr(request, "state", None), "correlation_id", None)
     )
 
 
@@ -75,8 +80,18 @@ def _classify_launch_url(host: str) -> str:
 
 def _safe_token_meta(raw_token: str | None) -> dict[str, Any]:
     if not raw_token:
-        return {"token_present": False}
-    meta: dict[str, Any] = {"token_present": True}
+        return {
+            "token_present": False,
+            "token_valid": None,
+            "token_expired": None,
+            "token_ttl_seconds": None,
+        }
+    meta: dict[str, Any] = {
+        "token_present": True,
+        "token_valid": None,
+        "token_expired": None,
+        "token_ttl_seconds": None,
+    }
     try:
         payload = jwt.decode(raw_token, options={"verify_signature": False})
     except jwt.PyJWTError:
@@ -85,17 +100,125 @@ def _safe_token_meta(raw_token: str | None) -> dict[str, Any]:
     exp = payload.get("exp")
     now = int(time.time())
     if isinstance(exp, int):
-        meta["token_exp_unix"] = exp
-        meta["token_ttl_s"] = max(exp - now, 0)
-    if isinstance(payload.get("iss"), str):
-        meta["token_issuer_present"] = True
-    if payload.get("aud") is not None:
-        meta["token_audience_present"] = True
+        ttl = exp - now
+        meta["token_ttl_seconds"] = max(ttl, 0)
+        meta["token_expired"] = ttl <= 0
     return meta
 
 
 def _mask_subject(subject: str) -> str:
-    return hashlib.sha256(subject.encode("utf-8")).hexdigest()[:12]
+    return hmac.new(
+        _LOG_HASH_KEY,
+        subject.strip().lower().encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:12]
+
+
+def _auth_log_base(
+    request: Request,
+    *,
+    forwarded_host: str | None = None,
+    installed_app: Any | None = None,
+    token_meta: Mapping[str, Any] | None = None,
+    token_valid: bool | None = None,
+    issuer_valid: bool | None = None,
+    audience_valid: bool | None = None,
+    authorized_party_valid: bool | None = None,
+    session_present: bool | None = None,
+    session_valid: bool | None = None,
+    user_id_hash: str | None = None,
+    app_access_granted: bool | None = None,
+    redirect_required: bool | None = None,
+    redirect_target_type: str | None = None,
+    forwardauth_result: str | None = None,
+) -> dict[str, Any]:
+    request_id = _request_id(request) or uuid4().hex
+    correlation_id = _correlation_id(request) or request_id
+    app_name = (
+        getattr(installed_app, "launchpad_app_name", None) if installed_app else None
+    )
+    app_id = str(getattr(installed_app, "app_id", None)) if installed_app else None
+    app_user_id = getattr(installed_app, "user_id", None) if installed_app else None
+    return {
+        "request_id": request_id,
+        "correlation_id": correlation_id,
+        "path": str(request.url.path),
+        "method": request.method,
+        "target_app_id": app_id,
+        "target_app_name": app_name,
+        "target_app_host": forwarded_host,
+        "token_present": None,
+        "token_valid": token_valid,
+        "token_expired": None,
+        "token_ttl_seconds": None,
+        "issuer_valid": issuer_valid,
+        "audience_valid": audience_valid,
+        "authorized_party_valid": authorized_party_valid,
+        "session_present": session_present,
+        "session_valid": session_valid,
+        "user_id_hash": user_id_hash,
+        "app_access_granted": app_access_granted,
+        "redirect_required": redirect_required,
+        "redirect_target_type": redirect_target_type,
+        "forwardauth_result": forwardauth_result,
+        "app_owner_hash": _mask_subject(app_user_id) if app_user_id else None,
+        **(dict(token_meta) if token_meta else {}),
+    }
+
+
+def _log_auth_decision(
+    level: int,
+    event: str,
+    *,
+    decision: str,
+    reason_code: str,
+    branch: str,
+    request: Request,
+    forwarded_host: str | None = None,
+    installed_app: Any | None = None,
+    token_meta: Mapping[str, Any] | None = None,
+    token_valid: bool | None = None,
+    issuer_valid: bool | None = None,
+    audience_valid: bool | None = None,
+    authorized_party_valid: bool | None = None,
+    session_present: bool | None = None,
+    session_valid: bool | None = None,
+    user_id_hash: str | None = None,
+    app_access_granted: bool | None = None,
+    redirect_required: bool | None = None,
+    redirect_target_type: str | None = None,
+    forwardauth_result: str | None = None,
+    extra: Mapping[str, Any] | None = None,
+) -> None:
+    payload = _auth_log_base(
+        request,
+        forwarded_host=forwarded_host,
+        installed_app=installed_app,
+        token_meta=token_meta,
+        token_valid=token_valid,
+        issuer_valid=issuer_valid,
+        audience_valid=audience_valid,
+        authorized_party_valid=authorized_party_valid,
+        session_present=session_present,
+        session_valid=session_valid,
+        user_id_hash=user_id_hash,
+        app_access_granted=app_access_granted,
+        redirect_required=redirect_required,
+        redirect_target_type=redirect_target_type,
+        forwardauth_result=forwardauth_result,
+    )
+    payload.update(
+        {
+            "event": event,
+            "event_name": event,
+            "decision": decision,
+            "reason_code": reason_code,
+            "branch": branch,
+        }
+    )
+    if extra:
+        payload.update(dict(extra))
+    logger.log(level, event, extra=payload)
 
 
 def _validate_origin(request: Request) -> None:
@@ -139,11 +262,31 @@ async def _validate_token_audience(
 
     azp = decoded.get("azp")
 
-    if not (azp == expected_client or expected_client in aud):
+    if azp == expected_client or expected_client in aud:
+        return
+
+    if azp is not None:
         logger.warning(
-            f"Audience mismatch: expected={expected_client}, aud={aud}, azp={azp}"
+            "authorized_party_mismatch",
+            extra={
+                "event": "launchpad.auth.claims.checked",
+                "event_name": "launchpad.auth.claims.checked",
+                "reason_code": "AUTHORIZED_PARTY_INVALID",
+                "expected_client_id": expected_client,
+                "token_audience_count": len(aud),
+                "authorized_party_present": True,
+            },
         )
-        raise Unauthorized("Invalid token audience")
+        raise Unauthorized(
+            "Invalid token audience",
+            reason_code="AUTHORIZED_PARTY_INVALID",
+            branch="launchpad.auth.api._validate_token_audience.azp",
+        )
+    raise Unauthorized(
+        "Invalid token audience",
+        reason_code="AUDIENCE_INVALID",
+        branch="launchpad.auth.api._validate_token_audience.aud",
+    )
 
 
 @auth_router.post("/token", response_model=TokenResponse)
@@ -257,135 +400,485 @@ async def view_post_authorize(
     db: Db,
     oauth: DepOauth,
 ) -> Response:
-    forwarded_host = request.headers[HEADER_X_FORWARDED_HOST]
+    forwarded_host = request.headers.get(HEADER_X_FORWARDED_HOST)
+    if not forwarded_host:
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.forwardauth.denied",
+            decision="deny",
+            reason_code="FORWARDAUTH_HOST_MISSING",
+            branch="launchpad.auth.api.view_post_authorize.forwarded_host_missing",
+            request=request,
+            redirect_required=False,
+            forwardauth_result="deny",
+        )
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.authorize.completed",
+            decision="deny",
+            reason_code="FORWARDAUTH_HOST_MISSING",
+            branch="launchpad.auth.api.view_post_authorize.forwarded_host_missing",
+            request=request,
+            redirect_required=False,
+            forwardauth_result="deny",
+        )
+        raise Unauthorized(
+            "Missing ForwardAuth host header",
+            reason_code="FORWARDAUTH_HOST_MISSING",
+            branch="launchpad.auth.api.view_post_authorize.forwarded_host_missing",
+        )
     app_url = f"https://{forwarded_host}"
-    req_id = _request_id(request)
-    corr_id = _correlation_id(request)
-    logger.info(
-        "launch_authorize_started",
-        extra={
-            "event_name": "launchpad.auth.launch.authorize.start",
-            "reason_code": "START",
-            "request_id": req_id,
-            "correlation_id": corr_id,
-            "target_host": forwarded_host,
-            "launch_url_category": _classify_launch_url(forwarded_host),
-        },
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.app_launch.started",
+        decision="evaluate",
+        reason_code="START",
+        branch="launchpad.auth.api.view_post_authorize.start",
+        request=request,
+        forwarded_host=forwarded_host,
+        redirect_required=False,
+        extra={"launch_url_category": _classify_launch_url(forwarded_host)},
+    )
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.auth.authorize.started",
+        decision="evaluate",
+        reason_code="START",
+        branch="launchpad.auth.api.view_post_authorize.start",
+        request=request,
+        forwarded_host=forwarded_host,
+        redirect_required=False,
+        extra={"launch_url_category": _classify_launch_url(forwarded_host)},
     )
 
     installed_app = await select_app_by_any_url(db=db, url=app_url)
     if installed_app is None:
-        logger.info(
-            "launch_authorize_app_not_found",
-            extra={
-                "event_name": "launchpad.auth.launch.authorize.reject",
-                "reason_code": "APP_NOT_FOUND_BY_URL",
-                "request_id": req_id,
-                "correlation_id": corr_id,
-                "target_host": forwarded_host,
-            },
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.forwardauth.denied",
+            decision="deny",
+            reason_code="TARGET_APP_UNRESOLVED",
+            branch="launchpad.auth.api.view_post_authorize.app_lookup",
+            request=request,
+            forwarded_host=forwarded_host,
+            redirect_required=False,
+            forwardauth_result="deny",
+        )
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.authorize.completed",
+            decision="deny",
+            reason_code="TARGET_APP_UNRESOLVED",
+            branch="launchpad.auth.api.view_post_authorize.app_lookup",
+            request=request,
+            forwarded_host=forwarded_host,
+            redirect_required=False,
+            forwardauth_result="deny",
         )
         raise Forbidden()
 
-    # make internal apps accessible for apps that only expose an api, not a web page
-    # if installed_app.is_internal:
-    #     logger.info("access to an internal app is forbidden")
-    #     raise Forbidden()
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.app_launch.target_resolved",
+        decision="evaluate",
+        reason_code="TARGET_APP_RESOLVED",
+        branch="launchpad.auth.api.view_post_authorize.target_resolved",
+        request=request,
+        forwarded_host=forwarded_host,
+        installed_app=installed_app,
+        redirect_required=False,
+    )
 
-    # Attempt to decode token (prefers cookie when oauth provided)
-    raw_token = _token_from_request(request, oauth, allow_cookie=True)
+    raw_token = get_raw_token_from_request(request, oauth, allow_cookie=True)
     token_meta = _safe_token_meta(raw_token)
-    logger.info(
-        "launch_authorize_token_presence_checked",
-        extra={
-            "event_name": "launchpad.auth.launch.token.checked",
-            "reason_code": "TOKEN_PRESENCE_CHECKED",
-            "request_id": req_id,
-            "correlation_id": corr_id,
-            "app_name": installed_app.launchpad_app_name,
-            "app_id": str(installed_app.app_id),
-            **token_meta,
-        },
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.auth.cookie.checked",
+        decision="evaluate",
+        reason_code="TOKEN_PRESENT" if raw_token else "TOKEN_MISSING",
+        branch="launchpad.auth.api.view_post_authorize.cookie_checked",
+        request=request,
+        forwarded_host=forwarded_host,
+        installed_app=installed_app,
+        token_meta=token_meta,
+        session_present=raw_token is not None,
+        session_valid=None,
+        redirect_required=False,
+    )
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.auth.token.validation_started",
+        decision="evaluate",
+        reason_code="TOKEN_VALIDATION_STARTED",
+        branch="launchpad.auth.api.view_post_authorize.token_validation_started",
+        request=request,
+        forwarded_host=forwarded_host,
+        installed_app=installed_app,
+        token_meta=token_meta,
+        session_present=raw_token is not None,
+        session_valid=None,
+        redirect_required=False,
     )
     try:
         decoded_token = await decode_token_from_request(request, oauth)
         await _validate_token_audience(decoded_token, request.app.config.keycloak)
-    except Unauthorized:
-        logger.info(
-            "launch_authorize_redirect_to_idp",
-            extra={
-                "event_name": "launchpad.auth.launch.redirect",
-                "reason_code": "TOKEN_MISSING_OR_INVALID",
-                "request_id": req_id,
-                "correlation_id": corr_id,
-                "app_name": installed_app.launchpad_app_name,
-                "app_id": str(installed_app.app_id),
-                **token_meta,
-            },
+    except Unauthorized as exc:
+        reason_code = getattr(exc, "reason_code", None) or "UNKNOWN_AUTH_REDIRECT"
+        branch = (
+            getattr(exc, "branch", None)
+            or "launchpad.auth.api.view_post_authorize.token_validation"
+        )
+        safe_meta = getattr(exc, "safe_meta", {}) or {}
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.token.validation_failed",
+            decision="redirect_to_auth",
+            reason_code=reason_code,
+            branch=branch,
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=False,
+            issuer_valid=False if reason_code == "ISSUER_INVALID" else None,
+            audience_valid=False if reason_code == "AUDIENCE_INVALID" else None,
+            authorized_party_valid=(
+                False if reason_code == "AUTHORIZED_PARTY_INVALID" else None
+            ),
+            session_present=raw_token is not None,
+            session_valid=False,
+            redirect_required=True,
+            redirect_target_type="keycloak",
+            forwardauth_result="redirect",
+            extra=safe_meta,
+        )
+        _log_auth_decision(
+            logging.INFO,
+            "launchpad.auth.reauthorization.required",
+            decision="redirect_to_auth",
+            reason_code=reason_code,
+            branch=branch,
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=False,
+            issuer_valid=False if reason_code == "ISSUER_INVALID" else None,
+            audience_valid=False if reason_code == "AUDIENCE_INVALID" else None,
+            authorized_party_valid=(
+                False if reason_code == "AUTHORIZED_PARTY_INVALID" else None
+            ),
+            session_present=raw_token is not None,
+            session_valid=False,
+            redirect_required=True,
+            redirect_target_type="keycloak",
+            forwardauth_result="redirect",
+            extra=safe_meta,
+        )
+        _log_auth_decision(
+            logging.INFO,
+            "launchpad.app_launch.redirect_prepared",
+            decision="redirect_to_auth",
+            reason_code=reason_code,
+            branch=branch,
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=False,
+            issuer_valid=False if reason_code == "ISSUER_INVALID" else None,
+            audience_valid=False if reason_code == "AUDIENCE_INVALID" else None,
+            authorized_party_valid=(
+                False if reason_code == "AUTHORIZED_PARTY_INVALID" else None
+            ),
+            session_present=raw_token is not None,
+            session_valid=False,
+            redirect_required=True,
+            redirect_target_type="keycloak",
+            forwardauth_result="redirect",
+        )
+        _log_auth_decision(
+            logging.INFO,
+            "launchpad.auth.forwardauth.redirected",
+            decision="redirect_to_auth",
+            reason_code=reason_code,
+            branch=branch,
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=False,
+            issuer_valid=False if reason_code == "ISSUER_INVALID" else None,
+            audience_valid=False if reason_code == "AUDIENCE_INVALID" else None,
+            authorized_party_valid=(
+                False if reason_code == "AUTHORIZED_PARTY_INVALID" else None
+            ),
+            session_present=raw_token is not None,
+            session_valid=False,
+            redirect_required=True,
+            redirect_target_type="keycloak",
+            forwardauth_result="redirect",
+        )
+        _log_auth_decision(
+            logging.INFO,
+            "launchpad.auth.authorize.completed",
+            decision="redirect_to_auth",
+            reason_code=reason_code,
+            branch=branch,
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=False,
+            issuer_valid=False if reason_code == "ISSUER_INVALID" else None,
+            audience_valid=False if reason_code == "AUDIENCE_INVALID" else None,
+            authorized_party_valid=(
+                False if reason_code == "AUTHORIZED_PARTY_INVALID" else None
+            ),
+            session_present=raw_token is not None,
+            session_valid=False,
+            redirect_required=True,
+            redirect_target_type="keycloak",
+            forwardauth_result="redirect",
         )
         return oauth.redirect(original_redirect_uri=app_url)
+
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.auth.token.validation_succeeded",
+        decision="evaluate",
+        reason_code="TOKEN_VALID",
+        branch="launchpad.auth.api.view_post_authorize.token_valid",
+        request=request,
+        forwarded_host=forwarded_host,
+        installed_app=installed_app,
+        token_meta=token_meta,
+        token_valid=True,
+        issuer_valid=True,
+        audience_valid=True,
+        authorized_party_valid=True,
+        session_present=raw_token is not None,
+        session_valid=True,
+        redirect_required=False,
+    )
 
     try:
         email = decoded_token["email"]
     except KeyError:
-        logger.error(
-            "launch_authorize_missing_email_claim",
-            extra={
-                "event_name": "launchpad.auth.launch.authorize.reject",
-                "reason_code": "MISSING_EMAIL_CLAIM",
-                "request_id": req_id,
-                "correlation_id": corr_id,
-                "app_name": installed_app.launchpad_app_name,
-                "app_id": str(installed_app.app_id),
-            },
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.claims.checked",
+            decision="deny",
+            reason_code="USER_NOT_FOUND",
+            branch="launchpad.auth.api.view_post_authorize.email_claim_missing",
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=True,
+            issuer_valid=True,
+            audience_valid=True,
+            authorized_party_valid=True,
+            session_present=raw_token is not None,
+            session_valid=True,
+            app_access_granted=None,
+            redirect_required=False,
+            forwardauth_result="deny",
+        )
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.forwardauth.denied",
+            decision="deny",
+            reason_code="USER_NOT_FOUND",
+            branch="launchpad.auth.api.view_post_authorize.email_claim_missing",
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=True,
+            issuer_valid=True,
+            audience_valid=True,
+            authorized_party_valid=True,
+            session_present=raw_token is not None,
+            session_valid=True,
+            redirect_required=False,
+            forwardauth_result="deny",
+        )
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.authorize.completed",
+            decision="deny",
+            reason_code="USER_NOT_FOUND",
+            branch="launchpad.auth.api.view_post_authorize.email_claim_missing",
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=True,
+            session_present=raw_token is not None,
+            session_valid=True,
+            redirect_required=False,
+            forwardauth_result="deny",
         )
         raise Forbidden()
 
-    # extract username from token
-    username = decoded_token.get("preferred_username", email)
+    user_id_hash = _mask_subject(email)
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.auth.claims.checked",
+        decision="evaluate",
+        reason_code="CLAIMS_VALID",
+        branch="launchpad.auth.api.view_post_authorize.claims_checked",
+        request=request,
+        forwarded_host=forwarded_host,
+        installed_app=installed_app,
+        token_meta=token_meta,
+        token_valid=True,
+        issuer_valid=True,
+        audience_valid=True,
+        authorized_party_valid=True,
+        session_present=raw_token is not None,
+        session_valid=True,
+        user_id_hash=user_id_hash,
+        redirect_required=False,
+    )
 
-    # extract groups from token (can be in "groups" or "realm_access.roles")
+    username = decoded_token.get("preferred_username", email)
     groups = decoded_token.get("groups", [])
     if not groups:
-        # fallback to roles if no groups claim exists
         groups = decoded_token.get("realm_access", {}).get("roles", [])
     groups_str = ",".join(groups) if groups else ""
 
-    # check permissions for individual apps
     if not installed_app.is_shared and email != installed_app.user_id:
-        logger.info(
-            "launch_authorize_permission_denied",
-            extra={
-                "event_name": "launchpad.auth.launch.authorize.reject",
-                "reason_code": "APP_ACCESS_DENIED",
-                "request_id": req_id,
-                "correlation_id": corr_id,
-                "app_name": installed_app.launchpad_app_name,
-                "app_id": str(installed_app.app_id),
-                "is_shared": installed_app.is_shared,
-                "subject_hash": _mask_subject(email),
-            },
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.app_access.checked",
+            decision="deny",
+            reason_code="APP_ACCESS_DENIED",
+            branch="launchpad.auth.api.view_post_authorize.app_access",
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=True,
+            issuer_valid=True,
+            audience_valid=True,
+            authorized_party_valid=True,
+            session_present=raw_token is not None,
+            session_valid=True,
+            user_id_hash=user_id_hash,
+            app_access_granted=False,
+            redirect_required=False,
+            forwardauth_result="deny",
+        )
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.forwardauth.denied",
+            decision="deny",
+            reason_code="APP_ACCESS_DENIED",
+            branch="launchpad.auth.api.view_post_authorize.app_access",
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=True,
+            issuer_valid=True,
+            audience_valid=True,
+            authorized_party_valid=True,
+            session_present=raw_token is not None,
+            session_valid=True,
+            user_id_hash=user_id_hash,
+            app_access_granted=False,
+            redirect_required=False,
+            forwardauth_result="deny",
+        )
+        _log_auth_decision(
+            logging.WARNING,
+            "launchpad.auth.authorize.completed",
+            decision="deny",
+            reason_code="APP_ACCESS_DENIED",
+            branch="launchpad.auth.api.view_post_authorize.app_access",
+            request=request,
+            forwarded_host=forwarded_host,
+            installed_app=installed_app,
+            token_meta=token_meta,
+            token_valid=True,
+            session_present=raw_token is not None,
+            session_valid=True,
+            user_id_hash=user_id_hash,
+            app_access_granted=False,
+            redirect_required=False,
+            forwardauth_result="deny",
         )
         raise Forbidden()
 
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.auth.app_access.checked",
+        decision="allow",
+        reason_code="APP_ACCESS_GRANTED",
+        branch="launchpad.auth.api.view_post_authorize.app_access",
+        request=request,
+        forwarded_host=forwarded_host,
+        installed_app=installed_app,
+        token_meta=token_meta,
+        token_valid=True,
+        issuer_valid=True,
+        audience_valid=True,
+        authorized_party_valid=True,
+        session_present=raw_token is not None,
+        session_valid=True,
+        user_id_hash=user_id_hash,
+        app_access_granted=True,
+        redirect_required=False,
+        forwardauth_result="allow",
+    )
+
     response_headers = {
-        # pass headers to a downstream app via traefik auth middleware
         HEADER_X_AUTH_REQUEST_EMAIL: email,
         HEADER_X_AUTH_REQUEST_USERNAME: username,
         HEADER_X_AUTH_REQUEST_GROUPS: groups_str,
     }
 
-    logger.info(
-        "launch_authorize_success",
-        extra={
-            "event_name": "launchpad.auth.launch.authorize.success",
-            "reason_code": "AUTHORIZED",
-            "request_id": req_id,
-            "correlation_id": corr_id,
-            "app_name": installed_app.launchpad_app_name,
-            "app_id": str(installed_app.app_id),
-            "is_shared": installed_app.is_shared,
-        },
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.auth.forwardauth.allowed",
+        decision="allow",
+        reason_code="AUTHORIZED",
+        branch="launchpad.auth.api.view_post_authorize.allow",
+        request=request,
+        forwarded_host=forwarded_host,
+        installed_app=installed_app,
+        token_meta=token_meta,
+        token_valid=True,
+        issuer_valid=True,
+        audience_valid=True,
+        authorized_party_valid=True,
+        session_present=raw_token is not None,
+        session_valid=True,
+        user_id_hash=user_id_hash,
+        app_access_granted=True,
+        redirect_required=False,
+        forwardauth_result="allow",
+        extra={"forwardauth_headers_present": True},
+    )
+    _log_auth_decision(
+        logging.INFO,
+        "launchpad.auth.authorize.completed",
+        decision="allow",
+        reason_code="AUTHORIZED",
+        branch="launchpad.auth.api.view_post_authorize.allow",
+        request=request,
+        forwarded_host=forwarded_host,
+        installed_app=installed_app,
+        token_meta=token_meta,
+        token_valid=True,
+        session_present=raw_token is not None,
+        session_valid=True,
+        user_id_hash=user_id_hash,
+        app_access_granted=True,
+        redirect_required=False,
+        forwardauth_result="allow",
     )
 
     return PlainTextResponse(

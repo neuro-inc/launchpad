@@ -125,7 +125,11 @@ async def decode_token_from_request(
         request, oauth=oauth, allow_cookie=allow_cookie
     )
     if not raw_token:
-        raise Unauthorized("Unauthorized")
+        raise Unauthorized(
+            "Unauthorized",
+            reason_code="TOKEN_MISSING",
+            branch="launchpad.auth.dependencies.decode_token_from_request.missing_token",
+        )
 
     return await token_from_string(
         http=request.app.http,
@@ -138,7 +142,11 @@ async def _token_from_request(request: Request) -> dict[str, Any]:
     """Extract bearer token from Authorization header and return decoded payload."""
     raw_token = _extract_bearer_token(request.headers.get("Authorization"))
     if not raw_token:
-        raise Unauthorized("Unathorized")
+        raise Unauthorized(
+            "Unathorized",
+            reason_code="TOKEN_MISSING",
+            branch="launchpad.auth.dependencies._token_from_request.missing_bearer",
+        )
     return await token_from_string(
         http=request.app.http,
         keycloak_config=request.app.config.keycloak,
@@ -157,16 +165,29 @@ async def token_from_string(
         header = jwt.get_unverified_header(access_token)
     except jwt.PyJWTError:
         logger.exception("can't get token header")
-        raise Unauthorized()
+        raise Unauthorized(
+            reason_code="TOKEN_MALFORMED",
+            branch="launchpad.auth.dependencies.token_from_string.unverified_header",
+        )
 
-    kid, alg = header["kid"], header["alg"]
+    try:
+        kid, alg = header["kid"], header["alg"]
+    except KeyError as exc:
+        raise Unauthorized(
+            reason_code="TOKEN_MALFORMED",
+            branch="launchpad.auth.dependencies.token_from_string.header_claims",
+        ) from exc
     alg_obj = jwt.get_algorithm_by_name(alg)
 
     try:
         jwks = await _get_jwks(http=http, keycloak_config=keycloak_config, kid=kid)
     except Exception:
         logger.exception("can't obtain JWKS")
-        raise Unauthorized()
+        raise Unauthorized(
+            reason_code="KEYCLOAK_JWKS_FETCH_FAILED",
+            branch="launchpad.auth.dependencies.token_from_string.jwks_fetch",
+            safe_meta={"ssl_verify": keycloak_config.ssl_verify},
+        )
 
     # get a secret key from a JWKS
     for key in jwks["keys"]:
@@ -177,14 +198,18 @@ async def token_from_string(
         logger.error(
             "jwt_kid_not_found_in_jwks",
             extra={
-                "event_name": "launchpad.auth.jwt.decode.failed",
+                "event": "launchpad.auth.token.validation_failed",
+                "event_name": "launchpad.auth.token.validation_failed",
                 "reason_code": "KID_NOT_FOUND",
                 "kid": kid,
                 "jwks_key_count": len(jwks.get("keys", [])),
                 "token_fingerprint": _token_fingerprint(access_token),
             },
         )
-        raise Unauthorized()
+        raise Unauthorized(
+            reason_code="TOKEN_SIGNATURE_INVALID",
+            branch="launchpad.auth.dependencies.token_from_string.kid_not_found",
+        )
 
     try:
         token: dict[str, Any] = jwt.decode(
@@ -196,10 +221,41 @@ async def token_from_string(
         )
         return token
     except jwt.ExpiredSignatureError:
-        raise Unauthorized()
+        raise Unauthorized(
+            reason_code="TOKEN_EXPIRED",
+            branch="launchpad.auth.dependencies.token_from_string.expired",
+        )
+    except jwt.ImmatureSignatureError:
+        raise Unauthorized(
+            reason_code="TOKEN_NOT_YET_VALID",
+            branch="launchpad.auth.dependencies.token_from_string.immature",
+        )
+    except jwt.InvalidIssuerError:
+        raise Unauthorized(
+            reason_code="ISSUER_INVALID",
+            branch="launchpad.auth.dependencies.token_from_string.issuer",
+        )
+    except jwt.InvalidAudienceError:
+        raise Unauthorized(
+            reason_code="AUDIENCE_INVALID",
+            branch="launchpad.auth.dependencies.token_from_string.audience",
+        )
+    except jwt.InvalidSignatureError:
+        raise Unauthorized(
+            reason_code="TOKEN_SIGNATURE_INVALID",
+            branch="launchpad.auth.dependencies.token_from_string.signature",
+        )
+    except jwt.DecodeError:
+        raise Unauthorized(
+            reason_code="TOKEN_MALFORMED",
+            branch="launchpad.auth.dependencies.token_from_string.decode",
+        )
     except jwt.PyJWTError:
         logger.exception("unable to decode a token")
-        raise Unauthorized()
+        raise Unauthorized(
+            reason_code="TOKEN_MALFORMED",
+            branch="launchpad.auth.dependencies.token_from_string.jwt_error",
+        )
 
 
 def cache_key_getter(*args: Any, **kwargs: str) -> str:
