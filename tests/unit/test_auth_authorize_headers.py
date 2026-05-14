@@ -17,6 +17,10 @@ from launchpad.auth.api import view_post_authorize
 def mock_request() -> MagicMock:
     request = MagicMock()
     request.headers = {HEADER_X_FORWARDED_HOST: "example.test"}
+    request.method = "GET"
+    request.url.path = "/auth/authorize"
+    request.state.request_id = "req-headers-1"
+    request.state.correlation_id = "corr-headers-1"
     return request
 
 
@@ -64,6 +68,7 @@ async def test_view_post_authorize_forwards_groups_and_roles_separately(
 ) -> None:
     db = MagicMock()
     oauth = MagicMock()
+    oauth.get_token_from_cookie.return_value = "cookie-token"
 
     with (
         patch(
@@ -72,9 +77,13 @@ async def test_view_post_authorize_forwards_groups_and_roles_separately(
         patch(
             "launchpad.auth.api.decode_token_from_request", new=AsyncMock()
         ) as mock_decode,
+        patch(
+            "launchpad.auth.api._validate_token_audience", new=AsyncMock()
+        ) as mock_validate_audience,
     ):
         mock_select_app.return_value = _installed_app()
         mock_decode.return_value = decoded_token
+        mock_validate_audience.return_value = None
 
         response = await view_post_authorize(request=mock_request, db=db, oauth=oauth)
 

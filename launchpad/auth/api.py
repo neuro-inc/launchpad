@@ -667,6 +667,7 @@ async def view_post_authorize(
     except KeyError:
         logger.error("Token missing required 'email' claim; denying access")
         raise Forbidden("Token is missing required 'email' claim")
+    user_id_hash = _mask_subject(email)
 
     # extract username from token
     username = str(decoded_token.get("preferred_username", email))
