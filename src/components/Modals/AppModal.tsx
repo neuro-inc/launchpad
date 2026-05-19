@@ -51,7 +51,12 @@ export const AppModal: React.FC<Props> = ({
             <p className="text-neural-04 sm:-mt-2">{descriptionShort}</p>
           </Render>
           <div className="mt-auto flex justify-end">
-            <Link className="px-10 sm:w-full" href={path.app(launchpadAppName)}>
+            <Link
+              blank
+              external
+              className="px-10 sm:w-full"
+              href={path.app(launchpadAppName)}
+            >
               Open
             </Link>
           </div>

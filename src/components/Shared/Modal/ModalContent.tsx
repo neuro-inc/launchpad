@@ -2,7 +2,11 @@ import clsx from 'clsx';
 
 import { cn, getCompoundSlots } from '@utils';
 
-import { Modal, Render, Slot } from '@components';
+import { Render } from '../Render';
+import { Slot } from '../Slot';
+
+import { ModalFooter } from './ModalFooter';
+import { ModalHeader } from './ModalHeader';
 
 type Props = {
   className?: string;
@@ -20,8 +24,8 @@ export const ModalContent = ({
   subtitle,
 }: Props) => {
   const { content, header, footer } = getCompoundSlots(children, {
-    header: Modal.Header,
-    footer: Modal.Footer,
+    header: ModalHeader,
+    footer: ModalFooter,
   });
 
   return (
@@ -33,7 +37,7 @@ export const ModalContent = ({
     >
       <Slot slot={header}>
         <Render if={title}>
-          <Modal.Header subtitle={subtitle}>{title}</Modal.Header>
+          <ModalHeader subtitle={subtitle}>{title}</ModalHeader>
         </Render>
       </Slot>
       <div className={clsx('px-8', { contents })}>{content}</div>

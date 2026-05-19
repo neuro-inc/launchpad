@@ -5,7 +5,7 @@ import * as TooltipUI from '@radix-ui/react-tooltip';
 import { VariantProps } from '@typings';
 import { getSlots, tv } from '@utils';
 
-import { Render } from '@components';
+import { Render } from './Render';
 
 const variants = tv({
   base: 'z-[60] rounded-lg bg-white px-3 py-4 text-body text-rebecca shadow-[0px_4px_12px_0px_rgba(0,0,0,0.12)] will-change-[transform,opacity] data-[state=closed]:duration-300 data-[state=delayed-open]:duration-300 data-[state=instant-open]:duration-300 data-[state=delayed-open]:animate-in data-[state=instant-open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=delayed-open]:fade-in data-[state=instant-open]:fade-in',

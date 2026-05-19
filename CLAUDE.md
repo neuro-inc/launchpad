@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is **Apolo Launchpad**, a Next.js 15 application that serves as a web-based portal for managing cloud-native applications. It provides a user interface for browsing, accessing, and managing applications deployed on Kubernetes infrastructure. The app uses NextAuth for authentication via Keycloak and communicates with a backend API server.
+This is **Apolo Launchpad**, a Next.js 16 application that serves as a web-based portal for managing cloud-native applications. It provides a user interface for browsing, accessing, and managing applications deployed on Kubernetes infrastructure. The app uses NextAuth for authentication via Keycloak and communicates with a backend API server.
 
 ## Key Development Commands
 
 ```bash
 # Development
-npm run dev          # Start development server with Turbopack (http://localhost:3000)
+npm run start          # Start development server with Turbopack (http://localhost:3000)
 
 # Building
 npm run build        # Production build
@@ -21,7 +21,7 @@ npm run lint:ts      # TypeScript type checking only (tsc --noEmit)
 npm run lint:eslint  # ESLint only (checks ./src directory)
 
 # Production
-npm run start        # Start production server
+npm run start:build        # Start production server
 ```
 
 ## Architecture Overview
@@ -34,7 +34,7 @@ The application uses a custom authentication system built on NextAuth with Keycl
 
 2. **Token Management**: JWT tokens are automatically refreshed before expiration via `refreshAccessToken()` in `src/features/auth.feature.ts:63`.
 
-3. **Middleware Protection**: All routes except `/auth` require authentication (see `src/middleware.ts:9`). Unauthenticated users are redirected to `/auth`, authenticated users accessing `/auth` are redirected to `/apps`.
+3. **Middleware Protection**: All routes except `/auth` require authentication (see `src/proxy.ts:1`). Unauthenticated users are redirected to `/auth`, authenticated users accessing `/auth` are redirected to `/apps`.
 
 4. **Multi-Environment URLs**: The app dynamically determines its URLs at runtime:
    - In localhost development: API calls are proxied to `https://launchpad.apps.dev.apolo.us`
@@ -164,5 +164,5 @@ Currently, the project doesn't have a test setup configured. When adding tests:
 - **FontAwesome Pro**: The project uses FontAwesome Pro icons (requires authentication/license)
 - **Radix UI**: Uses Radix primitives for accessible components (Dialog, Popover, Select, Tooltip)
 - **Sentry**: Error monitoring and performance tracking
-- **Next.js 15**: Uses latest App Router patterns
+- **Next.js 16**: Uses latest App Router patterns
 - **React 19**: Latest React version with improved hooks and server components

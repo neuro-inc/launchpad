@@ -1,10 +1,10 @@
 # Apolo Launchpad Web UI
 
-A Next.js 15 web application for cloud-native application management. Provides a web interface for deploying, monitoring, and managing applications in a Kubernetes environment.
+A Next.js 16 web application for cloud-native application management. Provides a web interface for deploying, monitoring, and managing applications in a Kubernetes environment.
 
 ## Tech Stack
 
-- **Next.js 15** with App Router
+- **Next.js 16** with App Router
 - **React 19**
 - **TypeScript** (strict mode)
 - **Tailwind CSS** with custom design system
@@ -14,8 +14,8 @@ A Next.js 15 web application for cloud-native application management. Provides a
 
 ## Prerequisites
 
-- **Node.js** 20 or higher
-- **Yarn** package manager (required - npm is not supported)
+- **Node.js** 22.x
+- **npm** package manager
 - **Apolo Platform** access with Launchpad installed
 
 ## Local Development Setup
@@ -45,10 +45,10 @@ Add the local development callback URL to your Keycloak configuration:
 
 ### 3. Install Dependencies
 
-**Important:** This project uses Yarn. Do not use npm.
+Use npm for dependency installation and local commands.
 
 ```bash
-yarn install
+npm install
 ```
 
 ### 4. Environment Variables
@@ -82,7 +82,7 @@ NEXT_PUBLIC_ENVIRONMENT=local
 ### 5. Run Development Server
 
 ```bash
-yarn dev
+npm run start
 ```
 
 The application will be available at [http://localhost:3000](http://localhost:3000).
@@ -93,18 +93,18 @@ The development server uses Turbopack for faster builds and hot module replaceme
 
 ```bash
 # Development
-yarn dev              # Start dev server with Turbopack
+npm run start           # Start dev server with Turbopack
 
 # Building
-yarn build            # Build production bundle
+npm run build         # Build production bundle
 
 # Production
-yarn start            # Start production server
+npm run start:prod         # Start production server
 
 # Linting
-yarn lint             # Run both TypeScript and ESLint checks
-yarn lint:ts          # TypeScript type checking only
-yarn lint:eslint      # ESLint checks only
+npm run lint          # Run both TypeScript and ESLint checks
+npm run lint:ts       # TypeScript type checking only
+npm run lint:eslint   # ESLint CLI checks only
 ```
 
 ## Project Structure
@@ -149,7 +149,7 @@ The project enforces strict linting rules:
 - **Import sorting** with specific grouping order
 - **Tailwind CSS** class validation
 
-Run `yarn lint` before committing to ensure code quality.
+Run `npm run lint` before committing to ensure code quality.
 
 ### Path Aliases
 

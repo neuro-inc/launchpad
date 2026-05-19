@@ -6,7 +6,8 @@ import * as PopoverUI from '@radix-ui/react-popover';
 import { VariantProps } from '@typings';
 import { getSlots, tv } from '@utils';
 
-import { Button, Render } from '@components';
+import { Button } from './Button';
+import { Render } from './Render';
 
 const variants = tv({
   base: 'z-30 rounded-lg bg-white px-3 py-4 text-body text-rebecca shadow-[0px_4px_12px_0px_rgba(0,0,0,0.12)] will-change-[transform,opacity] data-[state=closed]:duration-300 data-[state=open]:duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in',

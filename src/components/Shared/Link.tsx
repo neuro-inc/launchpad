@@ -7,7 +7,7 @@ import { cn } from '@utils';
 import { checkIsComponentWithIconChild } from '@utils/helpers';
 import { buttonVariants } from '@utils/variants';
 
-import { Icon } from '@components';
+import { Icon } from './Icon';
 
 type BaseLinkProps = {
   href: string;

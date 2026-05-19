@@ -6,7 +6,12 @@ import { VariantProps } from '@typings';
 import { cn, getSlots } from '@utils';
 import { fieldVariants } from '@utils/variants';
 
-import { Field, Icon, Slot } from '@components';
+import { Icon } from '../../Icon';
+import { Slot } from '../../Slot';
+import { FieldContainer } from '../FieldContainer';
+import { FieldError } from '../FieldError';
+import { FieldLabel } from '../FieldLabel';
+import { FieldNote } from '../FieldNote';
 
 import { FieldSelectItem as SelectItem } from './FieldSelectItem';
 
@@ -76,10 +81,10 @@ export const FieldCustomSelect = forwardRef<HTMLButtonElement, Props>(
     };
 
     return (
-      <Field.Container className={containerClassName}>
-        <Field.Label required={required} for={id} className={labelClassName}>
+      <FieldContainer className={containerClassName}>
+        <FieldLabel required={required} for={id} className={labelClassName}>
           {label}
-        </Field.Label>
+        </FieldLabel>
         <Select.Root {...props} value={value} onValueChange={onChange}>
           <Select.Trigger
             disabled={disabled}
@@ -117,12 +122,12 @@ export const FieldCustomSelect = forwardRef<HTMLButtonElement, Props>(
           </Select.Portal>
         </Select.Root>
         <Slot slot={slots.error}>
-          <Field.Error>{error}</Field.Error>
+          <FieldError>{error}</FieldError>
         </Slot>
         <Slot slot={slots.note}>
-          <Field.Note>{note}</Field.Note>
+          <FieldNote>{note}</FieldNote>
         </Slot>
-      </Field.Container>
+      </FieldContainer>
     );
   },
 );

@@ -14,7 +14,8 @@ import { faXmark } from '@fortawesome/pro-regular-svg-icons';
 
 import { cn, noop } from '@utils';
 
-import { Button, Icon } from '@components';
+import { Button } from '../Button';
+import { Icon } from '../Icon';
 
 import { ModalContent } from './ModalContent';
 import { ModalFooter } from './ModalFooter';
@@ -141,6 +142,8 @@ const ModalComponent = forwardRef<ModalRef, Props>(
     );
   },
 );
+
+ModalComponent.displayName = 'Modal';
 
 export const Modal = Object.assign(ModalComponent, {
   Content: ModalContent,

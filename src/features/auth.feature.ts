@@ -268,6 +268,14 @@ export async function getAuthOptions(): Promise<AuthOptions> {
               token.groups = [];
             }
           }
+
+          // // After extracting token, call backend to set launchpad cookie
+          // try {
+          //   await setLaunchpadCookie(account.access_token);
+          // } catch (e) {
+          //   // don't block login on cookie set failure
+          //   console.error('Failed to set launchpad cookie', e);
+          // }
         }
 
         if (token.accessTokenExpires && now < token.accessTokenExpires) {

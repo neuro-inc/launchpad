@@ -1,2 +1,2 @@
-yarn run lint
+npm run lint
 npx lint-staged

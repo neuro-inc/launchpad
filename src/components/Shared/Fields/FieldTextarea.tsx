@@ -6,7 +6,15 @@ import { FieldProps } from '@typings';
 import { cn, getSlots } from '@utils';
 import { fieldVariants } from '@utils/variants';
 
-import { Field, Icon, Render, Slot, Tooltip } from '@components';
+import { Icon } from '../Icon';
+import { Render } from '../Render';
+import { Slot } from '../Slot';
+import { Tooltip } from '../Tooltip';
+
+import { FieldContainer } from './FieldContainer';
+import { FieldError } from './FieldError';
+import { FieldLabel } from './FieldLabel';
+import { FieldNote } from './FieldNote';
 
 type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'size'> &
   FieldProps & {
@@ -45,7 +53,7 @@ export const FieldTextarea = React.forwardRef<HTMLTextAreaElement, Props>(
     const slots = getSlots<'note' | 'error' | 'icon'>(children);
 
     return (
-      <Field.Container className={containerClassName}>
+      <FieldContainer className={containerClassName}>
         <textarea
           {...props}
           ref={ref}
@@ -64,7 +72,7 @@ export const FieldTextarea = React.forwardRef<HTMLTextAreaElement, Props>(
           disabled={disabled}
           placeholder={placeholder}
         />
-        <Field.Label
+        <FieldLabel
           variant={variant}
           for={id}
           required={required}
@@ -83,19 +91,19 @@ export const FieldTextarea = React.forwardRef<HTMLTextAreaElement, Props>(
               </Tooltip>
             )}
           </span>
-        </Field.Label>
+        </FieldLabel>
         <Render if={showError}>
           <Slot slot={slots.error}>
-            <Field.Error>{error}</Field.Error>
+            <FieldError>{error}</FieldError>
           </Slot>
         </Render>
         <Render if={!error}>
           <Slot slot={slots.note}>
-            <Field.Note>{note}</Field.Note>
+            <FieldNote>{note}</FieldNote>
           </Slot>
         </Render>
         <Slot slot={slots.icon} />
-      </Field.Container>
+      </FieldContainer>
     );
   },
 );

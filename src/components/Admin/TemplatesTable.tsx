@@ -165,32 +165,32 @@ export const TemplatesTable: React.FC<TemplatesTableProps> = ({
                   className={clsx('border-b border-neutral-200', cellBg)}
                   style={rowStyle}
                 >
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-4">
                     <Button
                       variant="ghost"
                       onClick={() => onView?.(template)}
-                      className="px-2 py-1 text-caption"
+                      className="h-auto gap-1 px-0 py-1 text-caption"
                       title="View template"
                     >
-                      <Icon icon={faEye} className="mr-1" />
+                      <Icon size="lg" icon={faEye} />
                       View
                     </Button>
                     <Button
                       variant="ghost"
                       onClick={() => onEdit?.(template)}
-                      className="px-2 py-1 text-caption"
+                      className="h-auto gap-1 px-0 py-1 text-caption"
                       title="Edit template"
                     >
-                      <Icon icon={faPencil} className="mr-1" />
+                      <Icon size="lg" icon={faPencil} />
                       Edit
                     </Button>
                     <Button
                       variant="ghost"
                       onClick={() => onDelete?.(template)}
-                      className="px-2 py-1 text-caption text-error hover:bg-error-subtle"
+                      className="h-auto gap-1 px-0 py-1 text-caption text-error hover:bg-error-subtle"
                       title="Delete template"
                     >
-                      <Icon icon={faTrash} className="mr-1" />
+                      <Icon size="lg" icon={faTrash} />
                       Delete
                     </Button>
                   </div>

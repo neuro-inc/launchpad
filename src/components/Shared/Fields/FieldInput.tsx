@@ -6,7 +6,15 @@ import { FieldProps } from '@typings';
 import { getSlots } from '@utils';
 import { fieldVariants } from '@utils/variants';
 
-import { Field, Icon, Render, Slot, Tooltip } from '@components';
+import { Icon } from '../Icon';
+import { Render } from '../Render';
+import { Slot } from '../Slot';
+import { Tooltip } from '../Tooltip';
+
+import { FieldContainer } from './FieldContainer';
+import { FieldError } from './FieldError';
+import { FieldLabel } from './FieldLabel';
+import { FieldNote } from './FieldNote';
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> &
   FieldProps & {
@@ -49,7 +57,7 @@ export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
     };
 
     return (
-      <Field.Container className={containerClassName}>
+      <FieldContainer className={containerClassName}>
         <input
           {...props}
           ref={ref}
@@ -65,7 +73,7 @@ export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
           placeholder={placeholder}
           onWheel={handleWheel}
         />
-        <Field.Label
+        <FieldLabel
           variant={variant}
           for={id}
           required={required}
@@ -84,19 +92,19 @@ export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
               </Tooltip>
             )}
           </span>
-        </Field.Label>
+        </FieldLabel>
         <Render if={showError}>
           <Slot slot={slots.error}>
-            <Field.Error>{error}</Field.Error>
+            <FieldError>{error}</FieldError>
           </Slot>
         </Render>
         <Render if={!error}>
           <Slot slot={slots.note}>
-            <Field.Note>{note}</Field.Note>
+            <FieldNote>{note}</FieldNote>
           </Slot>
         </Render>
         <Slot slot={slots.icon} />
-      </Field.Container>
+      </FieldContainer>
     );
   },
 );

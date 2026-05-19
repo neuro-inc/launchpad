@@ -13,6 +13,8 @@ import '@features/dayjs.feature';
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import './globals.css';
 
+export const dynamic = 'force-dynamic';
+
 export async function generateMetadata(): Promise<Metadata> {
   const config = await getConfig();
 
