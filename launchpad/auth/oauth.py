@@ -53,6 +53,7 @@ class Oauth:
         self._scope = " ".join(
             scope or ["openid", "profile", "email", "offline_access"]
         )
+        self._idp_hint = keycloak_config.idp_hint
 
     def redirect(
         self,
@@ -67,17 +68,19 @@ class Oauth:
         )
         state = base64.urlsafe_b64encode(original_redirect_uri.encode()).decode()
 
-        auth_url = f"{self._keycloak_url}/auth?" + urlencode(
-            {
-                "client_id": self._client_id,
-                "response_type": "code",
-                "scope": self._scope,
-                "redirect_uri": self._callback_url,
-                "code_challenge": code_challenge,
-                "code_challenge_method": "S256",
-                "state": state,
-            }
-        )
+        params = {
+            "client_id": self._client_id,
+            "response_type": "code",
+            "scope": self._scope,
+            "redirect_uri": self._callback_url,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+            "state": state,
+        }
+        if self._idp_hint:
+            params["kc_idp_hint"] = self._idp_hint
+
+        auth_url = f"{self._keycloak_url}/auth?" + urlencode(params)
 
         response = RedirectResponse(url=auth_url)
         self._set_cookie(response, key=COOKIE_CODE_VERIFIER, value=code_verifier)

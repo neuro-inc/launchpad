@@ -64,6 +64,10 @@ spec:
               value: {{ include "keycloak.domain" . }}
             - name: KEYCLOAK_REALM
               value: {{ .Values.keycloak.defaultRealm }}
+            {{- if .Values.keycloakProcore.enabled }}
+            - name: KEYCLOAK_IDP_HINT
+              value: {{ .Values.keycloakProcore.alias | quote }}
+            {{- end }}
             - name: APOLO_PASSED_CONFIG
               value: {{ .Values.APOLO_PASSED_CONFIG | quote }}
             - name: LAUNCHPAD_INITIAL_CONFIG

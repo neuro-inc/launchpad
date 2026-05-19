@@ -30,6 +30,7 @@ def mock_keycloak_config() -> KeycloakConfig:
         url=URL("http://mock-keycloak.com"),
         realm="mock-realm",
         client_id="mock-client-id",
+        idp_hint=None,
     )
 
 
@@ -203,3 +204,22 @@ async def test_oauth_fetch_token_key_error(
     data = {"grant_type": "authorization_code"}
     with pytest.raises(OauthError):
         await oauth_instance._fetch_token(data)
+
+
+async def test_oauth_redirect_with_idp_hint(mock_http_session: AsyncMock) -> None:
+    oauth = Oauth(
+        http=mock_http_session,
+        keycloak_config=KeycloakConfig(
+            url=URL("http://mock-keycloak.com"),
+            realm="mock-realm",
+            client_id="mock-client-id",
+            idp_hint="procore",
+        ),
+        cookie_domain="mock-cookie.com",
+        launchpad_domain="mock-launchpad.com",
+    )
+
+    response = oauth.redirect("https://original.com/path")
+
+    redirect_url = URL(response.headers["location"])
+    assert redirect_url.query["kc_idp_hint"] == "procore"

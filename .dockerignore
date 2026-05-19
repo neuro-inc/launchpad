@@ -1,6 +1,7 @@
 *
 !Makefile
 !alembic*
+!keycloak-procore-idp
 !launchpad
 !pyproject.toml
 !poetry.lock

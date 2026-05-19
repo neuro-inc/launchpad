@@ -77,7 +77,24 @@ def test_environ_config_factory_create_keycloak(mock_environ: None) -> None:
     factory = EnvironConfigFactory()
     config = factory.create_keycloak()
     assert config == KeycloakConfig(
-        url=URL("https://keycloak.example.com"), realm="testrealm"
+        url=URL("https://keycloak.example.com"),
+        realm="testrealm",
+        idp_hint=None,
+    )
+
+
+def test_environ_config_factory_create_keycloak_with_idp_hint() -> None:
+    environ = {
+        "KEYCLOAK_URL": "keycloak.example.com",
+        "KEYCLOAK_REALM": "testrealm",
+        "KEYCLOAK_IDP_HINT": "procore",
+    }
+    factory = EnvironConfigFactory(environ=environ)
+    config = factory.create_keycloak()
+    assert config == KeycloakConfig(
+        url=URL("https://keycloak.example.com"),
+        realm="testrealm",
+        idp_hint="procore",
     )
 
 
