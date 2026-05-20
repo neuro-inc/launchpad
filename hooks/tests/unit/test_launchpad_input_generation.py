@@ -14,6 +14,7 @@ from apolo_apps_launchpad.inputs_processor import (
 )
 from apolo_apps_launchpad.types import (
     AppsConfig,
+    ProCodeIntegrationConfig,
     CustomLLMModel,
     HuggingFaceLLMModel,
     LaunchpadAppInputs,
@@ -805,6 +806,53 @@ async def test_launchpad_values_generation__min(apolo_client):
     }
 
     assert helm_params == expected_helm_values
+
+
+async def test_launchpad_values_generation__procore_integration(apolo_client):
+    processor = LaunchpadInputsProcessor(client=apolo_client)
+    helm_params = await processor.gen_extra_values(
+        input_=LaunchpadAppInputs(
+            launchpad_web_app_config=LaunchpadWebAppConfig(
+                preset=Preset(name="cpu-medium"),
+            ),
+            apps_config=AppsConfig(
+                quick_start_config=NoQuickStartConfig(no_quickstart=True),
+            ),
+            procore_integration=ProCodeIntegrationConfig(
+                client_id=ApoloSecret(key="procore-client-id"),
+                client_secret=ApoloSecret(key="procore-client-secret"),
+            ),
+        ),
+        app_name="launchpad-app",
+        namespace="default-namespace",
+        app_secrets_name=APP_SECRETS_NAME,
+        app_id=APP_ID,
+    )
+
+    assert helm_params["keycloak"]["extraEnvVars"] == [
+        {
+            "name": "PROCORE_CLIENT_ID",
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": APP_SECRETS_NAME,
+                    "key": "procore-client-id",
+                }
+            },
+        },
+        {
+            "name": "PROCORE_CLIENT_SECRET",
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": APP_SECRETS_NAME,
+                    "key": "procore-client-secret",
+                }
+            },
+        },
+    ]
+    assert (
+        helm_params["mlops-keycloak"]["extraEnvVars"]
+        == helm_params["keycloak"]["extraEnvVars"]
+    )
 
 
 async def test_launchpad_values_generation__brand(apolo_client):

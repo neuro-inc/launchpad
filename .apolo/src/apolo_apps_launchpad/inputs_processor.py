@@ -20,6 +20,10 @@ from apolo_app_types.protocols.common.hugging_face import (
     HuggingFaceCache,
     HuggingFaceModel,
 )
+from apolo_app_types.protocols.common.secrets_ import (
+    OptionalSecret,
+    serialize_optional_secret,
+)
 from apolo_app_types.protocols.common.storage import (
     ApoloFilesMount,
     ApoloFilesPath,
@@ -84,6 +88,22 @@ def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
         raise ValueError(err_msg)
 
     return "".join([random.choice(PASSWORD_CHAR_POOL) for _ in range(length)])
+
+
+def _append_secret_env_var(
+    env_vars: list[dict[str, t.Any]],
+    *,
+    name: str,
+    value: OptionalSecret | None,
+    secret_name: str,
+) -> None:
+    serialized_value = serialize_optional_secret(value, secret_name=secret_name)
+    if serialized_value == "":
+        return
+    if isinstance(serialized_value, dict):
+        env_vars.append({"name": name, **serialized_value})
+        return
+    env_vars.append({"name": name, "value": serialized_value})
 
 
 class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
@@ -454,6 +474,19 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         # Pass branding asset URLs to Keycloak so the theme can reference them directly.
         # All files are served by the Launchpad API which returns correct MIME types.
         kc_extra_env_vars = []
+        if input_.procode_integration:
+            _append_secret_env_var(
+                kc_extra_env_vars,
+                name="PROCORE_CLIENT_ID",
+                value=input_.procode_integration.client_id,
+                secret_name=app_secrets_name,
+            )
+            _append_secret_env_var(
+                kc_extra_env_vars,
+                name="PROCORE_CLIENT_SECRET",
+                value=input_.procode_integration.client_secret,
+                secret_name=app_secrets_name,
+            )
         if input_.branding:
             launchpad_api_base = f"https://launchpad-{app_id}-api.{domain}"
             if input_.branding.logo_file:

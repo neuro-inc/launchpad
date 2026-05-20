@@ -733,6 +733,50 @@
       "x-title": "Resource Preset",
       "x-type": "Preset"
     },
+    "ProCoreIntegrationConfig": {
+      "properties": {
+        "client_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApoloSecret"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "x-description": "ProCore OAuth client ID stored in Apolo Secrets.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Client ID"
+        },
+        "client_secret": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApoloSecret"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "x-description": "ProCore OAuth client secret stored in Apolo Secrets.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Client Secret"
+        }
+      },
+      "title": "ProCoreIntegrationConfig",
+      "type": "object",
+      "x-description": "Credentials for the ProCore identity provider used by Keycloak.",
+      "x-is-advanced-field": false,
+      "x-is-configurable": true,
+      "x-meta-type": "inline",
+      "x-title": "ProCore Integration",
+      "x-type": "ProCoreIntegrationConfig"
+    },
     "TextEmbeddingsConfig": {
       "properties": {
         "preset": {
@@ -777,6 +821,17 @@
     },
     "apps_config": {
       "$ref": "#/$defs/AppsConfig"
+    },
+    "procore_integration": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProCoreIntegrationConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "branding": {
       "anyOf": [
