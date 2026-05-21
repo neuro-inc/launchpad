@@ -1,4 +1,5 @@
 HEADER_X_FORWARDED_HOST = "x-forwarded-host"
+HEADER_X_FORWARDED_URI = "x-forwarded-uri"
 
 # headers used to bypass auth in a downstream apps
 HEADER_X_AUTH_REQUEST_EMAIL = "X-Auth-Request-Email"

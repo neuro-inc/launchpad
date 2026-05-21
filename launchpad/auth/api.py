@@ -18,6 +18,7 @@ from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_ROLES,
     HEADER_X_AUTH_REQUEST_USERNAME,
     HEADER_X_FORWARDED_HOST,
+    HEADER_X_FORWARDED_URI,
 )
 from launchpad.auth.dependencies import (
     _extract_bearer_token,
@@ -36,6 +37,32 @@ from launchpad.errors import Forbidden, Unauthorized
 logger = logging.getLogger(__name__)
 
 auth_router = APIRouter()
+AUTH_BYPASS_PATH_PREFIXES = ["/public", "/api/webhooks"]
+
+
+def _normalize_prefix(prefix: str) -> str:
+    normalized = prefix.strip()
+    if not normalized:
+        return ""
+    if not normalized.startswith("/"):
+        normalized = f"/{normalized}"
+    if normalized != "/" and normalized.endswith("/"):
+        normalized = normalized.rstrip("/")
+    return normalized
+
+
+def _is_auth_bypass_path(request_path: str, prefixes: list[str]) -> bool:
+    if not request_path:
+        return False
+    for raw_prefix in prefixes:
+        prefix = _normalize_prefix(raw_prefix)
+        if not prefix:
+            continue
+        if prefix == "/":
+            return True
+        if request_path == prefix or request_path.startswith(f"{prefix}/"):
+            return True
+    return False
 
 
 class TokenRequest(BaseModel):
@@ -191,6 +218,15 @@ async def view_post_authorize(
     if installed_app is None:
         logger.info(f"Unable to find installed app by url: {app_url}")
         raise Forbidden()
+
+    request_path = request.headers.get(HEADER_X_FORWARDED_URI, "")
+    if _is_auth_bypass_path(request_path, AUTH_BYPASS_PATH_PREFIXES):
+        logger.debug(
+            "Bypassing auth redirect for path '%s' by prefixes: %s",
+            request_path,
+            AUTH_BYPASS_PATH_PREFIXES,
+        )
+        return PlainTextResponse("OK", status_code=200)
 
     # make internal apps accessible for apps that only expose an api, not a web page
     # if installed_app.is_internal:
