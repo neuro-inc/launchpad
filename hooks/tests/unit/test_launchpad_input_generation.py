@@ -809,7 +809,10 @@ async def test_launchpad_values_generation__min(apolo_client):
     assert helm_params == expected_helm_values
 
 
-async def test_launchpad_values_generation__procore_integration(apolo_client):
+async def test_launchpad_values_generation__procore_integration(
+    apolo_client, monkeypatch
+):
+    monkeypatch.setenv("APP_IMAGE_TAG", "feature-procore-keycloak-idp")
     processor = LaunchpadInputsProcessor(client=apolo_client)
     helm_params = await processor.gen_extra_values(
         input_=LaunchpadAppInputs(
@@ -853,6 +856,10 @@ async def test_launchpad_values_generation__procore_integration(apolo_client):
     assert (
         helm_params["mlops-keycloak"]["extraEnvVars"]
         == helm_params["keycloak"]["extraEnvVars"]
+    )
+    assert helm_params["keycloak"]["image"]["tag"] == "feature-procore-keycloak-idp"
+    assert (
+        helm_params["mlops-keycloak"]["image"]["tag"] == "feature-procore-keycloak-idp"
     )
     assert helm_params["keycloak"]["extraEnvVarsSecret"] == "launchpad-keycloak-procore"
     assert (

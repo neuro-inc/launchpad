@@ -132,7 +132,8 @@ keycloak:
     imagePullSecrets:
       - ghcr
   image:
-    repository: ghcr.io/neuro-inc/launchpad-keycloak
+    registry: ghcr.io
+    repository: neuro-inc/launchpad-keycloak
     tag: latest
     pullSecrets:
       - ghcr

@@ -93,7 +93,7 @@ jobs:
         run: make test-unit
 
       - name: Upload unit test coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         if: always()
         with:
           files: .coverage.unit.xml
@@ -145,7 +145,7 @@ jobs:
           TESTCONTAINERS_RYUK_DISABLED: false
 
       - name: Upload integration test coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         if: always()
         with:
           files: .coverage.integration.xml
@@ -196,7 +196,7 @@ jobs:
         run: make test-hooks
 
       - name: Upload hooks test coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         if: always()
         with:
           files: hooks/coverage.hooks.xml

@@ -523,6 +523,12 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         if kc_extra_env_vars:
             keycloak_values["extraEnvVars"] = kc_extra_env_vars
 
+        keycloak_image_tag = os.getenv("APP_IMAGE_TAG", "latest")
+        for keycloak_values_block in (keycloak_values, values.get("mlops-keycloak")):
+            if isinstance(keycloak_values_block, dict):
+                image_values = keycloak_values_block.setdefault("image", {})
+                image_values["tag"] = keycloak_image_tag
+
         cluster_config = self.client.config.clusters[self.client.cluster_name]
         if cluster_config.apps.launchpad_use_subdomain:
             values["clientSubdomain"] = True
