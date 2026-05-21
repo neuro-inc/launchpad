@@ -854,6 +854,11 @@ async def test_launchpad_values_generation__procore_integration(apolo_client):
         helm_params["mlops-keycloak"]["extraEnvVars"]
         == helm_params["keycloak"]["extraEnvVars"]
     )
+    assert helm_params["keycloak"]["extraEnvVarsSecret"] == "launchpad-keycloak-procore"
+    assert (
+        helm_params["mlops-keycloak"]["extraEnvVarsSecret"]
+        == helm_params["keycloak"]["extraEnvVarsSecret"]
+    )
 
 
 def test_launchpad_values_generation__procore_integration_requires_both_secrets():

@@ -473,6 +473,10 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         # All files are served by the Launchpad API which returns correct MIME types.
         kc_extra_env_vars = []
         if input_.procore_integration:
+            keycloak_procore_values = values.get("keycloakProcore", {})
+            keycloak_values["extraEnvVarsSecret"] = keycloak_procore_values.get(
+                "secretName", "launchpad-keycloak-procore"
+            )
             _append_secret_env_var(
                 kc_extra_env_vars,
                 name="PROCORE_CLIENT_ID",
