@@ -744,7 +744,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "x-description": "ProCore OAuth client ID stored in Apolo Secrets.",
           "x-is-advanced-field": false,
           "x-is-configurable": true,
@@ -760,7 +759,6 @@
               "type": "null"
             }
           ],
-          "default": null,
           "x-description": "ProCore OAuth client secret stored in Apolo Secrets.",
           "x-is-advanced-field": false,
           "x-is-configurable": true,
@@ -768,6 +766,10 @@
           "x-title": "Client Secret"
         }
       },
+      "required": [
+        "client_id",
+        "client_secret"
+      ],
       "title": "ProCoreIntegrationConfig",
       "type": "object",
       "x-description": "Credentials for the ProCore identity provider used by Keycloak.",

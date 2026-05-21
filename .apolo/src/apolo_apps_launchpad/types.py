@@ -360,15 +360,15 @@ class ProCoreIntegrationConfig(AbstractAppFieldType):
         ).as_json_schema_extra(),
         is_advanced_field=True,
     )
-    client_id: OptionalSecret | None = Field(
-        default=None,
+    client_id: OptionalSecret = Field(
+        ...,
         json_schema_extra=SchemaExtraMetadata(
             title="Client ID",
             description="ProCore OAuth client ID stored in Apolo Secrets.",
         ).as_json_schema_extra(),
     )
-    client_secret: OptionalSecret | None = Field(
-        default=None,
+    client_secret: OptionalSecret = Field(
+        ...,
         json_schema_extra=SchemaExtraMetadata(
             title="Client Secret",
             description="ProCore OAuth client secret stored in Apolo Secrets.",

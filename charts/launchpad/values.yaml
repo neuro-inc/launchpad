@@ -137,7 +137,7 @@ keycloak:
     pullSecrets:
       - ghcr
   extraEnvVarsSecret: launchpad-keycloak-procore
-  defaultRealm: "launchpad" # internal variable
+  defaultRealm: "launchpad"  # internal variable
   fullnameOverride: launchpad-keycloak  # in real app will be f"launchpad-{apolo_app_id}-keycloak"
   replicas: 1
   commonAnnotations:
@@ -150,7 +150,7 @@ keycloak:
   externalDatabase:
     user: "postgres"
     database: "keycloak"
-    existingSecret: launchpad-db-secret # in real app will be f"launchpad-{apolo_app_id}-db-secret"
+    existingSecret: launchpad-db-secret  # in real app will be f"launchpad-{apolo_app_id}-db-secret"
     existingSecretHostKey: "DB_HOST"
     existingSecretPasswordKey: "DB_PASSWORD"
   proxy: "edge"
@@ -183,7 +183,7 @@ keycloak:
     - name: fetch-theme
       image: alpine/git:2.45.2
       imagePullPolicy: IfNotPresent
-      command: [ "/bin/sh","-lc" ]
+      command: ["/bin/sh", "-lc"]
       # NOTE: this script is duplicated from KEYCLOAK_THEME_INIT_SCRIPT in
       # inputs_processor.py, which is the authoritative copy used in production.
       # Keep them in sync when making changes.

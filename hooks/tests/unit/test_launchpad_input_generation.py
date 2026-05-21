@@ -3,6 +3,7 @@ import os
 
 import pytest
 from apolo_sdk import Cluster
+from pydantic import ValidationError
 
 from apolo_app_types import ApoloSecret, HuggingFaceToken
 from apolo_app_types.protocols.common import Preset
@@ -14,7 +15,7 @@ from apolo_apps_launchpad.inputs_processor import (
 )
 from apolo_apps_launchpad.types import (
     AppsConfig,
-    ProCodeIntegrationConfig,
+    ProCoreIntegrationConfig,
     CustomLLMModel,
     HuggingFaceLLMModel,
     LaunchpadAppInputs,
@@ -818,7 +819,7 @@ async def test_launchpad_values_generation__procore_integration(apolo_client):
             apps_config=AppsConfig(
                 quick_start_config=NoQuickStartConfig(no_quickstart=True),
             ),
-            procore_integration=ProCodeIntegrationConfig(
+            procore_integration=ProCoreIntegrationConfig(
                 client_id=ApoloSecret(key="procore-client-id"),
                 client_secret=ApoloSecret(key="procore-client-secret"),
             ),
@@ -853,6 +854,21 @@ async def test_launchpad_values_generation__procore_integration(apolo_client):
         helm_params["mlops-keycloak"]["extraEnvVars"]
         == helm_params["keycloak"]["extraEnvVars"]
     )
+
+
+def test_launchpad_values_generation__procore_integration_requires_both_secrets():
+    with pytest.raises(ValidationError):
+        LaunchpadAppInputs(
+            launchpad_web_app_config=LaunchpadWebAppConfig(
+                preset=Preset(name="cpu-medium"),
+            ),
+            apps_config=AppsConfig(
+                quick_start_config=NoQuickStartConfig(no_quickstart=True),
+            ),
+            procore_integration=ProCoreIntegrationConfig(
+                client_id=ApoloSecret(key="procore-client-id"),
+            ),
+        )
 
 
 async def test_launchpad_values_generation__brand(apolo_client):

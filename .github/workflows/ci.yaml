@@ -77,6 +77,13 @@ jobs:
           cd hooks
           poetry install --no-interaction
 
+      - name: Install chart-testing
+        uses: helm/chart-testing-action@v2.7.0
+
+      - name: Install helm-unittest plugin
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest --version 1.0.3
+
       - name: Run format checks
         run: make format
         env:
@@ -99,6 +106,9 @@ jobs:
 
       - name: Run Keycloak IDP tests
         run: make test-keycloak-idp
+
+      - name: Run Helm tests
+        run: make test-helm
 
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v5

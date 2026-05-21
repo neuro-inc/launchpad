@@ -94,12 +94,10 @@ def _append_secret_env_var(
     env_vars: list[dict[str, t.Any]],
     *,
     name: str,
-    value: OptionalSecret | None,
+    value: OptionalSecret,
     secret_name: str,
 ) -> None:
     serialized_value = serialize_optional_secret(value, secret_name=secret_name)
-    if serialized_value == "":
-        return
     if isinstance(serialized_value, dict):
         env_vars.append({"name": name, **serialized_value})
         return
@@ -474,17 +472,17 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         # Pass branding asset URLs to Keycloak so the theme can reference them directly.
         # All files are served by the Launchpad API which returns correct MIME types.
         kc_extra_env_vars = []
-        if input_.procode_integration:
+        if input_.procore_integration:
             _append_secret_env_var(
                 kc_extra_env_vars,
                 name="PROCORE_CLIENT_ID",
-                value=input_.procode_integration.client_id,
+                value=input_.procore_integration.client_id,
                 secret_name=app_secrets_name,
             )
             _append_secret_env_var(
                 kc_extra_env_vars,
                 name="PROCORE_CLIENT_SECRET",
-                value=input_.procode_integration.client_secret,
+                value=input_.procore_integration.client_secret,
                 secret_name=app_secrets_name,
             )
         if input_.branding:
