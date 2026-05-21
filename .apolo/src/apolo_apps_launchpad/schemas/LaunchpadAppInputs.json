@@ -736,33 +736,13 @@
     "ProCoreIntegrationConfig": {
       "properties": {
         "client_id": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ApoloSecret"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "$ref": "#/$defs/ApoloSecret",
           "x-description": "ProCore OAuth client ID stored in Apolo Secrets.",
-          "x-is-advanced-field": false,
-          "x-is-configurable": true,
-          "x-meta-type": "inline",
           "x-title": "Client ID"
         },
         "client_secret": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ApoloSecret"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "$ref": "#/$defs/ApoloSecret",
           "x-description": "ProCore OAuth client secret stored in Apolo Secrets.",
-          "x-is-advanced-field": false,
-          "x-is-configurable": true,
-          "x-meta-type": "inline",
           "x-title": "Client Secret"
         }
       },

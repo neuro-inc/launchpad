@@ -13,8 +13,96 @@ env:
 
 jobs:
 
-  test:
-    name: Test and Lint
+  format-and-lint:
+    name: Format and Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py313-${{ hashFiles('poetry.lock', 'pyproject.toml') }}
+
+      - name: Sync dependencies
+        run: poetry sync --with dev --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --only-root --no-interaction
+
+      - name: Verify formatting tooling
+        run: poetry run pre-commit --version
+
+      - name: Run linting
+        run: make lint
+        env:
+          CI: true
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        uses: actions/cache@v5
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py313-${{ hashFiles('poetry.lock', 'pyproject.toml') }}
+
+      - name: Sync dependencies
+        run: poetry sync --with dev --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --only-root --no-interaction
+
+      - name: Run unit tests
+        run: make test-unit
+
+      - name: Upload unit test coverage
+        uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          files: .coverage.unit.xml
+          flags: unit
+          name: unit-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  integration-tests:
+    name: Integration Tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,13 +118,6 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
@@ -45,11 +126,10 @@ jobs:
           virtualenvs-in-project: true
 
       - name: Load cached venv
-        id: cached-poetry-dependencies
         uses: actions/cache@v5
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock', 'pyproject.toml') }}
+          key: venv-${{ runner.os }}-py313-${{ hashFiles('poetry.lock', 'pyproject.toml') }}
 
       - name: Sync dependencies
         run: poetry sync --with dev --no-interaction --no-root
@@ -57,12 +137,48 @@ jobs:
       - name: Install project
         run: poetry install --only-root --no-interaction
 
+      - name: Run integration tests
+        run: make test-integration
+        env:
+          TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+          TESTCONTAINERS_RYUK_DISABLED: false
+
+      - name: Upload integration test coverage
+        uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          files: .coverage.integration.xml
+          flags: integration
+          name: integration-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  hooks-tests:
+    name: Hooks Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
       - name: Load cached hooks venv
-        id: cached-hooks-dependencies
         uses: actions/cache@v5
         with:
           path: hooks/.venv
-          key: hooks-venv-${{ runner.os }}-${{ hashFiles('hooks/poetry.lock', 'hooks/pyproject.toml') }}
+          key: hooks-venv-${{ runner.os }}-py312-${{ hashFiles('hooks/poetry.lock', 'hooks/pyproject.toml') }}
 
       - name: Sync hooks dependencies
         run: |
@@ -75,31 +191,46 @@ jobs:
           cd hooks
           poetry install --only-root --no-interaction
 
-      - name: Verify formatting tooling
-        run: poetry run pre-commit --version
-
-      - name: Run format checks
-        run: make format
-        env:
-          CI: true
-
-      - name: Run linting
-        run: make lint
-
-      - name: Run unit tests
-        run: make test-unit
-
-      - name: Run integration tests
-        run: make test-integration
-        env:
-          TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
-          TESTCONTAINERS_RYUK_DISABLED: false
-
       - name: Run hooks tests
         run: make test-hooks
 
+      - name: Upload hooks test coverage
+        uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          files: hooks/coverage.hooks.xml
+          flags: hooks
+          name: hooks-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+  keycloak-idp-tests:
+    name: Keycloak IDP Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
       - name: Run Keycloak IDP tests
         run: make test-keycloak-idp
+
+  helm-tests:
+    name: Helm Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v6
 
       - name: Install chart-testing
         uses: helm/chart-testing-action@v2.7.0
@@ -111,35 +242,19 @@ jobs:
       - name: Run Helm tests
         run: make test-helm
 
-      - name: Upload unit test coverage
-        uses: codecov/codecov-action@v5
-        if: always()
-        with:
-          files: .coverage.unit.xml
-          flags: unit
-          name: unit-tests
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-      - name: Upload integration test coverage
-        uses: codecov/codecov-action@v5
-        if: always()
-        with:
-          files: .coverage.integration.xml
-          flags: integration
-          name: integration-tests
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-      - name: Upload hooks test coverage
-        uses: codecov/codecov-action@v5
-        if: always()
-        with:
-          files: hooks/coverage.hooks.xml
-          flags: hooks
-          name: hooks-tests
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
+  test:
+    name: Test and Lint
+    runs-on: ubuntu-latest
+    needs:
+      - format-and-lint
+      - unit-tests
+      - integration-tests
+      - hooks-tests
+      - keycloak-idp-tests
+      - helm-tests
+    steps:
+      - name: CI gate
+        run: echo "All checks passed"
 
   approve:
     name: Approve bot PR
