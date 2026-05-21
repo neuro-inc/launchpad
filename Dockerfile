@@ -15,7 +15,7 @@ COPY --from=keycloak-procore-idp-builder /tmp/target/keycloak-procore-idp.jar /o
 
 RUN /opt/keycloak/bin/kc.sh build
 
-FROM python:${PY_VERSION}-slim-bullseye as builder
+FROM python:${PY_VERSION}-slim-bullseye AS builder
 
 WORKDIR /app
 
@@ -29,13 +29,15 @@ RUN apt-get update && apt-get install -y git make libmagic1
 
 RUN pip3 install --disable-pip-version-check --no-cache-dir poetry==2.1.3
 
-COPY poetry.lock pyproject.toml .apolo launchpad ./
+COPY README.md poetry.lock pyproject.toml ./
+COPY .apolo ./.apolo
+COPY launchpad ./launchpad
 
 RUN poetry install --only main
 
-FROM python:${PY_VERSION}-slim-bullseye as runtime
+FROM python:${PY_VERSION}-slim-bullseye AS runtime
 
-LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/launchpad"
+LABEL org.opencontainers.image.source="https://github.com/neuro-inc/launchpad"
 
 ENV SERVICE_NAME="launchpad"
 

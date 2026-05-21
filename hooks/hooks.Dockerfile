@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY README.md hooks/poetry.lock hooks/pyproject.toml hooks/
+COPY hooks/README.md hooks/poetry.lock hooks/pyproject.toml hooks/
 
 RUN cd hooks && pip --no-cache-dir install poetry && poetry install --no-root --no-cache
 
