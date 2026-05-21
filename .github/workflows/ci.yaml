@@ -49,33 +49,34 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock', 'pyproject.toml') }}
 
-      - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+      - name: Sync dependencies
+        run: poetry sync --with dev --no-interaction --no-root
 
       - name: Install project
-        run: poetry install --no-interaction
+        run: poetry install --only-root --no-interaction
 
       - name: Load cached hooks venv
         id: cached-hooks-dependencies
         uses: actions/cache@v5
         with:
           path: hooks/.venv
-          key: hooks-venv-${{ runner.os }}-${{ hashFiles('hooks/poetry.lock') }}
+          key: hooks-venv-${{ runner.os }}-${{ hashFiles('hooks/poetry.lock', 'hooks/pyproject.toml') }}
 
-      - name: Install hooks dependencies
-        if: steps.cached-hooks-dependencies.outputs.cache-hit != 'true'
+      - name: Sync hooks dependencies
         run: |
           cd hooks
           poetry config virtualenvs.in-project true
-          poetry install --no-interaction --no-root
+          poetry sync --with dev --no-interaction --no-root
 
       - name: Install hooks project
         run: |
           cd hooks
-          poetry install --no-interaction
+          poetry install --only-root --no-interaction
+
+      - name: Verify formatting tooling
+        run: poetry run pre-commit --version
 
       - name: Install chart-testing
         uses: helm/chart-testing-action@v2.7.0
@@ -134,7 +135,7 @@ jobs:
         uses: codecov/codecov-action@v5
         if: always()
         with:
-          files: hooks/.coverage.hooks.xml
+          files: hooks/coverage.hooks.xml
           flags: hooks
           name: hooks-tests
           token: ${{ secrets.CODECOV_TOKEN }}
