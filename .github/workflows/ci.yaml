@@ -78,13 +78,6 @@ jobs:
       - name: Verify formatting tooling
         run: poetry run pre-commit --version
 
-      - name: Install chart-testing
-        uses: helm/chart-testing-action@v2.7.0
-
-      - name: Install helm-unittest plugin
-        run: |
-          helm plugin install https://github.com/helm-unittest/helm-unittest --version 1.0.3
-
       - name: Run format checks
         run: make format
         env:
@@ -107,6 +100,13 @@ jobs:
 
       - name: Run Keycloak IDP tests
         run: make test-keycloak-idp
+
+      - name: Install chart-testing
+        uses: helm/chart-testing-action@v2.7.0
+
+      - name: Install helm-unittest plugin
+        run: |
+          helm plugin install https://github.com/helm-unittest/helm-unittest --version 1.0.3
 
       - name: Run Helm tests
         run: make test-helm
