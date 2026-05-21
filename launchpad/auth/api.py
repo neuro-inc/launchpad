@@ -37,7 +37,6 @@ from launchpad.errors import Forbidden, Unauthorized
 logger = logging.getLogger(__name__)
 
 auth_router = APIRouter()
-AUTH_BYPASS_PATH_PREFIXES = ["/public", "/api/webhooks"]
 
 
 def _normalize_prefix(prefix: str) -> str:
@@ -220,11 +219,12 @@ async def view_post_authorize(
         raise Forbidden()
 
     request_path = request.headers.get(HEADER_X_FORWARDED_URI, "")
-    if _is_auth_bypass_path(request_path, AUTH_BYPASS_PATH_PREFIXES):
+    auth_bypass_path_prefixes = request.app.config.auth_bypass_path_prefixes
+    if _is_auth_bypass_path(request_path, auth_bypass_path_prefixes):
         logger.debug(
             "Bypassing auth redirect for path '%s' by prefixes: %s",
             request_path,
-            AUTH_BYPASS_PATH_PREFIXES,
+            auth_bypass_path_prefixes,
         )
         return PlainTextResponse("OK", status_code=200)
 

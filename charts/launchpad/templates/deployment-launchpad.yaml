@@ -68,6 +68,8 @@ spec:
               value: {{ .Values.APOLO_PASSED_CONFIG | quote }}
             - name: LAUNCHPAD_INITIAL_CONFIG
               value: {{ .Values.LAUNCHPAD_INITIAL_CONFIG | quote }}
+            - name: LAUNCHPAD_AUTH_BYPASS_PATH_PREFIXES
+              value: {{ .Values.LAUNCHPAD_AUTH_BYPASS_PATH_PREFIXES | quote }}
             - name: SELF_DOMAIN
               value: {{ include "launchpad.apiDomain" . }}
             - name: WEB_DOMAIN
