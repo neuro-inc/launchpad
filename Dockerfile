@@ -1,5 +1,5 @@
 ARG PY_VERSION=3.13
-ARG KEYCLOAK_VERSION=26.6
+ARG KEYCLOAK_VERSION=26.3.3-debian-12-r0
 
 FROM maven:3.9.9-eclipse-temurin-21 AS keycloak-procore-idp-builder
 
@@ -9,11 +9,11 @@ COPY keycloak-procore-idp/pom.xml keycloak-procore-idp/src ./
 
 RUN mvn -B -ntp package
 
-FROM keycloak/keycloak:${KEYCLOAK_VERSION} AS keycloak-runtime
+FROM bitnamilegacy/keycloak:${KEYCLOAK_VERSION} AS keycloak-runtime
 
-COPY --from=keycloak-procore-idp-builder /tmp/target/keycloak-procore-idp.jar /opt/keycloak/providers/keycloak-procore-idp.jar
+COPY --from=keycloak-procore-idp-builder /tmp/target/keycloak-procore-idp.jar /opt/bitnami/keycloak/providers/keycloak-procore-idp.jar
 
-RUN /opt/keycloak/bin/kc.sh build
+RUN /opt/bitnami/keycloak/bin/kc.sh build
 
 FROM python:${PY_VERSION}-slim-bullseye AS builder
 
