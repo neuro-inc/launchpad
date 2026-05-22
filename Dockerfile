@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y git make libmagic1
 
 RUN pip3 install --disable-pip-version-check --no-cache-dir poetry==2.1.3
 
-COPY README.md poetry.lock pyproject.toml ./
+COPY poetry.lock pyproject.toml Makefile README.md ./
 COPY .apolo ./.apolo
 COPY launchpad ./launchpad
 
@@ -60,6 +60,11 @@ EXPOSE 8080
 
 COPY --from=builder ${VIRTUAL_ENV} ${VIRTUAL_ENV}
 
-COPY alembic.ini alembic launchpad scripts .apolo ./
+COPY alembic.ini .
+COPY alembic ./alembic
+
+COPY launchpad ./launchpad
+COPY scripts ./scripts
+COPY .apolo ./.apolo
 
 ENTRYPOINT ["python", "-m", "launchpad"]
