@@ -471,7 +471,20 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         # Pass branding asset URLs to Keycloak so the theme can reference them directly.
         # All files are served by the Launchpad API which returns correct MIME types.
-        kc_extra_env_vars = []
+        kc_extra_env_vars = [
+            {
+                "name": "KC_CACHE",
+                "value": "ispn",
+            },
+            {
+                "name": "KC_CACHE_STACK",
+                "value": "kubernetes",
+            },
+            {
+                "name": "KC_CACHE_CONFIG_FILE",
+                "value": "cache-ispn.xml",
+            },
+        ]
         if input_.procore_integration:
             keycloak_procore_values = values.get("keycloakProcore", {})
             keycloak_values["extraEnvVarsSecret"] = keycloak_procore_values.get(

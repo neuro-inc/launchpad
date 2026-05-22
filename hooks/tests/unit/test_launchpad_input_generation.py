@@ -737,11 +737,17 @@ async def test_launchpad_values_generation__min(apolo_client):
         "platform.apolo.us/component": "app",
         "platform.apolo.us/preset": "cpu-medium",
     }
+    expected_kc_extra_env_vars = [
+        {"name": "KC_CACHE", "value": "ispn"},
+        {"name": "KC_CACHE_STACK", "value": "kubernetes"},
+        {"name": "KC_CACHE_CONFIG_FILE", "value": "cache-ispn.xml"},
+    ]
     keycloak_values = {
         "fullnameOverride": f"launchpad-{APP_ID}-keycloak",
         "auth": {"adminPassword": f"keycloak-admin-pswd-{APP_ID}-value"},
         "externalDatabase": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
         "image": {"tag": "latest"},
+        "extraEnvVars": expected_kc_extra_env_vars,
         "preset_name": "cpu-medium",
         "resources": expected_resources,
         "tolerations": expected_tolerations,
@@ -834,7 +840,13 @@ async def test_launchpad_values_generation__procore_integration(
         app_id=APP_ID,
     )
 
+    expected_kc_extra_env_vars = [
+        {"name": "KC_CACHE", "value": "ispn"},
+        {"name": "KC_CACHE_STACK", "value": "kubernetes"},
+        {"name": "KC_CACHE_CONFIG_FILE", "value": "cache-ispn.xml"},
+    ]
     assert helm_params["keycloak"]["extraEnvVars"] == [
+        *expected_kc_extra_env_vars,
         {
             "name": "PROCORE_CLIENT_ID",
             "valueFrom": {
@@ -977,6 +989,9 @@ async def test_launchpad_values_generation__brand(apolo_client):
         },
         "service": {"extraLabels": {"service": "keycloak"}},
         "extraEnvVars": [
+            {"name": "KC_CACHE", "value": "ispn"},
+            {"name": "KC_CACHE_STACK", "value": "kubernetes"},
+            {"name": "KC_CACHE_CONFIG_FILE", "value": "cache-ispn.xml"},
             {
                 "name": "BRANDING_LOGO_URL",
                 "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/logo",
