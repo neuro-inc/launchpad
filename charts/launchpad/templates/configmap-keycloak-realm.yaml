@@ -18,7 +18,7 @@ data:
       "defaultSignatureAlgorithm": "RS256",
       "revokeRefreshToken": false,
       "refreshTokenMaxReuse": 0,
-      "accessTokenLifespan": 86400,
+      "accessTokenLifespan": 900,
       "accessTokenLifespanForImplicitFlow": 86400,
       "ssoSessionIdleTimeout": 864000,
       "ssoSessionMaxLifespan": 864000,
