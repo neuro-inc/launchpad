@@ -9,14 +9,19 @@ from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_ROLES,
     HEADER_X_AUTH_REQUEST_USERNAME,
     HEADER_X_FORWARDED_HOST,
+    HEADER_X_FORWARDED_URI,
 )
-from launchpad.auth.api import view_post_authorize
+from launchpad.auth.api import _is_auth_bypass_path, view_post_authorize
 
 
 @pytest.fixture
 def mock_request() -> MagicMock:
     request = MagicMock()
     request.headers = {HEADER_X_FORWARDED_HOST: "example.test"}
+    request.app = MagicMock()
+    request.app.config = SimpleNamespace(
+        auth_bypass_path_prefixes=["/public", "/api/webhooks"]
+    )
     return request
 
 
@@ -83,3 +88,70 @@ async def test_view_post_authorize_forwards_groups_and_roles_separately(
     assert response.headers[HEADER_X_AUTH_REQUEST_USERNAME] == "user@example.test"
     assert response.headers[HEADER_X_AUTH_REQUEST_GROUPS] == expected_groups
     assert response.headers[HEADER_X_AUTH_REQUEST_ROLES] == expected_roles
+
+
+@pytest.mark.parametrize(
+    ("path", "prefixes", "expected"),
+    [
+        ("/public", ["/public"], True),
+        ("/public/file.txt", ["/public"], True),
+        ("/api/webhooks/v1", ["/api/webhooks"], True),
+        ("/publicity", ["/public"], False),
+        ("/api/webhooksx", ["/api/webhooks"], False),
+        ("/x", ["/public", "/api/webhooks"], False),
+        ("/public", ["public/"], True),
+    ],
+)
+def test_is_auth_bypass_path(path: str, prefixes: list[str], expected: bool) -> None:
+    assert _is_auth_bypass_path(path, prefixes) is expected
+
+
+async def test_view_post_authorize_bypasses_redirect_for_configured_paths(
+    mock_request: MagicMock,
+) -> None:
+    db = MagicMock()
+    oauth = MagicMock()
+    mock_request.headers[HEADER_X_FORWARDED_URI] = "/api/webhooks/incoming"
+
+    with (
+        patch(
+            "launchpad.auth.api.select_app_by_any_url", new=AsyncMock()
+        ) as mock_select_app,
+        patch(
+            "launchpad.auth.api.decode_token_from_request", new=AsyncMock()
+        ) as mock_decode,
+    ):
+        mock_select_app.return_value = _installed_app()
+        mock_decode.side_effect = AssertionError(
+            "decode_token_from_request should not be called for bypass paths"
+        )
+
+        response = await view_post_authorize(request=mock_request, db=db, oauth=oauth)
+
+    assert response.status_code == 200
+    oauth.redirect.assert_not_called()
+
+
+async def test_view_post_authorize_does_not_bypass_when_prefixes_disabled(
+    mock_request: MagicMock,
+) -> None:
+    db = MagicMock()
+    oauth = MagicMock()
+    mock_request.headers[HEADER_X_FORWARDED_URI] = "/api/webhooks/incoming"
+    mock_request.app.config.auth_bypass_path_prefixes = []
+
+    with (
+        patch(
+            "launchpad.auth.api.select_app_by_any_url", new=AsyncMock()
+        ) as mock_select_app,
+        patch(
+            "launchpad.auth.api.decode_token_from_request", new=AsyncMock()
+        ) as mock_decode,
+    ):
+        mock_select_app.return_value = _installed_app()
+        mock_decode.return_value = {"email": "user@example.test"}
+
+        response = await view_post_authorize(request=mock_request, db=db, oauth=oauth)
+
+    assert response.status_code == 200
+    assert response.headers[HEADER_X_AUTH_REQUEST_EMAIL] == "user@example.test"

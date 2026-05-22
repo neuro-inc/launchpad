@@ -84,6 +84,7 @@ class Config:
     server: ServerConfig = ServerConfig()
     instance_id: UUID | None = None
     skip_seed_templates: bool = False
+    auth_bypass_path_prefixes: list[str] | None = None
 
 
 class EnvironConfigFactory:
@@ -108,6 +109,7 @@ class EnvironConfigFactory:
                     self._environ.get("LAUNCHPAD_SKIP_SEED_TEMPLATES")
                 ),
                 branding=self.create_branding(),
+                auth_bypass_path_prefixes=self.create_auth_bypass_path_prefixes(),
             )
         except KeyError as e:
             logger.exception("Missing required environment variable: %s", e)
@@ -237,3 +239,9 @@ class EnvironConfigFactory:
             background=self._environ.get("BRANDING_BACKGROUND"),
             branding_dir=Path(branding_dir),
         )
+
+    def create_auth_bypass_path_prefixes(self) -> list[str]:
+        raw = self._environ.get("LAUNCHPAD_AUTH_BYPASS_PATH_PREFIXES")
+        if raw is None:
+            return ["/public", "/api/webhooks"]
+        return [part.strip() for part in raw.split(",") if part.strip()]

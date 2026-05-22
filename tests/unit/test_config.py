@@ -120,6 +120,26 @@ def test_environ_config_factory_create_full_config(mock_environ: None) -> None:
     assert config.apolo.cluster == "test-cluster"
     assert config.apps is not None
     assert config.apps.vllm == {"setting": "vllm_value"}
+    assert config.auth_bypass_path_prefixes == ["/public", "/api/webhooks"]
+
+
+def test_environ_config_factory_create_auth_bypass_path_prefixes_custom(
+    mock_environ: None,
+) -> None:
+    factory = EnvironConfigFactory(
+        environ={
+            **os.environ,
+            "LAUNCHPAD_AUTH_BYPASS_PATH_PREFIXES": "/foo,/bar,/api/webhooks",
+        }
+    )
+    config = factory.create_auth_bypass_path_prefixes()
+    assert config == ["/foo", "/bar", "/api/webhooks"]
+
+
+def test_environ_config_factory_create_auth_bypass_path_prefixes_disabled() -> None:
+    factory = EnvironConfigFactory(environ={"LAUNCHPAD_AUTH_BYPASS_PATH_PREFIXES": ""})
+    config = factory.create_auth_bypass_path_prefixes()
+    assert config == []
 
 
 def test_environ_config_factory_create_apps_empty_config() -> None:
