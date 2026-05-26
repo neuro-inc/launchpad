@@ -152,23 +152,16 @@ export async function getAuthOptions(): Promise<AuthOptions> {
          * For public clients, use undefined instead of empty string
          * This prevents NextAuth from trying to use client secret authentication
          */
-        clientSecret: '',
+        clientSecret: process.env.KEYCLOAK_CLIENT_SECRET ?? '',
         issuer: getKeycloakIssuer(config),
         /**
          * Only PKCE for public clients
          */
-        checks: ['pkce'],
-        // httpOptions: {
-        //   headers: {
-        //     origin: siteUrl,
-        //   },
-        // },
+        checks: ['pkce', 'state'],
         authorization: {
           params: {
-            // prompt: 'login',
             scope: 'openid profile email offline_access',
             response_type: 'code',
-            // redirect_uri: `${siteUrl}/api/auth/callback/keycloak`,
           },
         },
       }),
