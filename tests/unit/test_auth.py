@@ -45,7 +45,6 @@ def oauth_instance(
     return Oauth(
         http=mock_http_session,
         keycloak_config=mock_keycloak_config,
-        cookie_domain="mock-cookie.com",
         launchpad_domain="mock-launchpad.com",
     )
 

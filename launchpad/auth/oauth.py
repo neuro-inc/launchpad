@@ -37,7 +37,6 @@ class Oauth:
         self,
         http: ClientSession,
         keycloak_config: KeycloakConfig,
-        cookie_domain: str,
         launchpad_domain: str,
         scope: list[str] | None = None,
     ):
@@ -45,7 +44,7 @@ class Oauth:
         self._url = keycloak_config.url
         self._realm = keycloak_config.realm
         self._client_id = keycloak_config.client_id
-        self._cookie_domain = f".{cookie_domain}"
+        self._cookie_domain = launchpad_domain
         self._launchpad_domain = launchpad_domain
         self._callback_url = f"https://{self._launchpad_domain}/auth/callback"
         self._keycloak_url = f"{self._url}/realms/{self._realm}/protocol/openid-connect"
