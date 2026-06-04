@@ -484,6 +484,10 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 "name": "KC_CACHE_CONFIG_FILE",
                 "value": "cache-ispn.xml",
             },
+            {
+                "name": "KC_HOSTNAME",
+                "value": f"https://launchpad-{app_id}-keycloak.{domain}",
+            },
         ]
         if input_.procore_integration:
             keycloak_procore_values = values.setdefault("keycloakProcore", {})

@@ -19,7 +19,6 @@ def test_config_endpoint(app_client: TestClient, config: Config) -> None:
         "keycloak": {
             "url": str(config.keycloak.url),
             "realm": config.keycloak.realm,
-            "idp_hint": config.keycloak.idp_hint,
             "required_identity_source": config.keycloak.required_identity_source,
             "required_identity_group": config.keycloak.required_identity_group,
         },

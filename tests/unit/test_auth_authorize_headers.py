@@ -23,7 +23,6 @@ def mock_request() -> MagicMock:
     request.app.config = SimpleNamespace(
         auth_bypass_path_prefixes=["/public", "/api/webhooks"],
         keycloak=SimpleNamespace(
-            idp_hint=None,
             required_identity_source=None,
             required_identity_group=None,
         ),

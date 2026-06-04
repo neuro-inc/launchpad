@@ -741,6 +741,10 @@ async def test_launchpad_values_generation__min(apolo_client):
         {"name": "KC_CACHE", "value": "ispn"},
         {"name": "KC_CACHE_STACK", "value": "kubernetes"},
         {"name": "KC_CACHE_CONFIG_FILE", "value": "cache-ispn.xml"},
+        {
+            "name": "KC_HOSTNAME",
+            "value": f"https://launchpad-{APP_ID}-keycloak.apps.some.org.apolo.us",
+        },
     ]
     keycloak_values = {
         "fullnameOverride": f"launchpad-{APP_ID}-keycloak",
@@ -801,7 +805,7 @@ async def test_launchpad_values_generation__min(apolo_client):
             "auth": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
             "fullnameOverride": f"launchpad-{APP_ID}-db",
         },
-        "domain": "apps.some.org.neu.ro",
+        "domain": "apps.some.org.apolo.us",
         "extraEnv": {},
         "image": {"tag": "latest"},
         "LAUNCHPAD_INITIAL_CONFIG": "",
@@ -844,6 +848,10 @@ async def test_launchpad_values_generation__procore_integration(
         {"name": "KC_CACHE", "value": "ispn"},
         {"name": "KC_CACHE_STACK", "value": "kubernetes"},
         {"name": "KC_CACHE_CONFIG_FILE", "value": "cache-ispn.xml"},
+        {
+            "name": "KC_HOSTNAME",
+            "value": f"https://launchpad-{APP_ID}-keycloak.apps.some.org.apolo.us",
+        },
     ]
     assert helm_params["keycloak"]["extraEnvVars"] == [
         *expected_kc_extra_env_vars,
@@ -1001,16 +1009,20 @@ async def test_launchpad_values_generation__brand(apolo_client):
             {"name": "KC_CACHE_STACK", "value": "kubernetes"},
             {"name": "KC_CACHE_CONFIG_FILE", "value": "cache-ispn.xml"},
             {
+                "name": "KC_HOSTNAME",
+                "value": f"https://launchpad-{APP_ID}-keycloak.apps.some.org.apolo.us",
+            },
+            {
                 "name": "BRANDING_LOGO_URL",
-                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/logo",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.apolo.us/branding/logo",
             },
             {
                 "name": "BRANDING_FAVICON_URL",
-                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/favicon",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.apolo.us/branding/favicon",
             },
             {
                 "name": "BRANDING_BACKGROUND_URL",
-                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/background",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.apolo.us/branding/background",
             },
         ],
         "extraVolumes": [
@@ -1088,7 +1100,7 @@ async def test_launchpad_values_generation__brand(apolo_client):
             "auth": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
             "fullnameOverride": f"launchpad-{APP_ID}-db",
         },
-        "domain": "apps.some.org.neu.ro",
+        "domain": "apps.some.org.apolo.us",
         "extraEnv": {
             "BRANDING_TITLE": "My Custom Launchpad",
             "BRANDING_DIR": "/etc/launchpad/branding",
