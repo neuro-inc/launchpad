@@ -282,8 +282,8 @@ def mock_http_and_oauth(
     oauth = Oauth(
         http=mock_http,
         keycloak_config=mock_config_auth.keycloak,
-        cookie_domain=mock_config_auth.apolo.base_domain,
         launchpad_domain=mock_config_auth.apolo.self_domain,
+        legacy_cookie_domain=mock_config_auth.apolo.base_domain,
     )
 
     return mock_http, oauth

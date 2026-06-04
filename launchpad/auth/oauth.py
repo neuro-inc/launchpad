@@ -37,15 +37,18 @@ class Oauth:
         self,
         http: ClientSession,
         keycloak_config: KeycloakConfig,
-        cookie_domain: str,
         launchpad_domain: str,
+        legacy_cookie_domain: str | None = None,
         scope: list[str] | None = None,
     ):
         self._http = http
         self._url = keycloak_config.url
         self._realm = keycloak_config.realm
         self._client_id = keycloak_config.client_id
-        self._cookie_domain = f".{cookie_domain}"
+        self._cookie_domain = launchpad_domain
+        self._legacy_cookie_domains = self._build_legacy_cookie_domains(
+            legacy_cookie_domain
+        )
         self._launchpad_domain = launchpad_domain
         self._callback_url = f"https://{self._launchpad_domain}/auth/callback"
         self._keycloak_url = f"{self._url}/realms/{self._realm}/protocol/openid-connect"
@@ -80,6 +83,7 @@ class Oauth:
         )
 
         response = RedirectResponse(url=auth_url)
+        self._clear_legacy_cookies(response)
         self._set_cookie(response, key=COOKIE_CODE_VERIFIER, value=code_verifier)
         return response
 
@@ -106,6 +110,7 @@ class Oauth:
         access_token = await self._fetch_token(data)
 
         response = RedirectResponse(original_url)
+        self._clear_legacy_cookies(response)
         self.set_auth_cookie(response, access_token)
         return response
 
@@ -115,9 +120,8 @@ class Oauth:
     def logout(self, response: Response) -> None:
         """Cleanup of cookies on logout"""
         for cookie in (COOKIE_TOKEN, COOKIE_CODE_VERIFIER):
-            response.delete_cookie(
-                key=cookie, domain=self._cookie_domain, secure=True, httponly=True
-            )
+            self._delete_cookie(response, key=cookie, domain=self._cookie_domain)
+        self._clear_legacy_cookies(response)
 
     @backoff.on_exception(
         wait_gen=backoff.expo,
@@ -149,6 +153,31 @@ class Oauth:
             key=key,
             value=value,
             domain=self._cookie_domain,
+            secure=True,
+            httponly=True,
+        )
+
+    @staticmethod
+    def _build_legacy_cookie_domains(domain: str | None) -> tuple[str, ...]:
+        if not domain:
+            return ()
+
+        normalized = domain.lstrip(".")
+        if not normalized:
+            return ()
+
+        return (normalized, f".{normalized}")
+
+    def _clear_legacy_cookies(self, response: Response) -> None:
+        for cookie in (COOKIE_TOKEN, COOKIE_CODE_VERIFIER):
+            for domain in self._legacy_cookie_domains:
+                self._delete_cookie(response, key=cookie, domain=domain)
+
+    @staticmethod
+    def _delete_cookie(response: Response, key: str, domain: str) -> None:
+        response.delete_cookie(
+            key=key,
+            domain=domain,
             secure=True,
             httponly=True,
         )

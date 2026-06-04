@@ -1,14 +1,15 @@
+import base64
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiohttp import ClientResponseError, ClientSession
 from starlette.requests import Request
-from starlette.responses import RedirectResponse
+from starlette.responses import RedirectResponse, Response
 from yarl import URL
 
 from launchpad.auth.dependencies import auth_required
 from launchpad.auth.models import User
-from launchpad.auth.oauth import COOKIE_CODE_VERIFIER, Oauth, OauthError
+from launchpad.auth.oauth import COOKIE_CODE_VERIFIER, COOKIE_TOKEN, Oauth, OauthError
 from launchpad.config import KeycloakConfig
 from launchpad.errors import Unauthorized
 
@@ -45,8 +46,8 @@ def oauth_instance(
     return Oauth(
         http=mock_http_session,
         keycloak_config=mock_keycloak_config,
-        cookie_domain="mock-cookie.com",
         launchpad_domain="mock-launchpad.com",
+        legacy_cookie_domain="mock-base.com",
     )
 
 
@@ -133,8 +134,11 @@ async def test_oauth_redirect(oauth_instance: Oauth, mock_request: MagicMock) ->
     assert "code_challenge" in redirect_url.query
     assert "state" in redirect_url.query
 
-    # Verify cookie
-    assert COOKIE_CODE_VERIFIER in response.headers["set-cookie"]
+    set_cookies = response.headers.getlist("set-cookie")
+    assert any(COOKIE_CODE_VERIFIER in header for header in set_cookies)
+    assert any('launchpad-token=""' in header for header in set_cookies)
+    assert any("Domain=mock-base.com" in header for header in set_cookies)
+    assert any("Domain=.mock-base.com" in header for header in set_cookies)
 
 
 async def test_oauth_callback_missing_params(
@@ -157,6 +161,44 @@ async def test_oauth_callback_missing_params(
     mock_request.cookies = {}
     with pytest.raises(OauthError, match="missing required params"):
         await oauth_instance.callback(mock_request)
+
+
+async def test_oauth_callback_clears_legacy_cookies(
+    oauth_instance: Oauth, mock_request: MagicMock
+) -> None:
+    original_redirect_uri = "https://original.com/path"
+    mock_request.query_params = {
+        "code": "mock-code",
+        "state": base64.urlsafe_b64encode(original_redirect_uri.encode()).decode(),
+    }
+    mock_request.cookies = {COOKIE_CODE_VERIFIER: "mock-code-verifier"}
+
+    with patch.object(
+        oauth_instance, "_fetch_token", new=AsyncMock(return_value="access-token")
+    ):
+        response = await oauth_instance.callback(mock_request)
+
+    assert response.headers["location"] == original_redirect_uri
+    set_cookies = response.headers.getlist("set-cookie")
+    assert any(f"{COOKIE_TOKEN}=access-token" in header for header in set_cookies)
+    assert any("Domain=mock-launchpad.com" in header for header in set_cookies)
+    assert any('launchpad-token=""' in header for header in set_cookies)
+    assert any('code_verifier=""' in header for header in set_cookies)
+    assert any("Domain=mock-base.com" in header for header in set_cookies)
+    assert any("Domain=.mock-base.com" in header for header in set_cookies)
+
+
+def test_oauth_logout_clears_host_and_legacy_cookies(oauth_instance: Oauth) -> None:
+    response = Response()
+
+    oauth_instance.logout(response)
+
+    set_cookies = response.headers.getlist("set-cookie")
+    assert any("Domain=mock-launchpad.com" in header for header in set_cookies)
+    assert any("Domain=mock-base.com" in header for header in set_cookies)
+    assert any("Domain=.mock-base.com" in header for header in set_cookies)
+    assert any('launchpad-token=""' in header for header in set_cookies)
+    assert any('code_verifier=""' in header for header in set_cookies)
 
 
 async def test_oauth_fetch_token_client_error(

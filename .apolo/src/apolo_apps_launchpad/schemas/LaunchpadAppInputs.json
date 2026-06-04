@@ -548,6 +548,33 @@
           "$ref": "#/$defs/Preset",
           "x-description": "Preset to use for the Launchpad application. Minimal resources: 0.5 CPU cores, 1 GiB memory.",
           "x-title": "Launchpad Preset"
+        },
+        "use_preview_ui": {
+          "default": false,
+          "title": "Use Preview Ui",
+          "type": "boolean",
+          "x-description": "Use a Launchpad Web UI preview build instead of the regular UI.",
+          "x-is-advanced-field": true,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Use Preview UI"
+        },
+        "preview_ui_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "https://deploy-preview-120--launchpad-web-ui-dev-apolo-us.netlify.app",
+          "title": "Preview Ui Url",
+          "x-description": "Paste the full Launchpad Web UI preview URL. You can replace the prefilled value with any other preview URL.",
+          "x-is-advanced-field": true,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Preview UI URL"
         }
       },
       "required": [

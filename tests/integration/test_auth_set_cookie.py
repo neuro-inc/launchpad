@@ -62,8 +62,8 @@ def oauth(mock_http: AsyncMock, mock_config: Config) -> Oauth:
     return Oauth(
         http=mock_http,
         keycloak_config=mock_config.keycloak,
-        cookie_domain=mock_config.apolo.base_domain,
         launchpad_domain=mock_config.apolo.self_domain,
+        legacy_cookie_domain=mock_config.apolo.base_domain,
     )
 
 
