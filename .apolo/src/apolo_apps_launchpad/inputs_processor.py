@@ -20,6 +20,10 @@ from apolo_app_types.protocols.common.hugging_face import (
     HuggingFaceCache,
     HuggingFaceModel,
 )
+from apolo_app_types.protocols.common.secrets_ import (
+    OptionalSecret,
+    serialize_optional_secret,
+)
 from apolo_app_types.protocols.common.storage import (
     ApoloFilesMount,
     ApoloFilesPath,
@@ -84,6 +88,20 @@ def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
         raise ValueError(err_msg)
 
     return "".join([random.choice(PASSWORD_CHAR_POOL) for _ in range(length)])
+
+
+def _append_secret_env_var(
+    env_vars: list[dict[str, t.Any]],
+    *,
+    name: str,
+    value: OptionalSecret,
+    secret_name: str,
+) -> None:
+    serialized_value = serialize_optional_secret(value, secret_name=secret_name)
+    if isinstance(serialized_value, dict):
+        env_vars.append({"name": name, **serialized_value})
+        return
+    env_vars.append({"name": name, "value": serialized_value})
 
 
 class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
@@ -453,7 +471,64 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         # Pass branding asset URLs to Keycloak so the theme can reference them directly.
         # All files are served by the Launchpad API which returns correct MIME types.
-        kc_extra_env_vars = []
+        kc_extra_env_vars = [
+            {
+                "name": "KC_CACHE",
+                "value": "ispn",
+            },
+            {
+                "name": "KC_CACHE_STACK",
+                "value": "kubernetes",
+            },
+            {
+                "name": "KC_CACHE_CONFIG_FILE",
+                "value": "cache-ispn.xml",
+            },
+            {
+                "name": "KC_HOSTNAME",
+                "value": f"https://launchpad-{app_id}-keycloak.{domain}",
+            },
+        ]
+        if input_.procore_integration:
+            keycloak_procore_values = values.setdefault("keycloakProcore", {})
+            keycloak_procore_values["enabled"] = True
+            _append_secret_env_var(
+                kc_extra_env_vars,
+                name="PROCORE_CLIENT_ID",
+                value=input_.procore_integration.client_id,
+                secret_name=app_secrets_name,
+            )
+            _append_secret_env_var(
+                kc_extra_env_vars,
+                name="PROCORE_CLIENT_SECRET",
+                value=input_.procore_integration.client_secret,
+                secret_name=app_secrets_name,
+            )
+            kc_extra_env_vars.extend(
+                [
+                    {
+                        "name": "PROCORE_AUTHORIZATION_URL",
+                        "value": keycloak_procore_values.get(
+                            "authorizationUrl",
+                            "https://login.procore.com/oauth/authorize",
+                        ),
+                    },
+                    {
+                        "name": "PROCORE_TOKEN_URL",
+                        "value": keycloak_procore_values.get(
+                            "tokenUrl",
+                            "https://login.procore.com/oauth/token",
+                        ),
+                    },
+                    {
+                        "name": "PROCORE_ME_URL",
+                        "value": keycloak_procore_values.get(
+                            "meUrl",
+                            "https://api.procore.com/rest/v1.0/me",
+                        ),
+                    },
+                ]
+            )
         if input_.branding:
             launchpad_api_base = f"https://launchpad-{app_id}-api.{domain}"
             if input_.branding.logo_file:
@@ -487,6 +562,12 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     )
         if kc_extra_env_vars:
             keycloak_values["extraEnvVars"] = kc_extra_env_vars
+
+        keycloak_image_tag = os.getenv("APP_IMAGE_TAG", "latest")
+        for keycloak_values_block in (keycloak_values, values.get("mlops-keycloak")):
+            if isinstance(keycloak_values_block, dict):
+                image_values = keycloak_values_block.setdefault("image", {})
+                image_values["tag"] = keycloak_image_tag
 
         cluster_config = self.client.config.clusters[self.client.cluster_name]
         if cluster_config.apps.launchpad_use_subdomain:

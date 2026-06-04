@@ -3,6 +3,7 @@ import os
 
 import pytest
 from apolo_sdk import Cluster
+from pydantic import ValidationError
 
 from apolo_app_types import ApoloSecret, HuggingFaceToken
 from apolo_app_types.protocols.common import Preset
@@ -14,6 +15,7 @@ from apolo_apps_launchpad.inputs_processor import (
 )
 from apolo_apps_launchpad.types import (
     AppsConfig,
+    ProCoreIntegrationConfig,
     CustomLLMModel,
     HuggingFaceLLMModel,
     LaunchpadAppInputs,
@@ -735,10 +737,21 @@ async def test_launchpad_values_generation__min(apolo_client):
         "platform.apolo.us/component": "app",
         "platform.apolo.us/preset": "cpu-medium",
     }
+    expected_kc_extra_env_vars = [
+        {"name": "KC_CACHE", "value": "ispn"},
+        {"name": "KC_CACHE_STACK", "value": "kubernetes"},
+        {"name": "KC_CACHE_CONFIG_FILE", "value": "cache-ispn.xml"},
+        {
+            "name": "KC_HOSTNAME",
+            "value": f"https://launchpad-{APP_ID}-keycloak.apps.some.org.apolo.us",
+        },
+    ]
     keycloak_values = {
         "fullnameOverride": f"launchpad-{APP_ID}-keycloak",
         "auth": {"adminPassword": f"keycloak-admin-pswd-{APP_ID}-value"},
         "externalDatabase": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
+        "image": {"tag": "latest"},
+        "extraEnvVars": expected_kc_extra_env_vars,
         "preset_name": "cpu-medium",
         "resources": expected_resources,
         "tolerations": expected_tolerations,
@@ -792,7 +805,7 @@ async def test_launchpad_values_generation__min(apolo_client):
             "auth": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
             "fullnameOverride": f"launchpad-{APP_ID}-db",
         },
-        "domain": "apps.some.org.neu.ro",
+        "domain": "apps.some.org.apolo.us",
         "extraEnv": {},
         "image": {"tag": "latest"},
         "LAUNCHPAD_INITIAL_CONFIG": "",
@@ -805,6 +818,98 @@ async def test_launchpad_values_generation__min(apolo_client):
     }
 
     assert helm_params == expected_helm_values
+
+
+async def test_launchpad_values_generation__procore_integration(
+    apolo_client, monkeypatch
+):
+    monkeypatch.setenv("APP_IMAGE_TAG", "feature-procore-keycloak-idp")
+    processor = LaunchpadInputsProcessor(client=apolo_client)
+    helm_params = await processor.gen_extra_values(
+        input_=LaunchpadAppInputs(
+            launchpad_web_app_config=LaunchpadWebAppConfig(
+                preset=Preset(name="cpu-medium"),
+            ),
+            apps_config=AppsConfig(
+                quick_start_config=NoQuickStartConfig(no_quickstart=True),
+            ),
+            procore_integration=ProCoreIntegrationConfig(
+                client_id=ApoloSecret(key="procore-client-id"),
+                client_secret=ApoloSecret(key="procore-client-secret"),
+            ),
+        ),
+        app_name="launchpad-app",
+        namespace="default-namespace",
+        app_secrets_name=APP_SECRETS_NAME,
+        app_id=APP_ID,
+    )
+
+    expected_kc_extra_env_vars = [
+        {"name": "KC_CACHE", "value": "ispn"},
+        {"name": "KC_CACHE_STACK", "value": "kubernetes"},
+        {"name": "KC_CACHE_CONFIG_FILE", "value": "cache-ispn.xml"},
+        {
+            "name": "KC_HOSTNAME",
+            "value": f"https://launchpad-{APP_ID}-keycloak.apps.some.org.apolo.us",
+        },
+    ]
+    assert helm_params["keycloak"]["extraEnvVars"] == [
+        *expected_kc_extra_env_vars,
+        {
+            "name": "PROCORE_CLIENT_ID",
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": APP_SECRETS_NAME,
+                    "key": "procore-client-id",
+                }
+            },
+        },
+        {
+            "name": "PROCORE_CLIENT_SECRET",
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": APP_SECRETS_NAME,
+                    "key": "procore-client-secret",
+                }
+            },
+        },
+        {
+            "name": "PROCORE_AUTHORIZATION_URL",
+            "value": "https://login.procore.com/oauth/authorize",
+        },
+        {
+            "name": "PROCORE_TOKEN_URL",
+            "value": "https://login.procore.com/oauth/token",
+        },
+        {
+            "name": "PROCORE_ME_URL",
+            "value": "https://api.procore.com/rest/v1.0/me",
+        },
+    ]
+    assert (
+        helm_params["mlops-keycloak"]["extraEnvVars"]
+        == helm_params["keycloak"]["extraEnvVars"]
+    )
+    assert helm_params["keycloak"]["image"]["tag"] == "feature-procore-keycloak-idp"
+    assert (
+        helm_params["mlops-keycloak"]["image"]["tag"] == "feature-procore-keycloak-idp"
+    )
+    assert helm_params["keycloakProcore"]["enabled"] is True
+
+
+def test_launchpad_values_generation__procore_integration_requires_both_secrets():
+    with pytest.raises(ValidationError):
+        LaunchpadAppInputs(
+            launchpad_web_app_config=LaunchpadWebAppConfig(
+                preset=Preset(name="cpu-medium"),
+            ),
+            apps_config=AppsConfig(
+                quick_start_config=NoQuickStartConfig(no_quickstart=True),
+            ),
+            procore_integration=ProCoreIntegrationConfig(
+                client_id=ApoloSecret(key="procore-client-id"),
+            ),
+        )
 
 
 async def test_launchpad_values_generation__brand(apolo_client):
@@ -882,6 +987,7 @@ async def test_launchpad_values_generation__brand(apolo_client):
         "fullnameOverride": f"launchpad-{APP_ID}-keycloak",
         "auth": {"adminPassword": f"keycloak-admin-pswd-{APP_ID}-value"},
         "externalDatabase": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
+        "image": {"tag": "latest"},
         "preset_name": "cpu-medium",
         "resources": expected_resources,
         "tolerations": expected_tolerations,
@@ -899,17 +1005,24 @@ async def test_launchpad_values_generation__brand(apolo_client):
         },
         "service": {"extraLabels": {"service": "keycloak"}},
         "extraEnvVars": [
+            {"name": "KC_CACHE", "value": "ispn"},
+            {"name": "KC_CACHE_STACK", "value": "kubernetes"},
+            {"name": "KC_CACHE_CONFIG_FILE", "value": "cache-ispn.xml"},
+            {
+                "name": "KC_HOSTNAME",
+                "value": f"https://launchpad-{APP_ID}-keycloak.apps.some.org.apolo.us",
+            },
             {
                 "name": "BRANDING_LOGO_URL",
-                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/logo",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.apolo.us/branding/logo",
             },
             {
                 "name": "BRANDING_FAVICON_URL",
-                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/favicon",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.apolo.us/branding/favicon",
             },
             {
                 "name": "BRANDING_BACKGROUND_URL",
-                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/background",
+                "value": f"https://launchpad-{APP_ID}-api.apps.some.org.apolo.us/branding/background",
             },
         ],
         "extraVolumes": [
@@ -987,7 +1100,7 @@ async def test_launchpad_values_generation__brand(apolo_client):
             "auth": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
             "fullnameOverride": f"launchpad-{APP_ID}-db",
         },
-        "domain": "apps.some.org.neu.ro",
+        "domain": "apps.some.org.apolo.us",
         "extraEnv": {
             "BRANDING_TITLE": "My Custom Launchpad",
             "BRANDING_DIR": "/etc/launchpad/branding",

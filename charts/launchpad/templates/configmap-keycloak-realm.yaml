@@ -450,7 +450,16 @@ data:
           ]
         }
       },
-      "groups": [],
+      "groups": [
+        {{- if .Values.keycloakProcore.enabled }}
+        {
+          "name": {{ trimPrefix "/" .Values.keycloakProcore.requiredGroup | quote }},
+          "path": {{ .Values.keycloakProcore.requiredGroup | quote }},
+          "subGroups": [],
+          "attributes": {}
+        }
+        {{- end }}
+      ],
       "users": [
         {
           "username": "admin",
@@ -786,7 +795,8 @@ data:
             "profile",
             "basic",
             "email",
-            "microprofile-jwt"
+            "microprofile-jwt",
+            "procore"
           ],
           "optionalClientScopes": [
             "address",
@@ -1514,7 +1524,7 @@ data:
               "consentRequired": false,
               "config": {
                 "introspection.token.claim": "true",
-                "full.path": "false",
+                "full.path": "true",
                 "id.token.claim": "true",
                 "access.token.claim": "true",
                 "claim.name": "groups",
@@ -1583,6 +1593,50 @@ data:
               }
             }
           ]
+        },
+        {
+          "id": "5fa8cf5f-1603-4b5d-9a70-6da3f1c5c8d0",
+          "name": "procore",
+          "description": "Launchpad Procore identity broker claims",
+          "protocol": "openid-connect",
+          "attributes": {
+            "include.in.token.scope": "true",
+            "display.on.consent.screen": "false"
+          },
+          "protocolMappers": [
+            {
+              "id": "a2a6139f-d2a6-4b76-bef4-1c53d1615121",
+              "name": "procore_user_id",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usermodel-attribute-mapper",
+              "consentRequired": false,
+              "config": {
+                "introspection.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "user.attribute": "procore_user_id",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "claim.name": "procore_user_id",
+                "jsonType.label": "String"
+              }
+            },
+            {
+              "id": "8d3d84f4-01b6-442b-bbc6-1be6478b0a4d",
+              "name": "identity_source",
+              "protocol": "openid-connect",
+              "protocolMapper": "oidc-usermodel-attribute-mapper",
+              "consentRequired": false,
+              "config": {
+                "introspection.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "user.attribute": "identity_source",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "claim.name": "identity_source",
+                "jsonType.label": "String"
+              }
+            }
+          ]
         }
       ],
       "defaultDefaultClientScopes": [
@@ -1623,7 +1677,29 @@ data:
       "enabledEventTypes": [],
       "adminEventsEnabled": false,
       "adminEventsDetailsEnabled": false,
-      "identityProviders": [],
+      "identityProviders": [
+        {{- if .Values.keycloakProcore.enabled }}
+        {
+          "alias": {{ .Values.keycloakProcore.alias | quote }},
+          "displayName": {{ .Values.keycloakProcore.displayName | quote }},
+          "providerId": "procore",
+          "enabled": true,
+          "storeToken": {{ .Values.keycloakProcore.storeToken }},
+          "trustEmail": {{ .Values.keycloakProcore.trustEmail }},
+          "firstBrokerLoginFlowAlias": "first broker login",
+          "config": {
+            "clientId": "${PROCORE_CLIENT_ID}",
+            "clientSecret": "${PROCORE_CLIENT_SECRET}",
+            "authorizationUrl": "${PROCORE_AUTHORIZATION_URL}",
+            "tokenUrl": "${PROCORE_TOKEN_URL}",
+            "meUrl": "${PROCORE_ME_URL}",
+            "clientAuthMethod": "client_secret_post",
+            "defaultScope": "",
+            "hideOnLoginPage": "false"
+          }
+        }
+        {{- end }}
+      ],
       "identityProviderMappers": [],
       "components": {
         "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy": [
@@ -2184,14 +2260,13 @@ data:
         {
           "id": "6fe6a55f-7b55-4edc-af78-12de69907861",
           "alias": "first broker login",
-          "description": "Actions taken after first broker login with identity provider account, which is not yet linked to any Keycloak account",
+          "description": "Actions taken after first broker login with identity provider account, which must already exist in Keycloak",
           "providerId": "basic-flow",
           "topLevel": true,
           "builtIn": true,
           "authenticationExecutions": [
             {
-              "authenticatorConfig": "review profile config",
-              "authenticator": "idp-review-profile",
+              "authenticator": "idp-detect-existing-broker-user",
               "authenticatorFlow": false,
               "requirement": "REQUIRED",
               "priority": 10,
@@ -2199,11 +2274,11 @@ data:
               "userSetupAllowed": false
             },
             {
-              "authenticatorFlow": true,
+              "authenticator": "idp-auto-link",
+              "authenticatorFlow": false,
               "requirement": "REQUIRED",
               "priority": 20,
-              "autheticatorFlow": true,
-              "flowAlias": "User creation or linking",
+              "autheticatorFlow": false,
               "userSetupAllowed": false
             }
           ]
@@ -2363,7 +2438,9 @@ data:
           "config": {
             "require.password.update.after.registration": "false"
           }
-        },
+        }
+        {{- if .Values.keycloakProcore.enabled }}
+        ,
         {
           "id": "952c1ab9-c759-409a-8ca6-264f533bb574",
           "alias": "review profile config",
@@ -2371,6 +2448,7 @@ data:
             "update.profile.on.first.login": "missing"
           }
         }
+        {{- end }}
       ],
       "requiredActions": [
         {

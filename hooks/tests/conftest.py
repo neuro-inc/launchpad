@@ -5,8 +5,18 @@ from yarl import URL
 # Register pytest plugins for fixtures
 pytest_plugins = [
     "apolo_app_types_fixtures.apolo_clients",
-    "apolo_app_types_fixtures.constants",
 ]
+
+
+@pytest.fixture(autouse=True)
+def mock_ingress_name_template(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _get_ingress_name_template(*args, **kwargs) -> str:
+        return "{name}.apps.some.org.apolo.us"
+
+    monkeypatch.setattr(
+        "apolo_apps_launchpad.inputs_processor._get_ingress_name_template",
+        _get_ingress_name_template,
+    )
 
 
 @pytest.fixture

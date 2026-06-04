@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncContextManager, AsyncIterator, Callable, Generator
+from typing import Any, AsyncContextManager, AsyncIterator, Callable, Generator, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -97,3 +97,62 @@ def app(
 @pytest.fixture
 def client(app: FastAPI) -> TestClient:
     return TestClient(app)
+
+
+def test_post_callback_allows_regular_user_without_procore_link(
+    client: TestClient,
+    app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app_with_config = cast(Any, app)
+    app_with_config.config.keycloak.required_identity_source = "procore"
+    app_with_config.config.keycloak.required_identity_group = "/procore-users"
+
+    async def fake_token_from_string(**_: object) -> dict[str, object]:
+        return {
+            "email": "user@example.test",
+            "azp": "frontend",
+            "groups": ["/support-users"],
+        }
+
+    monkeypatch.setattr("launchpad.auth.api.token_from_string", fake_token_from_string)
+
+    response = client.post(
+        "/auth/callback",
+        headers={
+            "Origin": "https://mock-launchpad.com",
+            "Authorization": "Bearer token",
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_post_callback_rejects_procore_user_without_procore_link(
+    client: TestClient,
+    app: FastAPI,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app_with_config = cast(Any, app)
+    app_with_config.config.keycloak.required_identity_source = "procore"
+    app_with_config.config.keycloak.required_identity_group = "/procore-users"
+
+    async def fake_token_from_string(**_: object) -> dict[str, object]:
+        return {
+            "email": "procore@example.test",
+            "azp": "frontend",
+            "groups": ["/procore-users"],
+        }
+
+    monkeypatch.setattr("launchpad.auth.api.token_from_string", fake_token_from_string)
+
+    response = client.post(
+        "/auth/callback",
+        headers={
+            "Origin": "https://mock-launchpad.com",
+            "Authorization": "Bearer token",
+        },
+    )
+
+    assert response.status_code == 403
+    assert "ProCore identity is required" in response.text

@@ -1,0 +1,15 @@
+LAUNCHPAD_ADMIN_PASSWORD: test-launchpad-admin-password
+dbPassword: test-db-password
+APOLO_PASSED_CONFIG: e30=
+apolo_app_id: test-app-id
+
+keycloak:
+  defaultRealm: launchpad
+
+keycloakProcore:
+  enabled: true
+  clientId: test-client-id
+  clientSecret: test-client-secret
+  alias: procore
+  requiredGroup: /procore-users
+  displayName: Procore

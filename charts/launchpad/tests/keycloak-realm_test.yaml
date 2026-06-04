@@ -1,0 +1,47 @@
+suite: keycloak realm import
+templates:
+  - templates/configmap-keycloak-realm.yaml
+tests:
+  - it: includes the procore identity provider wiring when enabled
+    values:
+      - ../ci/procore-values.yaml
+    asserts:
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"providerId": "procore"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"path": "/procore-users"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"full.path": "true"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"authenticator": "idp-detect-existing-broker-user"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"authenticator": "idp-auto-link"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"authenticatorConfig": \['
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"alias": "create unique user config"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"clientId": "\$\{PROCORE_CLIENT_ID\}"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"clientSecret": "\$\{PROCORE_CLIENT_SECRET\}"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"authorizationUrl": "\$\{PROCORE_AUTHORIZATION_URL\}"'
+  - it: omits the procore identity provider wiring when disabled
+    values:
+      - ../ci/procore-values.yaml
+    set:
+      keycloakProcore.enabled: false
+    asserts:
+      - notMatchRegex:
+          path: data["realm.json"]
+          pattern: '"providerId": "procore"'

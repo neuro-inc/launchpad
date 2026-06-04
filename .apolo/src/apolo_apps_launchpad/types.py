@@ -351,6 +351,31 @@ class LaunchpadWebAppConfig(AbstractAppFieldType):
     )
 
 
+class ProCoreIntegrationConfig(AbstractAppFieldType):
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra=SchemaExtraMetadata(
+            title="ProCore Integration",
+            description="Credentials for the ProCore identity provider used by Keycloak.",
+        ).as_json_schema_extra(),
+        is_advanced_field=True,
+    )
+    client_id: ApoloSecret = Field(
+        ...,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Client ID",
+            description="ProCore OAuth client ID stored in Apolo Secrets.",
+        ).as_json_schema_extra(),
+    )
+    client_secret: ApoloSecret = Field(
+        ...,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Client Secret",
+            description="ProCore OAuth client secret stored in Apolo Secrets.",
+        ).as_json_schema_extra(),
+    )
+
+
 class KeycloakConfig(AbstractAppFieldType):
     web_app_url: ServiceAPI[HttpApi]
     auth_admin_password: ApoloSecret = Field(
@@ -479,6 +504,7 @@ class LauchpadBrandingConfig(AbstractAppFieldType):
 class LaunchpadAppInputs(AppInputs):
     launchpad_web_app_config: LaunchpadWebAppConfig
     apps_config: AppsConfig
+    procore_integration: ProCoreIntegrationConfig | None = None
     branding: LauchpadBrandingConfig | None = None
 
 

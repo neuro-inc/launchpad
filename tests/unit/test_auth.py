@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -10,17 +12,24 @@ from launchpad.auth.dependencies import auth_required
 from launchpad.auth.models import User
 from launchpad.auth.oauth import COOKIE_CODE_VERIFIER, Oauth, OauthError
 from launchpad.config import KeycloakConfig
-from launchpad.errors import Unauthorized
+from launchpad.errors import Forbidden, Unauthorized
 
 
 @pytest.fixture
-def mock_request() -> MagicMock:
-    request = MagicMock(spec=Request)
+def mock_request() -> SimpleNamespace:
+    request = SimpleNamespace()
     request.headers = {}
     request.query_params = {}
     request.cookies = {}
     request.state = MagicMock()
-    request.app = MagicMock()
+    request.app = SimpleNamespace(
+        config=SimpleNamespace(
+            keycloak=SimpleNamespace(
+                required_identity_source=None,
+                required_identity_group=None,
+            )
+        )
+    )
     return request
 
 
@@ -30,6 +39,8 @@ def mock_keycloak_config() -> KeycloakConfig:
         url=URL("http://mock-keycloak.com"),
         realm="mock-realm",
         client_id="mock-client-id",
+        required_identity_source=None,
+        required_identity_group=None,
     )
 
 
@@ -107,9 +118,71 @@ async def test_auth_required_invalid_token(mock_request: MagicMock) -> None:
         mock_token_from_request.side_effect = Unauthorized("Token decoding failed")
 
         with pytest.raises(Unauthorized, match="Token decoding failed"):
-            await auth_required(request=mock_request)
+            await auth_required(request=cast(Request, mock_request))
 
         mock_token_from_request.assert_called_once_with(mock_request)
+
+
+async def test_auth_required_requires_procore_identity_when_configured(
+    mock_request: SimpleNamespace,
+) -> None:
+    mock_request.headers["Authorization"] = "Bearer valid-token"
+    mock_request.app.config.keycloak.required_identity_source = "procore"
+    mock_request.app.config.keycloak.required_identity_group = "/procore-users"
+
+    with patch(
+        "launchpad.auth.dependencies._token_from_request", new=AsyncMock()
+    ) as mock_token_from_request:
+        mock_token_from_request.return_value = {
+            "email": "test-user-id",
+            "name": "testuser",
+            "groups": ["/procore-users"],
+        }
+
+        with pytest.raises(Forbidden, match="ProCore identity is required"):
+            await auth_required(request=cast(Request, mock_request))
+
+
+async def test_auth_required_skips_procore_for_regular_user(
+    mock_request: SimpleNamespace,
+) -> None:
+    mock_request.headers["Authorization"] = "Bearer valid-token"
+    mock_request.app.config.keycloak.required_identity_source = "procore"
+    mock_request.app.config.keycloak.required_identity_group = "/procore-users"
+
+    with patch(
+        "launchpad.auth.dependencies._token_from_request", new=AsyncMock()
+    ) as mock_token_from_request:
+        mock_token_from_request.return_value = {
+            "email": "test-user-id",
+            "name": "testuser",
+            "groups": ["/support-users"],
+        }
+
+        user = await auth_required(request=cast(Request, mock_request))
+
+        assert user.email == "test-user-id"
+
+
+async def test_auth_required_skips_procore_for_admin_user(
+    mock_request: SimpleNamespace,
+) -> None:
+    mock_request.headers["Authorization"] = "Bearer valid-token"
+    mock_request.app.config.keycloak.required_identity_source = "procore"
+    mock_request.app.config.keycloak.required_identity_group = "/procore-users"
+
+    with patch(
+        "launchpad.auth.dependencies._token_from_request", new=AsyncMock()
+    ) as mock_token_from_request:
+        mock_token_from_request.return_value = {
+            "email": "admin@launchpad.com",
+            "name": "admin",
+            "realm_access": {"roles": ["admin"]},
+        }
+
+        user = await auth_required(request=cast(Request, mock_request))
+
+        assert user.email == "admin@launchpad.com"
 
 
 async def test_oauth_redirect(oauth_instance: Oauth, mock_request: MagicMock) -> None:
@@ -203,3 +276,25 @@ async def test_oauth_fetch_token_key_error(
     data = {"grant_type": "authorization_code"}
     with pytest.raises(OauthError):
         await oauth_instance._fetch_token(data)
+
+
+async def test_oauth_redirect_with_required_procore_identity_does_not_force_broker(
+    mock_http_session: AsyncMock,
+) -> None:
+    oauth = Oauth(
+        http=mock_http_session,
+        keycloak_config=KeycloakConfig(
+            url=URL("http://mock-keycloak.com"),
+            realm="mock-realm",
+            client_id="mock-client-id",
+            required_identity_source="procore",
+            required_identity_group="/procore-users",
+        ),
+        cookie_domain="mock-cookie.com",
+        launchpad_domain="mock-launchpad.com",
+    )
+
+    response = oauth.redirect("https://original.com/path")
+
+    redirect_url = URL(response.headers["location"])
+    assert "kc_idp_hint" not in redirect_url.query

@@ -1,9 +1,0 @@
-*
-!Makefile
-!alembic*
-!launchpad
-!pyproject.toml
-!poetry.lock
-!scripts
-!README.md
-!.apolo

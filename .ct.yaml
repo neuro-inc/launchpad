@@ -1,0 +1,7 @@
+chart-dirs:
+  - charts
+check-version-increment: false
+skip-helm-dependencies: true
+validate-maintainers: false
+validate-chart-schema: true
+validate-yaml: true

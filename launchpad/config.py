@@ -34,6 +34,8 @@ class KeycloakConfig:
     realm: str
     client_id: str = "frontend"
     ssl_verify: bool = True
+    required_identity_source: str | None = None
+    required_identity_group: str | None = None
 
 
 @dataclass
@@ -160,6 +162,14 @@ class EnvironConfigFactory:
                 url=URL(f"https://{self._environ['KEYCLOAK_URL']}"),
                 realm=self._environ["KEYCLOAK_REALM"],
                 ssl_verify=ssl_verify,
+                required_identity_source=(
+                    self._environ.get("KEYCLOAK_REQUIRED_IDENTITY_SOURCE") or ""
+                ).strip()
+                or None,
+                required_identity_group=(
+                    self._environ.get("KEYCLOAK_REQUIRED_IDENTITY_GROUP") or ""
+                ).strip()
+                or None,
             )
         except KeyError as e:
             logger.exception("Missing required Keycloak environment variable: %s", e)

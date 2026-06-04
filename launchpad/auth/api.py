@@ -23,6 +23,7 @@ from launchpad.auth import (
 from launchpad.auth.dependencies import (
     _extract_bearer_token,
     decode_token_from_request,
+    ensure_procore_identity,
     get_raw_token_from_request,
     token_from_string,
 )
@@ -242,6 +243,8 @@ async def view_post_authorize(
         )
         return oauth.redirect(original_redirect_uri=app_url)
 
+    ensure_procore_identity(decoded_token, request.app.config.keycloak)
+
     logger.debug(f"Decoded token keys: {list(decoded_token.keys())}")
     logger.debug(f"Token realm_access: {decoded_token.get('realm_access')}")
     logger.debug(f"Token groups: {decoded_token.get('groups')}")
@@ -330,6 +333,7 @@ async def callback(request: Request, oauth: DepOauth) -> Response:
 
         # Audience check
         await _validate_token_audience(decoded, request.app.config.keycloak)
+        ensure_procore_identity(decoded, request.app.config.keycloak)
 
         # Set secure cookie
         response = Response("OK", status_code=200)
