@@ -54,6 +54,7 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
             http=app.http,
             keycloak_config=app.config.keycloak,
             launchpad_domain=app.config.apolo.self_domain,
+            legacy_cookie_domain=app.config.apolo.base_domain,
         )
 
         # Seed app templates and initialize internal apps only if apps config is present
