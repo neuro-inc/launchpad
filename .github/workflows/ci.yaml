@@ -159,7 +159,7 @@ jobs:
       - name: Purge old artifacts
         uses: kolpav/purge-artifacts-action@v2
         with:
-          token: [REDACTED:API key param] github.token }}
+          token: ${{ github.token }}
           expire-in: 30mins
 
       - name: Login to ghcr.io
@@ -254,7 +254,7 @@ jobs:
       - name: Purge old artifacts
         uses: kolpav/purge-artifacts-action@v2
         with:
-          token: [REDACTED:API key param] github.token }}
+          token: ${{ github.token }}
           expire-in: 30mins
       - name: Set APP_IMAGE_TAG
         run: |
