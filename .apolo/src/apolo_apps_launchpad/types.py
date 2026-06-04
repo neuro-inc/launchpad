@@ -349,6 +349,29 @@ class LaunchpadWebAppConfig(AbstractAppFieldType):
             "Minimal resources: 0.5 CPU cores, 1 GiB memory.",
         ).as_json_schema_extra(),
     )
+    use_preview_ui: bool = Field(
+        default=False,
+        json_schema_extra=SchemaExtraMetadata(
+            title="Use Preview UI",
+            description=(
+                "Use a Launchpad Web UI preview build instead of the regular UI."
+            ),
+            is_advanced_field=True,
+        ).as_json_schema_extra(),
+    )
+    preview_ui_url: str | None = Field(
+        default=(
+            "https://deploy-preview-120--launchpad-web-ui-dev-apolo-us.netlify.app"
+        ),
+        json_schema_extra=SchemaExtraMetadata(
+            title="Preview UI URL",
+            description=(
+                "Paste the full Launchpad Web UI preview URL. "
+                "You can replace the prefilled value with any other preview URL."
+            ),
+            is_advanced_field=True,
+        ).as_json_schema_extra(),
+    )
 
 
 class KeycloakConfig(AbstractAppFieldType):

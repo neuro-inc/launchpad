@@ -3,6 +3,7 @@ import os
 import random
 import string
 import typing as t
+from urllib.parse import urlparse
 
 import apolo_sdk
 from apolo_app_types import LLMInputs, TextEmbeddingsInferenceAppInputs
@@ -76,6 +77,22 @@ mkdir -p "/opt/bitnami/keycloak/themes/apolo"
 cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
 chown -R 1001:0 /opt/bitnami/keycloak/themes
 """
+
+
+def _normalize_netlify_domain(preview_ui_url: str) -> str:
+    normalized = preview_ui_url.strip()
+    if not normalized:
+        raise ValueError("Preview UI URL is required when 'Use Preview UI' is enabled.")
+
+    if "://" not in normalized:
+        normalized = f"https://{normalized}"
+
+    parsed = urlparse(normalized)
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Preview UI URL must be a valid hostname or full https URL.")
+
+    return hostname
 
 
 def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
@@ -491,6 +508,10 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         cluster_config = self.client.config.clusters[self.client.cluster_name]
         if cluster_config.apps.launchpad_use_subdomain:
             values["clientSubdomain"] = True
+        if input_.launchpad_web_app_config.use_preview_ui:
+            values["netlifyDomain"] = _normalize_netlify_domain(
+                input_.launchpad_web_app_config.preview_ui_url or ""
+            )
 
         return {
             **values,

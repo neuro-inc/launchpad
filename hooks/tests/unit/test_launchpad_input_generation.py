@@ -1029,3 +1029,58 @@ async def test_launchpad_values_generation__subdomain(
     )
 
     assert helm_params["clientSubdomain"] is True
+
+
+@pytest.mark.asyncio
+async def test_launchpad_values_generation__preview_ui_override(apolo_client):
+    processor = LaunchpadInputsProcessor(client=apolo_client)
+    helm_params = await processor.gen_extra_values(
+        input_=LaunchpadAppInputs(
+            launchpad_web_app_config=LaunchpadWebAppConfig(
+                preset=Preset(name="cpu-medium"),
+                use_preview_ui=True,
+                preview_ui_url=(
+                    "https://deploy-preview-120--"
+                    "launchpad-web-ui-dev-apolo-us.netlify.app"
+                ),
+            ),
+            apps_config=AppsConfig(
+                quick_start_config=NoQuickStartConfig(no_quickstart=True),
+            ),
+        ),
+        app_name="launchpad-app",
+        namespace="default-namespace",
+        app_secrets_name=APP_SECRETS_NAME,
+        app_id=APP_ID,
+    )
+
+    assert (
+        helm_params["netlifyDomain"]
+        == "deploy-preview-120--launchpad-web-ui-dev-apolo-us.netlify.app"
+    )
+
+
+@pytest.mark.asyncio
+async def test_launchpad_values_generation__preview_ui_requires_url(apolo_client):
+    processor = LaunchpadInputsProcessor(client=apolo_client)
+
+    with pytest.raises(
+        ValueError,
+        match="Preview UI URL is required when 'Use Preview UI' is enabled.",
+    ):
+        await processor.gen_extra_values(
+            input_=LaunchpadAppInputs(
+                launchpad_web_app_config=LaunchpadWebAppConfig(
+                    preset=Preset(name="cpu-medium"),
+                    use_preview_ui=True,
+                    preview_ui_url="",
+                ),
+                apps_config=AppsConfig(
+                    quick_start_config=NoQuickStartConfig(no_quickstart=True),
+                ),
+            ),
+            app_name="launchpad-app",
+            namespace="default-namespace",
+            app_secrets_name=APP_SECRETS_NAME,
+            app_id=APP_ID,
+        )
