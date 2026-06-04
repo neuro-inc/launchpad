@@ -2,16 +2,25 @@ suite: deployment env wiring
 templates:
   - templates/deployment-launchpad.yaml
 tests:
-  - it: sets KEYCLOAK_IDP_HINT when procore integration is enabled
+  - it: requires ProCore identity without forcing broker redirect when enabled
     values:
       - ../ci/procore-values.yaml
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
           content:
-            name: KEYCLOAK_IDP_HINT
+            name: KEYCLOAK_REQUIRED_IDENTITY_SOURCE
             value: procore
-  - it: does not set KEYCLOAK_IDP_HINT when procore integration is disabled
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KEYCLOAK_REQUIRED_IDENTITY_GROUP
+            value: /procore-users
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KEYCLOAK_IDP_HINT
+  - it: does not require ProCore identity when integration is disabled
     values:
       - ../ci/procore-values.yaml
     set:
@@ -20,4 +29,8 @@ tests:
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
-            name: KEYCLOAK_IDP_HINT
+            name: KEYCLOAK_REQUIRED_IDENTITY_SOURCE
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: KEYCLOAK_REQUIRED_IDENTITY_GROUP

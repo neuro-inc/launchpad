@@ -27,7 +27,7 @@ public final class ProcoreIdentityProvider extends AbstractOAuth2IdentityProvide
         super(session, config);
         config.applyDefaults();
         config.validateProviderConfiguration();
-        this.httpClient = httpClient != null ? httpClient : new ProcoreHttpClient(session, config);
+        this.httpClient = httpClient != null ? httpClient : new ProcoreHttpClient(config);
         LOG.debugf("Initialized Procore identity provider with config %s", this.httpClient.sanitizeForLogSummary());
     }
 

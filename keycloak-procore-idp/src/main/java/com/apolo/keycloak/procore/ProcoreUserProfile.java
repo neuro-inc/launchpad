@@ -1,10 +1,15 @@
 package com.apolo.keycloak.procore;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 public record ProcoreUserProfile(String id, String login, String name) {
+
+    public static final ObjectMapper MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public static ProcoreUserProfile fromJson(JsonNode json) {
         if (json == null || json.isNull()) {

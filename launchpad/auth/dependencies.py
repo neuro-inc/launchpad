@@ -16,10 +16,100 @@ from starlette.status import HTTP_401_UNAUTHORIZED
 
 from launchpad.auth.models import User
 from launchpad.config import KeycloakConfig
-from launchpad.errors import Unauthorized
+from launchpad.errors import Forbidden, Unauthorized
 
 
 logger = logging.getLogger(__name__)
+
+
+def _requires_procore_identity(keycloak_config: KeycloakConfig | None) -> bool:
+    identity_source = getattr(keycloak_config, "required_identity_source", None)
+    return (identity_source or "").strip().lower() == "procore"
+
+
+def _normalized_groups(decoded_token: dict[str, Any]) -> set[str]:
+    groups = decoded_token.get("groups", [])
+    if not isinstance(groups, list):
+        return set()
+
+    return {str(group).strip().lower() for group in groups if str(group).strip()}
+
+
+def _has_admin_role(decoded_token: dict[str, Any]) -> bool:
+    realm_access = decoded_token.get("realm_access", {})
+    if isinstance(realm_access, dict):
+        realm_roles = realm_access.get("roles", [])
+        if isinstance(realm_roles, list) and any(
+            str(role).strip().lower() == "admin" for role in realm_roles
+        ):
+            return True
+
+    resource_access = decoded_token.get("resource_access", {})
+    if isinstance(resource_access, dict):
+        frontend_access = resource_access.get("frontend", {})
+        if isinstance(frontend_access, dict):
+            frontend_roles = frontend_access.get("roles", [])
+            if isinstance(frontend_roles, list) and any(
+                str(role).strip().lower() == "admin" for role in frontend_roles
+            ):
+                return True
+
+    return "admin" in _normalized_groups(decoded_token)
+
+
+def _user_requires_procore_identity(
+    decoded_token: dict[str, Any],
+    keycloak_config: KeycloakConfig | None,
+) -> bool:
+    if not _requires_procore_identity(keycloak_config):
+        return False
+
+    if _has_admin_role(decoded_token):
+        return False
+
+    required_group = getattr(keycloak_config, "required_identity_group", None)
+    normalized_required_group = (required_group or "").strip().lower()
+    if not normalized_required_group:
+        return True
+
+    return normalized_required_group in _normalized_groups(decoded_token)
+
+
+def ensure_procore_identity(
+    decoded_token: dict[str, Any],
+    keycloak_config: KeycloakConfig | None,
+) -> None:
+    """Ensure the token belongs to a pre-created ProCore-linked Keycloak user."""
+    username = str(
+        decoded_token.get("preferred_username")
+        or decoded_token.get("email")
+        or "unknown"
+    )
+    required_group = getattr(keycloak_config, "required_identity_group", None) or ""
+    if not _user_requires_procore_identity(decoded_token, keycloak_config):
+        logger.info(
+            "User %s is not a member of %s. Skipping ProCore validation.",
+            username,
+            required_group or "<no-group-configured>",
+        )
+        return
+
+    identity_source = str(decoded_token.get("identity_source") or "").strip().lower()
+    procore_user_id = str(decoded_token.get("procore_user_id") or "").strip()
+
+    if identity_source != "procore" or not procore_user_id:
+        logger.warning(
+            "User %s belongs to %s. ProCore identity missing. Access denied.",
+            username,
+            required_group or "<no-group-configured>",
+        )
+        raise Forbidden("ProCore identity is required")
+
+    logger.info(
+        "User %s belongs to %s. ProCore identity validated.",
+        username,
+        required_group or "<no-group-configured>",
+    )
 
 
 async def auth_required(
@@ -29,6 +119,8 @@ async def auth_required(
     JWT authentication entry-point
     """
     decoded_token = await _token_from_request(request)
+    keycloak_config = getattr(getattr(request.app, "config", None), "keycloak", None)
+    ensure_procore_identity(decoded_token, keycloak_config)
     try:
         email = decoded_token["email"]
     except KeyError:

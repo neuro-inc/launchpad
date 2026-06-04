@@ -65,8 +65,10 @@ spec:
             - name: KEYCLOAK_REALM
               value: {{ .Values.keycloak.defaultRealm }}
             {{- if .Values.keycloakProcore.enabled }}
-            - name: KEYCLOAK_IDP_HINT
+            - name: KEYCLOAK_REQUIRED_IDENTITY_SOURCE
               value: {{ .Values.keycloakProcore.alias | quote }}
+            - name: KEYCLOAK_REQUIRED_IDENTITY_GROUP
+              value: {{ .Values.keycloakProcore.requiredGroup | quote }}
             {{- end }}
             - name: APOLO_PASSED_CONFIG
               value: {{ .Values.APOLO_PASSED_CONFIG | quote }}

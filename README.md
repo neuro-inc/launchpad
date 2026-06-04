@@ -16,6 +16,10 @@ Launchpad is a FastAPI-based application service that manages application deploy
 
 Before using the API, you need to obtain an access token. Launchpad uses OAuth2 with Keycloak for authentication.
 
+When ProCore integration is enabled, only users in the Keycloak group `/procore-users`
+are required to have a linked ProCore identity. All other users continue to use the
+standard Keycloak flow.
+
 #### Method 1: Using the helper script
 
 ```bash

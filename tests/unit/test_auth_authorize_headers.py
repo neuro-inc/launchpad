@@ -12,6 +12,7 @@ from launchpad.auth import (
     HEADER_X_FORWARDED_URI,
 )
 from launchpad.auth.api import _is_auth_bypass_path, view_post_authorize
+from launchpad.errors import Forbidden
 
 
 @pytest.fixture
@@ -20,7 +21,12 @@ def mock_request() -> MagicMock:
     request.headers = {HEADER_X_FORWARDED_HOST: "example.test"}
     request.app = MagicMock()
     request.app.config = SimpleNamespace(
-        auth_bypass_path_prefixes=["/public", "/api/webhooks"]
+        auth_bypass_path_prefixes=["/public", "/api/webhooks"],
+        keycloak=SimpleNamespace(
+            idp_hint=None,
+            required_identity_source=None,
+            required_identity_group=None,
+        ),
     )
     return request
 
@@ -155,3 +161,58 @@ async def test_view_post_authorize_does_not_bypass_when_prefixes_disabled(
 
     assert response.status_code == 200
     assert response.headers[HEADER_X_AUTH_REQUEST_EMAIL] == "user@example.test"
+
+
+async def test_view_post_authorize_requires_procore_identity_when_configured(
+    mock_request: MagicMock,
+) -> None:
+    mock_request.app.config.keycloak.required_identity_source = "procore"
+    mock_request.app.config.keycloak.required_identity_group = "/procore-users"
+    db = MagicMock()
+    oauth = MagicMock()
+
+    with (
+        patch(
+            "launchpad.auth.api.select_app_by_any_url", new=AsyncMock()
+        ) as mock_select_app,
+        patch(
+            "launchpad.auth.api.decode_token_from_request", new=AsyncMock()
+        ) as mock_decode,
+    ):
+        mock_select_app.return_value = _installed_app()
+        mock_decode.return_value = {
+            "email": "user@example.test",
+            "groups": ["/procore-users"],
+            "realm_access": {"roles": ["r1"]},
+        }
+
+        with pytest.raises(Forbidden, match="ProCore identity is required"):
+            await view_post_authorize(request=mock_request, db=db, oauth=oauth)
+
+
+async def test_view_post_authorize_skips_procore_for_regular_user(
+    mock_request: MagicMock,
+) -> None:
+    mock_request.app.config.keycloak.required_identity_source = "procore"
+    mock_request.app.config.keycloak.required_identity_group = "/procore-users"
+    db = MagicMock()
+    oauth = MagicMock()
+
+    with (
+        patch(
+            "launchpad.auth.api.select_app_by_any_url", new=AsyncMock()
+        ) as mock_select_app,
+        patch(
+            "launchpad.auth.api.decode_token_from_request", new=AsyncMock()
+        ) as mock_decode,
+    ):
+        mock_select_app.return_value = _installed_app()
+        mock_decode.return_value = {
+            "email": "user@example.test",
+            "groups": ["/support-users"],
+            "realm_access": {"roles": ["r1"]},
+        }
+
+        response = await view_post_authorize(request=mock_request, db=db, oauth=oauth)
+
+    assert response.status_code == 200

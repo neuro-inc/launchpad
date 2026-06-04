@@ -1,50 +1,54 @@
 package com.apolo.keycloak.procore;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.StringJoiner;
 
 import jakarta.ws.rs.core.Response;
-import org.apache.http.client.config.RequestConfig;
 import org.jboss.logging.Logger;
-import org.keycloak.http.simple.SimpleHttp;
-import org.keycloak.http.simple.SimpleHttpRequest;
-import org.keycloak.http.simple.SimpleHttpResponse;
-import org.keycloak.models.KeycloakSession;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
 public final class ProcoreHttpClient {
 
     private static final Logger LOG = Logger.getLogger(ProcoreHttpClient.class);
-    private static final int CONNECT_TIMEOUT_MILLIS = 5_000;
-    private static final int CONNECTION_REQUEST_TIMEOUT_MILLIS = 5_000;
-    private static final int SOCKET_TIMEOUT_MILLIS = 10_000;
-    private static final long MAX_RESPONSE_SIZE_BYTES = 1_048_576L;
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
 
-    private final KeycloakSession session;
     private final ProcoreIdentityProviderConfig config;
-    private final RequestConfig requestConfig;
+    private final HttpClient httpClient;
     private final Transport transport;
 
-    public ProcoreHttpClient(KeycloakSession session, ProcoreIdentityProviderConfig config) {
-        this(session, config, null);
+    public ProcoreHttpClient(ProcoreIdentityProviderConfig config) {
+        this(config, null, null);
     }
 
-    ProcoreHttpClient(KeycloakSession session, ProcoreIdentityProviderConfig config, Transport transport) {
-        this.session = session;
+    ProcoreHttpClient(HttpClient httpClient, ProcoreIdentityProviderConfig config, Transport transport) {
+        this(config, httpClient, transport);
+    }
+
+    ProcoreHttpClient(ProcoreIdentityProviderConfig config, HttpClient httpClient, Transport transport) {
         this.config = config;
-        this.requestConfig = RequestConfig.custom()
-                .setConnectTimeout(CONNECT_TIMEOUT_MILLIS)
-                .setConnectionRequestTimeout(CONNECTION_REQUEST_TIMEOUT_MILLIS)
-                .setSocketTimeout(SOCKET_TIMEOUT_MILLIS)
+        this.httpClient = httpClient != null ? httpClient : HttpClient.newBuilder()
+                .connectTimeout(CONNECT_TIMEOUT)
                 .build();
-        this.transport = transport != null ? transport : new SimpleHttpTransport();
+        this.transport = transport != null ? transport : new JavaNetTransport();
     }
 
     public ProcoreTokenResponse exchangeAuthorizationCode(String authorizationCode, String redirectUri) {
         try {
             return parseTokenResponse(transport.exchangeAuthorizationCode(config, authorizationCode, redirectUri));
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Unable to exchange Procore authorization code.", exception);
         } catch (IOException exception) {
             throw new IllegalStateException("Unable to exchange Procore authorization code.", exception);
         }
@@ -61,6 +65,9 @@ public final class ProcoreHttpClient {
                 throw new IllegalStateException("Procore profile request failed with status " + status + ".");
             }
             return ProcoreUserProfile.fromJson(body);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Unable to fetch Procore user profile.", exception);
         } catch (IOException exception) {
             throw new IllegalStateException("Unable to fetch Procore user profile.", exception);
         }
@@ -75,12 +82,6 @@ public final class ProcoreHttpClient {
             throw new IllegalStateException("Procore token exchange failed with status " + status + ".");
         }
         return ProcoreTokenResponse.fromJson(body);
-    }
-
-    private SimpleHttp http() {
-        return SimpleHttp.create(session)
-                .withRequestConfig(requestConfig)
-                .withMaxConsumedResponseSize(MAX_RESPONSE_SIZE_BYTES);
     }
 
     private static String readErrorCode(JsonNode body) {
@@ -120,51 +121,84 @@ public final class ProcoreHttpClient {
         return summary;
     }
 
+    private static String formEncode(Map<String, String> params) {
+        StringJoiner sj = new StringJoiner("&");
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            sj.add(URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8)
+                    + "=" + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8));
+        }
+        return sj.toString();
+    }
+
+    private static JsonNode parseJson(HttpResponse<byte[]> response) throws IOException {
+        byte[] body = response.body();
+        if (body == null || body.length == 0) {
+            return null;
+        }
+        return ProcoreUserProfile.MAPPER.readTree(body);
+    }
+
     interface Transport {
         HttpResult exchangeAuthorizationCode(
                 ProcoreIdentityProviderConfig config,
                 String authorizationCode,
-                String redirectUri) throws IOException;
+                String redirectUri) throws IOException, InterruptedException;
 
-        HttpResult fetchUserProfile(ProcoreIdentityProviderConfig config, String accessToken) throws IOException;
+        HttpResult fetchUserProfile(ProcoreIdentityProviderConfig config, String accessToken) throws IOException, InterruptedException;
     }
 
     record HttpResult(int status, JsonNode body) {
     }
 
-    private final class SimpleHttpTransport implements Transport {
+    private final class JavaNetTransport implements Transport {
 
         @Override
         public HttpResult exchangeAuthorizationCode(
                 ProcoreIdentityProviderConfig config,
                 String authorizationCode,
-                String redirectUri) throws IOException {
-            SimpleHttpRequest request = http().doPost(config.getTokenUrl())
-                    .param("grant_type", "authorization_code")
-                    .param("code", authorizationCode)
-                    .param("redirect_uri", redirectUri)
-                    .param("client_id", config.getClientId())
-                    .acceptJson();
+                String redirectUri) throws IOException, InterruptedException {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("grant_type", "authorization_code");
+            params.put("code", authorizationCode);
+            params.put("redirect_uri", redirectUri);
+            params.put("client_id", config.getClientId());
 
             if (config.isBasicAuthentication()) {
-                request.authBasic(config.getClientId(), config.getClientSecret());
+                String creds = config.getClientId() + ":" + config.getClientSecret();
+                String auth = java.util.Base64.getEncoder().encodeToString(creds.getBytes(StandardCharsets.UTF_8));
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(config.getTokenUrl()))
+                        .timeout(READ_TIMEOUT)
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .header("Authorization", "Basic " + auth)
+                        .POST(HttpRequest.BodyPublishers.ofString(formEncode(params)))
+                        .build();
+                HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+                return new HttpResult(response.statusCode(), parseJson(response));
             } else {
-                request.param("client_secret", config.getClientSecret());
-            }
-
-            try (SimpleHttpResponse response = request.asResponse()) {
-                return new HttpResult(response.getStatus(), response.asJson());
+                params.put("client_secret", config.getClientSecret());
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(config.getTokenUrl()))
+                        .timeout(READ_TIMEOUT)
+                        .header("Content-Type", "application/x-www-form-urlencoded")
+                        .POST(HttpRequest.BodyPublishers.ofString(formEncode(params)))
+                        .build();
+                HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+                return new HttpResult(response.statusCode(), parseJson(response));
             }
         }
 
         @Override
-        public HttpResult fetchUserProfile(ProcoreIdentityProviderConfig config, String accessToken) throws IOException {
-            try (SimpleHttpResponse response = http().doGet(config.getMeUrl())
+        public HttpResult fetchUserProfile(ProcoreIdentityProviderConfig config, String accessToken) throws IOException, InterruptedException {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(config.getMeUrl()))
+                    .timeout(READ_TIMEOUT)
                     .header("Authorization", "Bearer " + accessToken)
-                    .acceptJson()
-                    .asResponse()) {
-                return new HttpResult(response.getStatus(), response.asJson());
-            }
+                    .header("Accept", "application/json")
+                    .GET()
+                    .build();
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            return new HttpResult(response.statusCode(), parseJson(response));
         }
     }
 }

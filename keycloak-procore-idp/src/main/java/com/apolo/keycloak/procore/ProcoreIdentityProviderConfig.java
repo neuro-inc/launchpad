@@ -50,9 +50,9 @@ public final class ProcoreIdentityProviderConfig extends OAuth2IdentityProviderC
         if (getDefaultScope() == null) {
             setDefaultScope("");
         }
-        setStoreToken(false);
-        setStoreTokenInSession(false);
-        setPkceEnabled(false);
+        getConfig().put("storeToken", "false");
+        getConfig().put("storeTokenInSession", "false");
+        getConfig().put("pkceEnabled", "false");
     }
 
     public void validateProviderConfiguration() {

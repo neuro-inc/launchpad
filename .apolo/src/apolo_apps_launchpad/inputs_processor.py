@@ -486,7 +486,8 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             },
         ]
         if input_.procore_integration:
-            keycloak_procore_values = values.get("keycloakProcore", {})
+            keycloak_procore_values = values.setdefault("keycloakProcore", {})
+            keycloak_procore_values["enabled"] = True
             keycloak_values["extraEnvVarsSecret"] = keycloak_procore_values.get(
                 "secretName", "launchpad-keycloak-procore"
             )

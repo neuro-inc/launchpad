@@ -71,6 +71,8 @@ async def view_get_config(request: Request) -> dict[str, Any]:
             "url": str(app.config.keycloak.url),
             "realm": app.config.keycloak.realm,
             "idp_hint": app.config.keycloak.idp_hint,
+            "required_identity_source": app.config.keycloak.required_identity_source,
+            "required_identity_group": app.config.keycloak.required_identity_group,
         },
         "branding": {
             "logo_url": logo_url,

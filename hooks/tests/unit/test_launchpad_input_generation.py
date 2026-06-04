@@ -874,6 +874,7 @@ async def test_launchpad_values_generation__procore_integration(
     assert (
         helm_params["mlops-keycloak"]["image"]["tag"] == "feature-procore-keycloak-idp"
     )
+    assert helm_params["keycloakProcore"]["enabled"] is True
     assert helm_params["keycloak"]["extraEnvVarsSecret"] == "launchpad-keycloak-procore"
     assert (
         helm_params["mlops-keycloak"]["extraEnvVarsSecret"]

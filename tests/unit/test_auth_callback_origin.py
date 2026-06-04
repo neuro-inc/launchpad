@@ -1,10 +1,11 @@
 from types import SimpleNamespace
-from typing import Any
-from unittest.mock import MagicMock
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from starlette.requests import Request
 
-from launchpad.auth.api import callback
+from launchpad.auth.api import TokenRequest, callback, get_token
 from launchpad.errors import Forbidden, Unauthorized
 
 
@@ -25,7 +26,7 @@ def make_request(
     app.config.keycloak = SimpleNamespace(client_id=client_id)
     # http is passed to token_from_string; tests patch token_from_string so
     # this can be a dummy object.
-    app.http = SimpleNamespace()
+    app.http = MagicMock()
 
     req = SimpleNamespace()
     req.method = method
@@ -85,3 +86,34 @@ async def test_post_callback_sets_cookie_on_valid_request(
     called_args = oauth.set_auth_cookie.call_args[0]
     assert called_args[1] == "mytoken"
     assert resp.status_code == 200
+
+
+async def test_post_token_allows_keycloak_login_when_procore_identity_required() -> (
+    None
+):
+    req = make_request("POST", headers={}, client_id="client-id")
+    req.app.config.keycloak.url = "https://keycloak.example.com"
+    req.app.config.keycloak.realm = "launchpad"
+    req.app.config.keycloak.ssl_verify = True
+    req.app.config.keycloak.required_identity_source = "procore"
+    req.app.config.keycloak.required_identity_group = "/procore-users"
+
+    response = MagicMock()
+    response.status = 200
+    response.raise_for_status.return_value = None
+    response.json = AsyncMock(
+        return_value={
+            "access_token": "token",
+            "token_type": "Bearer",
+            "expires_in": 300,
+        }
+    )
+    req.app.http.post.return_value.__aenter__.return_value = response
+
+    result = await get_token(
+        cast(Request, req),
+        TokenRequest(username="alice", password="secret"),
+    )
+
+    assert result.status_code == 200
+    req.app.http.post.assert_called_once()

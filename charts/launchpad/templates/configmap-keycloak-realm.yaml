@@ -450,7 +450,16 @@ data:
           ]
         }
       },
-      "groups": [],
+      "groups": [
+        {{- if .Values.keycloakProcore.enabled }}
+        {
+          "name": {{ trimPrefix "/" .Values.keycloakProcore.requiredGroup | quote }},
+          "path": {{ .Values.keycloakProcore.requiredGroup | quote }},
+          "subGroups": [],
+          "attributes": {}
+        }
+        {{- end }}
+      ],
       "users": [
         {
           "username": "admin",
@@ -1515,7 +1524,7 @@ data:
               "consentRequired": false,
               "config": {
                 "introspection.token.claim": "true",
-                "full.path": "false",
+                "full.path": "true",
                 "id.token.claim": "true",
                 "access.token.claim": "true",
                 "claim.name": "groups",
@@ -1685,7 +1694,8 @@ data:
             "tokenUrl": "${PROCORE_TOKEN_URL}",
             "meUrl": "${PROCORE_ME_URL}",
             "clientAuthMethod": "client_secret_post",
-            "defaultScope": ""
+            "defaultScope": "",
+            "hideOnLoginPage": "false"
           }
         }
         {{- end }}
@@ -2250,14 +2260,13 @@ data:
         {
           "id": "6fe6a55f-7b55-4edc-af78-12de69907861",
           "alias": "first broker login",
-          "description": "Actions taken after first broker login with identity provider account, which is not yet linked to any Keycloak account",
+          "description": "Actions taken after first broker login with identity provider account, which must already exist in Keycloak",
           "providerId": "basic-flow",
           "topLevel": true,
           "builtIn": true,
           "authenticationExecutions": [
             {
-              "authenticatorConfig": "review profile config",
-              "authenticator": "idp-review-profile",
+              "authenticator": "idp-detect-existing-broker-user",
               "authenticatorFlow": false,
               "requirement": "REQUIRED",
               "priority": 10,
@@ -2265,11 +2274,11 @@ data:
               "userSetupAllowed": false
             },
             {
-              "authenticatorFlow": true,
+              "authenticator": "idp-auto-link",
+              "authenticatorFlow": false,
               "requirement": "REQUIRED",
               "priority": 20,
-              "autheticatorFlow": true,
-              "flowAlias": "User creation or linking",
+              "autheticatorFlow": false,
               "userSetupAllowed": false
             }
           ]
@@ -2420,22 +2429,6 @@ data:
               "userSetupAllowed": false
             }
           ]
-        }
-      ],
-      "authenticatorConfig": [
-        {
-          "id": "a900c3cd-0548-48fd-984c-d98d18731d15",
-          "alias": "create unique user config",
-          "config": {
-            "require.password.update.after.registration": "false"
-          }
-        },
-        {
-          "id": "952c1ab9-c759-409a-8ca6-264f533bb574",
-          "alias": "review profile config",
-          "config": {
-            "update.profile.on.first.login": "missing"
-          }
         }
       ],
       "requiredActions": [

@@ -11,6 +11,18 @@ tests:
           pattern: '"providerId": "procore"'
       - matchRegex:
           path: data["realm.json"]
+          pattern: '"path": "/procore-users"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"full.path": "true"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"authenticator": "idp-detect-existing-broker-user"'
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"authenticator": "idp-auto-link"'
+      - matchRegex:
+          path: data["realm.json"]
           pattern: '"clientId": "\$\{PROCORE_CLIENT_ID\}"'
       - matchRegex:
           path: data["realm.json"]

@@ -5,7 +5,7 @@ FROM maven:3.9.9-eclipse-temurin-21 AS keycloak-procore-idp-builder
 
 WORKDIR /tmp
 
-COPY keycloak-procore-idp/pom.xml keycloak-procore-idp/src ./
+COPY keycloak-procore-idp/ ./
 
 RUN mvn -B -ntp package
 

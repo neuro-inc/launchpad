@@ -80,6 +80,8 @@ def test_environ_config_factory_create_keycloak(mock_environ: None) -> None:
         url=URL("https://keycloak.example.com"),
         realm="testrealm",
         idp_hint=None,
+        required_identity_source=None,
+        required_identity_group=None,
     )
 
 
@@ -95,6 +97,26 @@ def test_environ_config_factory_create_keycloak_with_idp_hint() -> None:
         url=URL("https://keycloak.example.com"),
         realm="testrealm",
         idp_hint="procore",
+        required_identity_source=None,
+        required_identity_group=None,
+    )
+
+
+def test_environ_config_factory_create_keycloak_with_required_identity_source() -> None:
+    environ = {
+        "KEYCLOAK_URL": "keycloak.example.com",
+        "KEYCLOAK_REALM": "testrealm",
+        "KEYCLOAK_REQUIRED_IDENTITY_SOURCE": "procore",
+        "KEYCLOAK_REQUIRED_IDENTITY_GROUP": "/procore-users",
+    }
+    factory = EnvironConfigFactory(environ=environ)
+    config = factory.create_keycloak()
+    assert config == KeycloakConfig(
+        url=URL("https://keycloak.example.com"),
+        realm="testrealm",
+        idp_hint=None,
+        required_identity_source="procore",
+        required_identity_group="/procore-users",
     )
 
 

@@ -11,4 +11,5 @@ keycloakProcore:
   clientId: test-client-id
   clientSecret: test-client-secret
   alias: procore
+  requiredGroup: /procore-users
   displayName: Procore
