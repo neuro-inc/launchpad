@@ -226,4 +226,3 @@ keycloakProcore:
   authorizationUrl: https://login.procore.com/oauth/authorize
   tokenUrl: https://login.procore.com/oauth/token
   meUrl: https://api.procore.com/rest/v1.0/me
-  secretName: launchpad-keycloak-procore

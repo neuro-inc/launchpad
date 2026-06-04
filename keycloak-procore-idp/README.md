@@ -46,40 +46,6 @@ Validated Procore `/me` response fields:
 - Token and client secret values are never written to logs.
 - Token storage is disabled by default in the provider config.
 
-## Project Tree
-
-```text
-keycloak-procore-idp/
-├── Dockerfile
-├── README.md
-├── examples
-│   ├── helm
-│   │   └── values.yaml
-│   ├── keycloak
-│   │   └── identity-provider-configuration.md
-│   └── kubernetes
-│       ├── deployment-snippet.yaml
-│       └── secret.yaml
-├── pom.xml
-└── src
-    └── main
-        ├── java
-        │   └── com
-        │       └── apolo
-        │           └── keycloak
-        │               └── procore
-        │                   ├── ProcoreHttpClient.java
-        │                   ├── ProcoreIdentityProvider.java
-        │                   ├── ProcoreIdentityProviderConfig.java
-        │                   ├── ProcoreIdentityProviderFactory.java
-        │                   ├── ProcoreTokenResponse.java
-        │                   └── ProcoreUserProfile.java
-        └── resources
-            └── META-INF
-                └── services
-                    └── org.keycloak.broker.provider.IdentityProviderFactory
-```
-
 ## Source Files
 
 ### `ProcoreIdentityProviderFactory`
@@ -136,7 +102,7 @@ target/keycloak-procore-idp.jar
 ### Container build
 
 ```bash
-docker build -t registry.example.com/apolo/keycloak-procore:26.6.1 .
+docker build -t registry.example.com/apolo/keycloak-procore:local .
 ```
 
 The Dockerfile builds the provider jar first, then copies it into the official Keycloak image and runs:
@@ -152,7 +118,6 @@ The Dockerfile builds the provider jar first, then copies it into the official K
 The provider is deployable in the officially supported pattern:
 
 ```dockerfile
-FROM quay.io/keycloak/keycloak:26.6.1
 COPY target/keycloak-procore-idp.jar /opt/keycloak/providers/
 RUN /opt/keycloak/bin/kc.sh build
 ```
@@ -161,27 +126,17 @@ RUN /opt/keycloak/bin/kc.sh build
 
 1. Build and push the custom Keycloak image.
 2. Update the Keycloak deployment to use the custom image.
-3. Create the Kubernetes Secret from `examples/kubernetes/secret.yaml`.
-4. Configure the Procore identity provider in the Keycloak Admin Console using `examples/keycloak/identity-provider-configuration.md`.
+3. Create the Kubernetes Secret with the Procore OAuth credentials and endpoints.
+4. Configure the Procore identity provider in the Keycloak Admin Console.
 5. Add user attribute protocol mappers to the `apolo-launchpad` client.
-
-Example manifests:
-
-- Deployment snippet: [examples/kubernetes/deployment-snippet.yaml](/Users/tymoshv/MyProjects/Apolo/procore/examples/kubernetes/deployment-snippet.yaml)
-- Secret: [examples/kubernetes/secret.yaml](/Users/tymoshv/MyProjects/Apolo/procore/examples/kubernetes/secret.yaml)
-- Helm values: [examples/helm/values.yaml](/Users/tymoshv/MyProjects/Apolo/procore/examples/helm/values.yaml)
 
 ## Example Keycloak Configuration
 
-See:
+Recommended setup includes:
 
-- [examples/keycloak/identity-provider-configuration.md](/Users/tymoshv/MyProjects/Apolo/procore/examples/keycloak/identity-provider-configuration.md)
-
-That file includes:
-
-- Admin Console setup
-- `kc_idp_hint=procore`
-- recommended user attribute protocol mappers
+- Admin Console provider configuration
+- `kc_idp_hint=procore` only when explicitly desired
+- user attribute protocol mappers
 - token claim mapping for `procore_user_id` and `identity_source`
 
 ## Local Development
@@ -200,7 +155,6 @@ docker run --rm -it \
   -e KEYCLOAK_ADMIN=admin \
   -e KEYCLOAK_ADMIN_PASSWORD=admin \
   -v "$(pwd)/target/keycloak-procore-idp.jar:/opt/keycloak/providers/keycloak-procore-idp.jar" \
-  quay.io/keycloak/keycloak:26.6.1 \
   start-dev
 ```
 
@@ -269,37 +223,6 @@ mvn -B -DskipTests package
    - `procore_user_id`
    - `identity_source=procore`
 
-## Troubleshooting
-
-### Provider does not show in Admin Console
-
-- Verify the jar exists in `/opt/keycloak/providers/`.
-- Verify `META-INF/services/org.keycloak.broker.provider.IdentityProviderFactory` is present in the jar.
-- Re-run `/opt/keycloak/bin/kc.sh build`.
-
-### Login redirects to Keycloak but not Procore
-
-- Verify the identity provider alias is `procore`.
-- Verify Launchpad sends `kc_idp_hint=procore` only when desired.
-- Verify the Procore provider is enabled in realm `apolo`.
-
-### Callback returns an OAuth error
-
-- Verify the Procore application redirect URI exactly matches the Keycloak broker callback:
-  - `/realms/apolo/broker/procore/endpoint`
-- Verify the external hostname and reverse proxy headers are correct in Keycloak.
-
-### User is authenticated in Procore but not linked in Keycloak
-
-- Verify First Broker Login flow is configured.
-- Verify username and email collision handling in realm settings.
-- Verify the imported user has the expected brokered attributes.
-
-### Token claims are missing in Launchpad
-
-- The provider only sets Keycloak user attributes.
-- Add Keycloak protocol mappers on the `apolo-launchpad` client or its client scope.
-
 ## Notes On Keycloak Version
 
-This project is pinned to Keycloak `26.6.1`, which is the latest 26.x API/documentation release visible in official Keycloak documentation and GitHub release metadata as of May 18, 2026.
+This project targets Keycloak 26.x APIs and should be validated against the exact Keycloak image version used in your deployment.

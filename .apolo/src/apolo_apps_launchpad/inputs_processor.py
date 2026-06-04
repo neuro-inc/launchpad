@@ -488,9 +488,6 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         if input_.procore_integration:
             keycloak_procore_values = values.setdefault("keycloakProcore", {})
             keycloak_procore_values["enabled"] = True
-            keycloak_values["extraEnvVarsSecret"] = keycloak_procore_values.get(
-                "secretName", "launchpad-keycloak-procore"
-            )
             _append_secret_env_var(
                 kc_extra_env_vars,
                 name="PROCORE_CLIENT_ID",
@@ -502,6 +499,31 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 name="PROCORE_CLIENT_SECRET",
                 value=input_.procore_integration.client_secret,
                 secret_name=app_secrets_name,
+            )
+            kc_extra_env_vars.extend(
+                [
+                    {
+                        "name": "PROCORE_AUTHORIZATION_URL",
+                        "value": keycloak_procore_values.get(
+                            "authorizationUrl",
+                            "https://login.procore.com/oauth/authorize",
+                        ),
+                    },
+                    {
+                        "name": "PROCORE_TOKEN_URL",
+                        "value": keycloak_procore_values.get(
+                            "tokenUrl",
+                            "https://login.procore.com/oauth/token",
+                        ),
+                    },
+                    {
+                        "name": "PROCORE_ME_URL",
+                        "value": keycloak_procore_values.get(
+                            "meUrl",
+                            "https://api.procore.com/rest/v1.0/me",
+                        ),
+                    },
+                ]
             )
         if input_.branding:
             launchpad_api_base = f"https://launchpad-{app_id}-api.{domain}"

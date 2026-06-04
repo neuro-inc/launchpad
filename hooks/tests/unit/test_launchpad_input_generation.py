@@ -865,6 +865,18 @@ async def test_launchpad_values_generation__procore_integration(
                 }
             },
         },
+        {
+            "name": "PROCORE_AUTHORIZATION_URL",
+            "value": "https://login.procore.com/oauth/authorize",
+        },
+        {
+            "name": "PROCORE_TOKEN_URL",
+            "value": "https://login.procore.com/oauth/token",
+        },
+        {
+            "name": "PROCORE_ME_URL",
+            "value": "https://api.procore.com/rest/v1.0/me",
+        },
     ]
     assert (
         helm_params["mlops-keycloak"]["extraEnvVars"]
@@ -875,11 +887,6 @@ async def test_launchpad_values_generation__procore_integration(
         helm_params["mlops-keycloak"]["image"]["tag"] == "feature-procore-keycloak-idp"
     )
     assert helm_params["keycloakProcore"]["enabled"] is True
-    assert helm_params["keycloak"]["extraEnvVarsSecret"] == "launchpad-keycloak-procore"
-    assert (
-        helm_params["mlops-keycloak"]["extraEnvVarsSecret"]
-        == helm_params["keycloak"]["extraEnvVarsSecret"]
-    )
 
 
 def test_launchpad_values_generation__procore_integration_requires_both_secrets():
