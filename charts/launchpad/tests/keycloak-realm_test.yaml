@@ -23,6 +23,12 @@ tests:
           pattern: '"authenticator": "idp-auto-link"'
       - matchRegex:
           path: data["realm.json"]
+          pattern: '"authenticatorConfig": \['
+      - matchRegex:
+          path: data["realm.json"]
+          pattern: '"alias": "create unique user config"'
+      - matchRegex:
+          path: data["realm.json"]
           pattern: '"clientId": "\$\{PROCORE_CLIENT_ID\}"'
       - matchRegex:
           path: data["realm.json"]

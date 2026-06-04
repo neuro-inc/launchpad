@@ -2431,6 +2431,25 @@ data:
           ]
         }
       ],
+      "authenticatorConfig": [
+        {
+          "id": "a900c3cd-0548-48fd-984c-d98d18731d15",
+          "alias": "create unique user config",
+          "config": {
+            "require.password.update.after.registration": "false"
+          }
+        }
+        {{- if .Values.keycloakProcore.enabled }}
+        ,
+        {
+          "id": "952c1ab9-c759-409a-8ca6-264f533bb574",
+          "alias": "review profile config",
+          "config": {
+            "update.profile.on.first.login": "missing"
+          }
+        }
+        {{- end }}
+      ],
       "requiredActions": [
         {
           "alias": "CONFIGURE_TOTP",
