@@ -3,6 +3,7 @@ import hashlib
 import logging
 import os
 import typing
+import uuid
 from typing import TYPE_CHECKING, Annotated
 from urllib.parse import urlencode
 
@@ -22,10 +23,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-COOKIE_TOKEN = "launchpad-token"
-COOKIE_CODE_VERIFIER = "code_verifier"
-
-
 class OauthError(Exception): ...
 
 
@@ -39,6 +36,7 @@ class Oauth:
         keycloak_config: KeycloakConfig,
         cookie_domain: str,
         launchpad_domain: str,
+        launchpad_app_id: uuid.UUID | None = None,
         scope: list[str] | None = None,
     ):
         self._http = http
@@ -53,6 +51,10 @@ class Oauth:
         self._scope = " ".join(
             scope or ["openid", "profile", "email", "offline_access"]
         )
+        if not launchpad_app_id:
+            launchpad_app_id = uuid.uuid4()
+        self._cookie_token = f"launchpad-{launchpad_app_id.hex}-token"
+        self._cookie_code_verifier = f"launchpad-{launchpad_app_id.hex}-code-verifier"
 
     def redirect(
         self,
@@ -80,17 +82,17 @@ class Oauth:
         )
 
         response = RedirectResponse(url=auth_url)
-        self._set_cookie(response, key=COOKIE_CODE_VERIFIER, value=code_verifier)
+        self._set_cookie(response, key=self._cookie_code_verifier, value=code_verifier)
         return response
 
     def get_token_from_cookie(self, request: Request) -> str | None:
-        return request.cookies.get(COOKIE_TOKEN)
+        return request.cookies.get(self._cookie_token)
 
     async def callback(self, request: Request) -> RedirectResponse:
         try:
             code = request.query_params["code"]
             state = request.query_params["state"]
-            code_verifier = request.cookies["code_verifier"]
+            code_verifier = request.cookies[self._cookie_code_verifier]
         except KeyError:
             raise OauthError("missing required params")
 
@@ -110,11 +112,10 @@ class Oauth:
         return response
 
     def set_auth_cookie(self, response: Response, access_token: str) -> None:
-        self._set_cookie(response, key=COOKIE_TOKEN, value=access_token)
+        self._set_cookie(response, key=self._cookie_token, value=access_token)
 
     def logout(self, response: Response) -> None:
-        """Cleanup of cookies on logout"""
-        for cookie in (COOKIE_TOKEN, COOKIE_CODE_VERIFIER):
+        for cookie in (self._cookie_token, self._cookie_code_verifier):
             response.delete_cookie(
                 key=cookie, domain=self._cookie_domain, secure=True, httponly=True
             )
