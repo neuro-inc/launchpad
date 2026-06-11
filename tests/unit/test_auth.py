@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -8,7 +9,7 @@ from yarl import URL
 
 from launchpad.auth.dependencies import auth_required
 from launchpad.auth.models import User
-from launchpad.auth.oauth import COOKIE_CODE_VERIFIER, Oauth, OauthError
+from launchpad.auth.oauth import Oauth, OauthError
 from launchpad.config import KeycloakConfig
 from launchpad.errors import Unauthorized
 
@@ -38,6 +39,9 @@ def mock_http_session() -> AsyncMock:
     return AsyncMock(spec=ClientSession)
 
 
+_TEST_APP_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+
 @pytest.fixture
 def oauth_instance(
     mock_keycloak_config: KeycloakConfig, mock_http_session: AsyncMock
@@ -47,6 +51,7 @@ def oauth_instance(
         keycloak_config=mock_keycloak_config,
         cookie_domain="mock-cookie.com",
         launchpad_domain="mock-launchpad.com",
+        launchpad_app_id=_TEST_APP_ID,
     )
 
 
@@ -134,7 +139,7 @@ async def test_oauth_redirect(oauth_instance: Oauth, mock_request: MagicMock) ->
     assert "state" in redirect_url.query
 
     # Verify cookie
-    assert COOKIE_CODE_VERIFIER in response.headers["set-cookie"]
+    assert oauth_instance._cookie_code_verifier in response.headers["set-cookie"]
 
 
 async def test_oauth_callback_missing_params(
@@ -142,13 +147,13 @@ async def test_oauth_callback_missing_params(
 ) -> None:
     # Test missing code
     mock_request.query_params = {"state": "mock-state"}
-    mock_request.cookies = {COOKIE_CODE_VERIFIER: "mock-code-verifier"}
+    mock_request.cookies = {oauth_instance._cookie_code_verifier: "mock-code-verifier"}
     with pytest.raises(OauthError, match="missing required params"):
         await oauth_instance.callback(mock_request)
 
     # Test missing state
     mock_request.query_params = {"code": "mock-code"}
-    mock_request.cookies = {COOKIE_CODE_VERIFIER: "mock-code-verifier"}
+    mock_request.cookies = {oauth_instance._cookie_code_verifier: "mock-code-verifier"}
     with pytest.raises(OauthError, match="missing required params"):
         await oauth_instance.callback(mock_request)
 
