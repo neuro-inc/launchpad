@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Callable, Iterable, Optional
 
 import pytest
@@ -8,7 +9,11 @@ from starlette.requests import Request
 from launchpad.auth.dependencies import (
     get_raw_token_from_request as _token_from_request,
 )
-from launchpad.auth.oauth import COOKIE_TOKEN, Oauth
+from launchpad.auth.oauth import Oauth
+
+
+_TEST_APP_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+_TEST_COOKIE_TOKEN = f"launchpad-{_TEST_APP_ID.hex}-token"
 
 
 def _normalize_headers(
@@ -50,10 +55,11 @@ class DummyOauth(Oauth):
     """Test double with explicit fallback semantics."""
 
     def __init__(self, fallback_cookie_token: str | None = None) -> None:
+        self._cookie_token = _TEST_COOKIE_TOKEN
         self._fallback_cookie_token = fallback_cookie_token
 
     def get_token_from_cookie(self, request: Request) -> str | None:
-        cookie = request.cookies.get(COOKIE_TOKEN)
+        cookie = request.cookies.get(self._cookie_token)
         return cookie if cookie is not None else self._fallback_cookie_token
 
 
@@ -82,7 +88,7 @@ def oauth_factory() -> OauthFactory:
 @pytest.mark.parametrize(
     "headers, expected",
     [
-        ({"cookie": f"{COOKIE_TOKEN}=cookie-123"}, "cookie-123"),
+        ({"cookie": f"{_TEST_COOKIE_TOKEN}=cookie-123"}, "cookie-123"),
         ({"authorization": "Bearer header-456"}, "header-456"),
     ],
 )
@@ -106,7 +112,7 @@ def test_token_from_request_cookie_disabled_uses_header(
     req = request_factory(
         headers=(
             ("authorization", "Bearer hdr-789"),
-            ("cookie", f"{COOKIE_TOKEN}=cookie-should-be-ignored"),
+            ("cookie", f"{_TEST_COOKIE_TOKEN}=cookie-should-be-ignored"),
         )
     )
     oauth = oauth_factory("cookie-should-be-ignored")
@@ -153,7 +159,7 @@ def test_cookie_wins_over_invalid_header(
 ) -> None:
     req = request_factory(
         headers={
-            "cookie": f"{COOKIE_TOKEN}=cookie-123",
+            "cookie": f"{_TEST_COOKIE_TOKEN}=cookie-123",
             "authorization": "invalid",
         }
     )
