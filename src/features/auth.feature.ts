@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { AuthOptions } from 'next-auth';
 import KeycloakProvider from 'next-auth/providers/keycloak';
 
@@ -7,7 +8,7 @@ import { getKeycloakIssuer, getServerApiUrl, getSiteUrl } from '@utils/helpers';
 
 type AuthConfig = KeycloakConfig;
 
-export async function getAuthConfig(): Promise<AuthConfig> {
+export const getAuthConfig = cache(async (): Promise<AuthConfig> => {
   try {
     const serverApiUrl = await getServerApiUrl();
 
@@ -60,7 +61,7 @@ export async function getAuthConfig(): Promise<AuthConfig> {
 
     throw error;
   }
-}
+});
 
 export const refreshAccessToken = async (token: any) => {
   try {
@@ -212,7 +213,11 @@ export async function getAuthOptions(): Promise<AuthOptions> {
           token.accessToken = account.access_token;
           token.refreshToken = account.refresh_token;
           token.idToken = account.id_token;
-          token.accessTokenExpires = account.expires_at;
+          // expires_at from OAuth providers is in seconds; Date.now() is ms.
+          // Guard against providers that already return ms (value > 1e12).
+          const expiresAt = account.expires_at ?? 0;
+          token.accessTokenExpires =
+            expiresAt > 1e12 ? expiresAt : expiresAt * 1000;
 
           token.name = profile?.name ?? undefined;
           token.email = profile?.email ?? undefined;
