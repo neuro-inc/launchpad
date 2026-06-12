@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth';
 import clsx from 'clsx';
 
 import { getAuthOptions } from '@features';
+import { getServerApiUrl } from '@utils/helpers';
 
 import { LayoutCookieSync } from '@components/Ui/Layout/LayoutCookieSync';
 
@@ -16,11 +17,14 @@ type Props = {
 
 export const Layout = async ({ className, children }: Props) => {
   const authOptions = await getAuthOptions();
-  const session = await getServerSession(authOptions);
+  const [session, apiUrl] = await Promise.all([
+    getServerSession(authOptions),
+    getServerApiUrl(),
+  ]);
 
   return (
     <LayoutWrapper className="flex flex-1 flex-col">
-      <LayoutCookieSync token={session?.accessToken} />
+      <LayoutCookieSync token={session?.accessToken} apiUrl={apiUrl} />
       <LayoutHeader />
       <main className={clsx('flex flex-1 flex-col', className)}>
         {children}

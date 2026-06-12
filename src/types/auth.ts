@@ -4,4 +4,5 @@
 export type KeycloakConfig = {
   realm: string;
   url: string;
+  idp_hint?: string | null;
 };
