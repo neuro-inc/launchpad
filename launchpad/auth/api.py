@@ -80,7 +80,9 @@ class TokenResponse(BaseModel):
 
 def _validate_origin(request: Request) -> None:
     """Validate Origin/Referer headers against configured public URL."""
-    expected_host = urlparse(request.app.config.apolo.web_app_domain).hostname
+    web_domain = request.app.config.apolo.web_app_domain
+    # web_app_domain is a bare hostname — urlparse needs a scheme to extract .hostname
+    expected_host = urlparse(web_domain).hostname or web_domain
 
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
