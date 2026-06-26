@@ -1,8 +1,14 @@
+from pathlib import Path
+from typing import cast
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
+import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from launchpad.auth.dependencies import admin_role_required, auth_required
+from launchpad.auth.models import User
 from launchpad.config import Config
 
 
@@ -22,6 +28,36 @@ def test_config_endpoint(app_client: TestClient, config: Config) -> None:
         },
         "branding": {
             "logo_url": f"{app_client.base_url}/branding/logo",
+            "favicon_url": f"{app_client.base_url}/branding/favicon",
+            "background_url": f"{app_client.base_url}/branding/background",
+            "title": "Test Title",
+            "background": "12345",
+        },
+    }
+
+
+def test_config_endpoint_ignores_stale_branding_files(
+    app_client: TestClient, config: Config, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_exists = Path.exists
+
+    def stale_logo_exists(path: Path) -> bool:
+        if path == config.branding.branding_dir / "logo":
+            raise OSError(116, "Stale file handle", str(path))
+        return original_exists(path)
+
+    monkeypatch.setattr(Path, "exists", stale_logo_exists)
+
+    response = app_client.get("/config")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "keycloak": {
+            "url": str(config.keycloak.url),
+            "realm": config.keycloak.realm,
+        },
+        "branding": {
+            "logo_url": None,
             "favicon_url": f"{app_client.base_url}/branding/favicon",
             "background_url": f"{app_client.base_url}/branding/background",
             "title": "Test Title",
@@ -56,6 +92,57 @@ def test_cors_middleware(app_client: TestClient, config: Config) -> None:
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == frontend_origin
     assert response.headers["access-control-allow-credentials"] == "true"
+
+
+class TestAdminAuthorization:
+    """Integration tests for admin-only app management endpoints."""
+
+    def test_non_admin_cannot_add_or_delete_apps(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        async def non_admin_auth_required() -> User:
+            return User(
+                id="user@example.com",
+                email="user@example.com",
+                name="Regular User",
+                groups=["user"],
+            )
+
+        app = cast(FastAPI, app_client.app)
+        app.dependency_overrides.pop(admin_role_required, None)
+        app.dependency_overrides[auth_required] = non_admin_auth_required
+
+        import_template_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "admin-only-template",
+                "template_version": "1.0.0",
+            },
+        )
+        assert import_template_response.status_code == 401
+
+        import_app_response = app_client.post(
+            "/api/v1/apps/import",
+            json={
+                "app_id": str(uuid4()),
+                "name": "admin-only-app",
+            },
+        )
+        assert import_app_response.status_code == 401
+
+        delete_instance_response = app_client.delete(
+            f"/api/v1/apps/instances/{uuid4()}"
+        )
+        assert delete_instance_response.status_code == 401
+
+        delete_template_response = app_client.delete(
+            f"/api/v1/apps/templates/{uuid4()}"
+        )
+        assert delete_template_response.status_code == 401
+
+        mock_apps_api_client.get_template.assert_not_called()
+        mock_apps_api_client.get_by_id.assert_not_called()
+        mock_apps_api_client.delete_app.assert_not_called()
 
 
 class TestTemplatesEndpoint:
@@ -244,6 +331,15 @@ class TestDeleteInstance:
         actual_app_id = next(
             item["app_id"] for item in instances if item["launchpad_app_name"] == app_id
         )
+        preserved_app_id = uuid4()
+        mock_apps_api_client.get_outputs.return_value = {
+            "installed_apps": {
+                "app_list": [
+                    {"app_id": actual_app_id, "app_name": "deletable-app"},
+                    {"app_id": str(preserved_app_id), "app_name": "preserved-app"},
+                ]
+            }
+        }
 
         # Delete the instance
         delete_response = app_client.delete(
@@ -254,6 +350,12 @@ class TestDeleteInstance:
 
         # Verify it was deleted via Apps API
         mock_apps_api_client.delete_app.assert_called_once()
+
+        # Verify it was removed from launchpad outputs
+        mock_apps_api_client.update_outputs.assert_called_once()
+        updated_outputs = mock_apps_api_client.update_outputs.call_args[0][1]
+        app_list = updated_outputs["installed_apps"]["app_list"]
+        assert {app["app_id"] for app in app_list} == {str(preserved_app_id)}
 
         # Verify it's no longer in the database
         instances_response = app_client.get("/api/v1/apps/instances")
@@ -344,6 +446,16 @@ class TestDeleteTemplate:
         non_internal = [item for item in instances if not item["is_internal"]]
         assert len(non_internal) == 1
         assert non_internal[0]["launchpad_app_name"] == "cascade-test"
+        actual_app_id = non_internal[0]["app_id"]
+        preserved_app_id = uuid4()
+        mock_apps_api_client.get_outputs.return_value = {
+            "installed_apps": {
+                "app_list": [
+                    {"app_id": actual_app_id, "app_name": "cascade-test"},
+                    {"app_id": str(preserved_app_id), "app_name": "preserved-app"},
+                ]
+            }
+        }
 
         # Delete the template
         delete_response = app_client.delete(f"/api/v1/apps/templates/{template_id}")
@@ -351,6 +463,12 @@ class TestDeleteTemplate:
 
         # Verify Apps API delete was called for the instance
         assert mock_apps_api_client.delete_app.call_count == 1
+
+        # Verify the deleted app was removed from launchpad outputs
+        mock_apps_api_client.update_outputs.assert_called_once()
+        updated_outputs = mock_apps_api_client.update_outputs.call_args[0][1]
+        app_list = updated_outputs["installed_apps"]["app_list"]
+        assert {app["app_id"] for app in app_list} == {str(preserved_app_id)}
 
         # Verify both template and instance are gone
         pool_response = app_client.get("/api/v1/apps")

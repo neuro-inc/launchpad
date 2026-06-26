@@ -171,7 +171,10 @@ async def token_from_string(
     else:
         logger.error(
             "unable to match a KID between a token and a JWKS",
-            extra={"jwks": jwks, "access_token": access_token},
+            extra={
+                "token_kid": kid,
+                "jwks_key_ids": [key.get("kid") for key in jwks["keys"]],
+            },
         )
         raise Unauthorized()
 
@@ -217,13 +220,13 @@ async def _get_jwks(
     return await response.json()
 
 
-async def admin_role_required(
-    request: Request,
-) -> User:
+Auth = Annotated[User, Depends(auth_required)]
+
+
+async def admin_role_required(user: Auth) -> User:
     """
     JWT authentication with admin role check
     """
-    user = await auth_required(request)
     if "admin" not in user.groups:
         logger.warning(
             f"User {user.email} attempted to access admin endpoint without admin role"
@@ -232,7 +235,6 @@ async def admin_role_required(
     return user
 
 
-Auth = Annotated[User, Depends(auth_required)]
 AdminAuth = Annotated[User, Depends(admin_role_required)]
 
 
