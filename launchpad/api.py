@@ -50,15 +50,23 @@ async def ping() -> Response:
     return Response("Pong", status_code=200)
 
 
+def _branding_file_exists(file_path: Path) -> bool:
+    try:
+        return file_path.exists()
+    except OSError as e:
+        logger.warning("Failed to access branding file %s: %s", file_path, e)
+        return False
+
+
 @root_router.get("/config")
 async def view_get_config(request: Request) -> dict[str, Any]:
     app: Launchpad = request.app
 
     # Check if custom branding files exist
     branding_dir = app.config.branding.branding_dir
-    logo_exists = (branding_dir / "logo").exists()
-    favicon_exists = (branding_dir / "favicon").exists()
-    background_exists = (branding_dir / "background").exists()
+    logo_exists = _branding_file_exists(branding_dir / "logo")
+    favicon_exists = _branding_file_exists(branding_dir / "favicon")
+    background_exists = _branding_file_exists(branding_dir / "background")
 
     # Build branding URLs
     base_url = str(request.url_for("view_get_config")).rsplit("/config", 1)[0]
@@ -86,7 +94,7 @@ async def get_branding_logo(request: Request) -> FileResponse:
     app: Launchpad = request.app
     logo_path = app.config.branding.branding_dir / "logo"
 
-    if not logo_path.exists():
+    if not _branding_file_exists(logo_path):
         raise HTTPException(status_code=404, detail="Logo not found")
 
     media_type = detect_media_type(file_path=logo_path, default="image/svg+xml")
@@ -103,7 +111,7 @@ async def get_branding_favicon(request: Request) -> FileResponse:
     app: Launchpad = request.app
     favicon_path = app.config.branding.branding_dir / "favicon"
 
-    if not favicon_path.exists():
+    if not _branding_file_exists(favicon_path):
         raise HTTPException(status_code=404, detail="Favicon not found")
 
     media_type = detect_media_type(file_path=favicon_path, default="image/x-icon")
@@ -120,7 +128,7 @@ async def get_branding_background(request: Request) -> FileResponse:
     app: Launchpad = request.app
     background_path = app.config.branding.branding_dir / "background"
 
-    if not background_path.exists():
+    if not _branding_file_exists(background_path):
         raise HTTPException(status_code=404, detail="Background not found")
 
     media_type = detect_media_type(file_path=background_path, default="image/png")

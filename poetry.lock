@@ -342,26 +342,26 @@ trio = ["trio (>=0.32.0)"]
 
 [[package]]
 name = "apolo-app-types"
-version = "26.4.0"
+version = "26.6.0"
 description = "Apolo Platform App Types."
 optional = false
 python-versions = "<4.0,>=3.10.0"
 groups = ["main"]
 files = [
-    {file = "apolo_app_types-26.4.0-py3-none-any.whl", hash = "sha256:f0f280f78164afc25635f7d9b49ac1c814ce9d781fa502fe349a59b60e3bce8d"},
-    {file = "apolo_app_types-26.4.0.tar.gz", hash = "sha256:c318c4c94fbe68534e1f5128cc3cf85f4bc6377e00018eb96cd804866d4e15e9"},
+    {file = "apolo_app_types-26.6.0-py3-none-any.whl", hash = "sha256:91a21fc4db73f51af0960a53c1ab5b4aa29ad4de672e9bb3d08702100dfa27e5"},
+    {file = "apolo_app_types-26.6.0.tar.gz", hash = "sha256:3f3731e49b087a91373f76fcc5b178944fef4ab5944900f484100c8da034093e"},
 ]
 
 [package.dependencies]
 apolo-sdk = ">=26.3.0,<27.0.0"
-click = ">=8.3.1,<9.0.0"
+click = ">=8.3.2,<9.0.0"
 httpx = ">=0.28.0,<0.29.0"
 jsonref = ">=1.1.0,<2.0.0"
-kubernetes = ">=35.0.0,<36.0.0"
+kubernetes = ">=35,<37"
 pydantic = ">=2.12.5,<3.0.0"
 pyyaml = ">=6.0.3,<7.0.0"
 tenacity = ">=9.1.2,<10.0.0"
-types-PyYAML = ">=6.0.12.20250915,<7.0.0.0"
+types-PyYAML = ">=6.0.12.20260408,<7.0.0.0"
 yarl = ">=1.23.0,<2.0.0"
 
 [[package]]
@@ -1104,14 +1104,14 @@ files = [
 
 [[package]]
 name = "click"
-version = "8.3.1"
+version = "8.4.2"
 description = "Composable command line interface toolkit"
 optional = false
 python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "click-8.3.1-py3-none-any.whl", hash = "sha256:981153a64e25f12d547d3426c367a4857371575ee7ad18df2a6183ab0545b2a6"},
-    {file = "click-8.3.1.tar.gz", hash = "sha256:12ff4785d337a1bb490bb7e9c2b1ee5da3112e94a8622f26a6c77f5d2fc6842a"},
+    {file = "click-8.4.2-py3-none-any.whl", hash = "sha256:e6f9f66136c816745b9d65817da91d61d957fb16e02e4dcd0552553c5a197b76"},
+    {file = "click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6"},
 ]
 
 [package.dependencies]
@@ -3806,14 +3806,14 @@ files = [
 
 [[package]]
 name = "types-pyyaml"
-version = "6.0.12.20250915"
+version = "6.0.12.20260518"
 description = "Typing stubs for PyYAML"
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["main"]
 files = [
-    {file = "types_pyyaml-6.0.12.20250915-py3-none-any.whl", hash = "sha256:e7d4d9e064e89a3b3cae120b4990cd370874d2bf12fa5f46c97018dd5d3c9ab6"},
-    {file = "types_pyyaml-6.0.12.20250915.tar.gz", hash = "sha256:0f8b54a528c303f0e6f7165687dd33fafa81c807fcac23f632b63aa624ced1d3"},
+    {file = "types_pyyaml-6.0.12.20260518-py3-none-any.whl", hash = "sha256:d2150f75a231c9fe9c7463bd29487d93e60bac90400287351384bc2284eba7cd"},
+    {file = "types_pyyaml-6.0.12.20260518.tar.gz", hash = "sha256:d917f83fb38462550338c1297faedd860b3ec83912b96b1e3d73255f7473e466"},
 ]
 
 [[package]]
@@ -4264,4 +4264,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "289800657b6142f7cddc2feebb0cd64527ac15a6741908bbda6771e2d6ad2314"
+content-hash = "e0e7a4bf3aab2f0e90db535621109f0e16b8e059f05b36de2e0a99192a5f6ab4"

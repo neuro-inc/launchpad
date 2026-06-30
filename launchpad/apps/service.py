@@ -354,6 +354,64 @@ class AppService:
             )
             raise AppServiceError("Failed to update instance outputs") from e
 
+    @backoff.on_exception(
+        wait_gen=backoff.expo,
+        exception=(
+            AppServiceError,
+            AppsApiError,
+        ),
+        max_tries=5,
+    )
+    async def _remove_apps_from_launchpad_outputs(self, app_ids: list[UUID]) -> None:
+        if self._instance_id is None:
+            raise AppServiceError("Instance ID is not configured")
+
+        app_ids_set = {str(app_id) for app_id in app_ids}
+        if not app_ids_set:
+            return
+
+        try:
+            outputs = await self._apps_api_client.get_outputs(self._instance_id)
+        except NotFound:
+            logger.info(
+                "No outputs found for instance %s while removing deleted apps",
+                self._instance_id,
+            )
+            return
+        except AppsApiError as e:
+            logger.error(
+                "Failed to get outputs for instance %s while removing deleted apps: %s",
+                self._instance_id,
+                e,
+            )
+            raise AppServiceError("Failed to get instance outputs") from e
+
+        installed_apps = outputs.get("installed_apps") or {}
+        app_list = installed_apps.get("app_list") or []
+        next_app_list = [
+            app for app in app_list if str(app.get("app_id")) not in app_ids_set
+        ]
+
+        if len(next_app_list) == len(app_list):
+            logger.info("Deleted apps are not present in outputs; skipping update")
+            return
+
+        installed_apps["app_list"] = next_app_list
+        outputs["installed_apps"] = installed_apps
+
+        try:
+            await self._apps_api_client.update_outputs(
+                self._instance_id,
+                outputs,
+            )
+        except AppsApiError as e:
+            logger.error(
+                "Failed to update outputs for instance %s while removing deleted apps: %s",
+                self._instance_id,
+                e,
+            )
+            raise AppServiceError("Failed to update instance outputs") from e
+
     async def _add_app_to_buffer(self, app: InstalledApp) -> None:
         """Add an app to the output buffer for later processing."""
         await self._output_buffer.put(app)
@@ -875,7 +933,11 @@ class AppService:
 
     async def delete(self, app_id: UUID, uninstall: bool = False) -> None:
         if uninstall:
-            await self._apps_api_client.delete_app(app_id)
+            try:
+                await self._apps_api_client.delete_app(app_id)
+            except NotFound:
+                logger.info("App %s is already absent from Apps API", app_id)
+        await self._remove_apps_from_launchpad_outputs([app_id])
         async with self._db() as db:
             async with db.begin():
                 await delete_app(db, app_id)
@@ -919,7 +981,10 @@ class AppService:
         )
 
         # Uninstall each app instance via Apps API and delete from DB
+        app_ids_to_remove_from_launchpad_outputs = []
         for app in installed_apps:
+            app_ids_to_remove_from_launchpad_outputs.append(app.app_id)
+
             if uninstall:
                 logger.info(
                     f"Uninstalling app instance {app.app_id} "
@@ -935,7 +1000,11 @@ class AppService:
             else:
                 logger.info(f"Skip uninstallation of app instance {app.app_id}")
 
-            # Delete from database
+        await self._remove_apps_from_launchpad_outputs(
+            app_ids_to_remove_from_launchpad_outputs
+        )
+
+        for app in installed_apps:
             async with self._db() as db:
                 async with db.begin():
                     await delete_app(db, app.app_id)
