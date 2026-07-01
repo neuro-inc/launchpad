@@ -2,7 +2,11 @@ import { getServerSession } from 'next-auth';
 import clsx from 'clsx';
 
 import { getAuthOptions } from '@features';
-import { getServerApiUrl } from '@utils/helpers';
+import {
+  canDeriveLaunchpadApiHostname,
+  getServerApiUrl,
+  getSiteUrl,
+} from '@utils/helpers';
 
 import { LayoutCookieSync } from '@components/Ui/Layout/LayoutCookieSync';
 
@@ -16,16 +20,32 @@ type Props = {
 };
 
 export const Layout = async ({ className, children }: Props) => {
-  const authOptions = await getAuthOptions();
-  const [session, apiUrl] = await Promise.all([
-    getServerSession(authOptions),
-    getServerApiUrl(),
-  ]);
+  const siteUrl = await getSiteUrl();
+  const siteHostname = new URL(siteUrl).hostname;
+  const supportsLaunchpadAuth = canDeriveLaunchpadApiHostname(siteHostname);
+
+  const authBootstrap = supportsLaunchpadAuth
+    ? await (async () => {
+        const authOptions = await getAuthOptions();
+        const [session, apiUrl] = await Promise.all([
+          getServerSession(authOptions),
+          getServerApiUrl(),
+        ]);
+
+        return { session, apiUrl };
+      })()
+    : { session: null, apiUrl: null };
 
   return (
     <LayoutWrapper className="flex flex-1 flex-col">
-      <LayoutCookieSync token={session?.accessToken} apiUrl={apiUrl} />
-      <LayoutHeader />
+      {authBootstrap.apiUrl && (
+        <LayoutCookieSync
+          token={authBootstrap.session?.accessToken}
+          sessionError={authBootstrap.session?.error}
+          apiUrl={authBootstrap.apiUrl}
+        />
+      )}
+      <LayoutHeader session={authBootstrap.session} />
       <main className={clsx('flex flex-1 flex-col', className)}>
         {children}
       </main>

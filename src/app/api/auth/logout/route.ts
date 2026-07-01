@@ -27,11 +27,6 @@ export async function GET(request: NextRequest) {
 
   if (token?.idToken) {
     logoutUrl.searchParams.set('id_token_hint', token.idToken);
-    // eslint-disable-next-line no-console
-    console.log('Added id_token_hint to logout URL');
-  } else {
-    // eslint-disable-next-line no-console
-    console.log('No id_token available - proceeding without hint');
   }
 
   logoutUrl.searchParams.set('post_logout_redirect_uri', siteUrl);

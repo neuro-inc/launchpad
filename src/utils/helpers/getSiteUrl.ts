@@ -4,6 +4,17 @@ const normalizeUrl = (url: string): string => url.replace(/\/$/, '');
 
 const PREVIEW_SITE_HOSTNAME_PATTERN = /^([^.]+)\.launchpad\.(.+)$/;
 
+export const canDeriveLaunchpadApiHostname = (
+  siteHostname: string,
+): boolean => {
+  const parts = siteHostname.split('.');
+  const [firstLabel, ...restLabels] = parts;
+
+  return Boolean(
+    firstLabel && restLabels.length > 0 && firstLabel !== 'launchpad',
+  );
+};
+
 const getApiHostnameFromSiteHostname = (siteHostname: string): string => {
   const previewMatch = siteHostname.match(PREVIEW_SITE_HOSTNAME_PATTERN);
 
@@ -23,8 +34,10 @@ const getApiHostnameFromSiteHostname = (siteHostname: string): string => {
   const parts = siteHostname.split('.');
   const [firstLabel, ...restLabels] = parts;
 
-  if (!firstLabel || restLabels.length === 0) {
-    return `${siteHostname}-api`;
+  if (!canDeriveLaunchpadApiHostname(siteHostname)) {
+    throw new Error(
+      `Cannot derive Launchpad API hostname from generic site hostname: ${siteHostname}`,
+    );
   }
 
   return `${firstLabel}-api.${restLabels.join('.')}`;
@@ -62,18 +75,23 @@ export const getSiteUrl = async (): Promise<string> => {
 
     return origin;
   } catch (error) {
-    console.error('getSiteUrl error (likely outside request scope):', error);
+    if (IS_LOCAL && process.env.NEXT_PUBLIC_SITE_URL) {
+      return process.env.NEXT_PUBLIC_SITE_URL;
+    }
 
-    /**
-     * Fallback when headers() is called outside request scope
-     * This commonly happens during auth flows
-     */
-    const envUrl = process.env.NEXT_PUBLIC_SITE_URL!;
+    console.error(
+      JSON.stringify({
+        scope: 'launchpad-net',
+        event: 'site-url-resolution-error',
+        ts: new Date().toISOString(),
+        error:
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : { message: String(error) },
+      }),
+    );
 
-    // eslint-disable-next-line no-console
-    console.log('Using fallback env URL:', envUrl);
-
-    return envUrl;
+    throw error;
   }
 };
 

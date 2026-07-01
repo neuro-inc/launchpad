@@ -5,14 +5,14 @@ import {
   LaunchpadConfig,
   LaunchpadConfigResponse,
 } from '@typings';
-import { serverRequest } from '@utils/helpers/request';
+import { getRawConfig } from '@features';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export async function GET() {
   try {
-    const response = await serverRequest<LaunchpadConfigResponse>('/config');
+    const response = (await getRawConfig()) as LaunchpadConfigResponse;
 
     // Extract branding data and convert snake_case to camelCase
     const { branding } = response;
@@ -29,7 +29,17 @@ export async function GET() {
 
     return NextResponse.json(config);
   } catch (error) {
-    console.error('Error fetching config:', error);
+    console.error(
+      JSON.stringify({
+        scope: 'launchpad-net',
+        event: 'api-config-error',
+        ts: new Date().toISOString(),
+        error:
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : { message: String(error) },
+      }),
+    );
 
     // Return default config on error
     return NextResponse.json({

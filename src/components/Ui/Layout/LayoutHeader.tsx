@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import { getServerSession } from 'next-auth';
+import { Session } from 'next-auth';
 
 import { User } from '@typings';
-import { getAuthOptions } from '@features';
 import { getConfig } from '@actions/server.actions';
 import { isObject } from '@utils';
 import { isAdmin } from '@utils/helpers';
@@ -12,16 +11,15 @@ import { Image } from '@components/Shared';
 import { Layout } from '@components/Ui';
 import { UserPanel } from '@components/Ui/UserPanel';
 
-type Session = { user: User } | null;
+type HeaderSession = { user: User } | null;
 
 type Props = {
   className?: string;
+  session: Session | null;
 };
 
-export const LayoutHeader: React.FC<Props> = async ({ className }) => {
-  const authOptions = await getAuthOptions();
-  const session = await getServerSession(authOptions);
-  const data = session as Session;
+export const LayoutHeader: React.FC<Props> = async ({ className, session }) => {
+  const data = session as HeaderSession;
   const config = await getConfig();
 
   const isAuthenticated = isObject(data?.user);

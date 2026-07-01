@@ -2,26 +2,14 @@
 
 import { cache } from 'react';
 
-import {
-  DEFAULT_CONFIG,
-  LaunchpadConfig,
-  LaunchpadConfigResponse,
-} from '@typings';
-import { serverRequest } from '@utils/helpers/request';
+import { DEFAULT_CONFIG, LaunchpadConfig } from '@typings';
+import { getRawConfig } from '@features';
 
-/**
- * Get Launchpad configuration with caching
- * This will be cached for the duration of the request
- */
 export const getConfig = cache(async (): Promise<LaunchpadConfig> => {
   try {
-    const response = await serverRequest<LaunchpadConfigResponse>('/config');
+    const raw = await getRawConfig();
+    const branding = raw?.branding;
 
-    // Extract branding data and convert snake_case to camelCase
-    // Defensively handle missing response or branding to avoid runtime errors
-    const branding = response?.branding;
-
-    // Merge with defaults to ensure all fields are present
     return {
       logoUrl: branding?.logo_url ?? DEFAULT_CONFIG.logoUrl,
       faviconUrl: branding?.favicon_url ?? DEFAULT_CONFIG.faviconUrl,

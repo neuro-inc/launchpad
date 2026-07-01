@@ -2,78 +2,143 @@ import { cache } from 'react';
 import { AuthOptions } from 'next-auth';
 import KeycloakProvider from 'next-auth/providers/keycloak';
 
-import { KeycloakConfig } from '@typings';
+import { KeycloakConfig, LaunchpadConfigResponse } from '@typings';
 import { NEXTAUTH_SECRET } from '@constants';
-import { getKeycloakIssuer, getServerApiUrl, getSiteUrl } from '@utils/helpers';
+import {
+  getKeycloakIssuer,
+  getServerApiUrl,
+  getSiteUrl,
+  logLaunchpadNet,
+  safeError,
+  safeUrlParts,
+} from '@utils/helpers';
+import { fetchWithRetry } from '@utils/helpers/fetchWithRetry';
 
 type AuthConfig = KeycloakConfig;
 
-export const getAuthConfig = cache(async (): Promise<AuthConfig> => {
-  try {
-    const serverApiUrl = await getServerApiUrl();
+type RawConfig = {
+  keycloak: KeycloakConfig;
+  branding?: LaunchpadConfigResponse['branding'];
+};
 
-    const response = await fetch(`${serverApiUrl}/config?t=${Date.now()}`, {
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-        Expires: '0',
-      },
-      cache: 'no-store',
-    });
+const SESSION_MAX_AGE_SECONDS = 10 * 24 * 60 * 60;
 
-    if (!response.ok) {
-      const errorText = await response.text();
-
-      console.error('Server response error:', response.status, errorText);
-
-      throw new Error(
-        `Failed to fetch auth config: ${response.status} ${response.statusText}`,
-      );
-    }
-
-    /**
-     * Check if response is actually JSON
-     */
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const responseText = await response.text();
-      console.error('Non-JSON response received:', responseText);
-      throw new Error('Server did not return JSON response');
-    }
-
-    const responseText = await response.text();
-
-    if (!responseText.trim()) {
-      throw new Error('Empty response from server');
-    }
-
-    const responseJson = JSON.parse(responseText) as {
-      keycloak: KeycloakConfig;
-    };
-
-    if (!responseJson.keycloak) {
-      throw new Error('Invalid response structure: keycloak config not found');
-    }
-
-    return responseJson.keycloak;
-  } catch (error) {
-    console.error('Error fetching auth config:', error);
-
-    throw error;
+const getOAuthErrorInfo = (error: unknown) => {
+  if (!error || typeof error !== 'object') {
+    return undefined;
   }
+
+  const data = error as Record<string, unknown>;
+
+  return {
+    error: typeof data.error === 'string' ? data.error : undefined,
+    errorDescription:
+      typeof data.error_description === 'string'
+        ? data.error_description
+        : undefined,
+    status: typeof data.status === 'number' ? data.status : undefined,
+    statusText:
+      typeof data.statusText === 'string' ? data.statusText : undefined,
+  };
+};
+
+// Module-level cache keyed by apiUrl — survives across React renders and generateMetadata()
+const rawConfigCache = new Map<string, { data: RawConfig; expires: number }>();
+const rawConfigInflight = new Map<string, Promise<RawConfig>>();
+
+async function fetchRawConfigFromApi(apiUrl: string): Promise<RawConfig> {
+  const safeApiUrl = safeUrlParts(apiUrl);
+  const cached = rawConfigCache.get(apiUrl);
+  if (cached && Date.now() < cached.expires) {
+    return cached.data;
+  }
+
+  const inflight = rawConfigInflight.get(apiUrl);
+  if (inflight) {
+    return inflight;
+  }
+
+  const promise = (async () => {
+    const startedAt = Date.now();
+
+    try {
+      const response = await fetchWithRetry(
+        `${apiUrl}/config`,
+        {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            Pragma: 'no-cache',
+            Expires: '0',
+          },
+          cache: 'no-store',
+        },
+        1,
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Failed to fetch config: ${response.status} ${response.statusText} — ${errorText}`,
+        );
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        throw new Error('Server did not return JSON response');
+      }
+
+      const data = (await response.json()) as RawConfig;
+
+      if (!data.keycloak) {
+        throw new Error(
+          'Invalid response structure: keycloak config not found',
+        );
+      }
+
+      rawConfigCache.set(apiUrl, { data, expires: Date.now() + 30_000 });
+      return data;
+    } catch (error) {
+      logLaunchpadNet('raw-config-fetch-error', {
+        ...safeApiUrl,
+        durationMs: Date.now() - startedAt,
+        error: safeError(error),
+      });
+      throw error;
+    } finally {
+      rawConfigInflight.delete(apiUrl);
+    }
+  })();
+
+  rawConfigInflight.set(apiUrl, promise);
+  return promise;
+}
+
+// Per-request deduplication on top of the module-level cache
+export const getRawConfig = cache(async (): Promise<RawConfig> => {
+  const apiUrl = await getServerApiUrl();
+  return fetchRawConfigFromApi(apiUrl);
+});
+
+export const getAuthConfig = cache(async (): Promise<AuthConfig> => {
+  const raw = await getRawConfig();
+  return raw.keycloak;
 });
 
 export const refreshAccessToken = async (token: any) => {
+  const startedAt = Date.now();
+  let tokenUrlParts: ReturnType<typeof safeUrlParts> | undefined;
+
   try {
     const config = await getAuthConfig();
-
     const url = `${getKeycloakIssuer(config)}/protocol/openid-connect/token`;
+    tokenUrlParts = safeUrlParts(url);
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+      signal: AbortSignal.timeout(5_000),
       body: new URLSearchParams({
         client_id: 'frontend',
         grant_type: 'refresh_token',
@@ -84,7 +149,11 @@ export const refreshAccessToken = async (token: any) => {
     const refreshed = await response.json();
 
     if (!response.ok) {
-      throw refreshed;
+      throw {
+        ...refreshed,
+        status: response.status,
+        statusText: response.statusText,
+      };
     }
 
     // Decode the new access token to extract roles
@@ -132,8 +201,23 @@ export const refreshAccessToken = async (token: any) => {
       groups,
     };
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Error refreshing access token:', error);
+    console.error(
+      JSON.stringify({
+        scope: 'launchpad-net',
+        event: 'auth-refresh-error',
+        ts: new Date().toISOString(),
+        durationMs: Date.now() - startedAt,
+        tokenEndpoint: tokenUrlParts,
+        oauth: getOAuthErrorInfo(error),
+        error: safeError(error),
+      }),
+    );
+    logLaunchpadNet('auth-refresh-error', {
+      durationMs: Date.now() - startedAt,
+      tokenEndpoint: tokenUrlParts,
+      oauth: getOAuthErrorInfo(error),
+      error: safeError(error),
+    });
     return {
       ...token,
       error: 'RefreshAccessTokenError',
@@ -143,7 +227,6 @@ export const refreshAccessToken = async (token: any) => {
 
 export async function getAuthOptions(): Promise<AuthOptions> {
   const config = await getAuthConfig();
-  // const siteUrl = await getSiteUrl();
 
   return {
     providers: [
@@ -168,12 +251,16 @@ export async function getAuthOptions(): Promise<AuthOptions> {
       }),
     ],
     secret: NEXTAUTH_SECRET,
-    debug: true,
+    debug: false,
     session: {
       /**
        * Using JWT for public clients
        */
       strategy: 'jwt',
+      maxAge: SESSION_MAX_AGE_SECONDS,
+    },
+    jwt: {
+      maxAge: SESSION_MAX_AGE_SECONDS,
     },
     callbacks: {
       async redirect({ url }) {
@@ -266,14 +353,6 @@ export async function getAuthOptions(): Promise<AuthOptions> {
               token.groups = [];
             }
           }
-
-          // // After extracting token, call backend to set launchpad cookie
-          // try {
-          //   await setLaunchpadCookie(account.access_token);
-          // } catch (e) {
-          //   // don't block login on cookie set failure
-          //   console.error('Failed to set launchpad cookie', e);
-          // }
         }
 
         if (token.accessTokenExpires && now < token.accessTokenExpires) {

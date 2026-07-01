@@ -1,17 +1,17 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   ImportAppRequest,
   ImportTemplateRequest,
   InstalledApp,
   Template,
+  WithPagination,
 } from '@typings';
 import { toast } from '@features';
-import { formatToSnakeCase } from '@utils/formatters';
-import { request } from '@utils/helpers';
+import { formatToCamelCase, formatToSnakeCase } from '@utils/formatters';
+import { request, safeError } from '@utils/helpers';
 
 import {
   ConfirmationModal,
@@ -21,11 +21,15 @@ import {
   TemplatesTable,
   TemplateViewEditModal,
 } from '@components/Admin';
-import { Button, Field, Modal, ModalRef } from '@components/Shared';
+import {
+  Button,
+  ChaseSpinner,
+  Field,
+  Modal,
+  ModalRef,
+} from '@components/Shared';
 
 type AdminPageProps = {
-  initialTemplates: Template[];
-  initialInstances: InstalledApp[];
   surfaceColors?: {
     headerBgColor?: string;
     rowBgColor?: string;
@@ -33,16 +37,15 @@ type AdminPageProps = {
   };
 };
 
-export const AdminPage: React.FC<AdminPageProps> = ({
-  initialTemplates,
-  initialInstances,
-  surfaceColors,
-}) => {
-  const router = useRouter();
-
+export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
   // Modal refs for programmatic control
   const importTemplateModalRef = useRef<ModalRef>(null);
   const importAppModalRef = useRef<ModalRef>(null);
+
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [instances, setInstances] = useState<InstalledApp[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Template view/edit modal - store only the template and mode, not open/close state
   const [templateToViewEdit, setTemplateToViewEdit] = useState<{
@@ -60,8 +63,44 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [uninstallTemplate, setUninstallTemplate] = useState(true);
   const [uninstallApp, setUninstallApp] = useState(true);
 
-  const handleRefresh = () => {
-    router.refresh();
+  const loadAdminData = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      const templatesResponse = await request<WithPagination<Template>>(
+        '/api/v1/apps/templates',
+      );
+      const nextTemplates = formatToCamelCase(
+        templatesResponse.items,
+      ) as Template[];
+
+      const instancesResponse = await request<WithPagination<InstalledApp>>(
+        '/api/v1/apps/instances',
+      );
+      const nextInstances = formatToCamelCase(
+        instancesResponse.items,
+      ) as InstalledApp[];
+
+      setTemplates(nextTemplates);
+      setInstances(nextInstances);
+    } catch (error) {
+      setTemplates([]);
+      setInstances([]);
+      setLoadError(error instanceof Error ? error.message : String(error));
+      // eslint-disable-next-line no-console
+      console.error('Error fetching admin data:', safeError(error));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadAdminData();
+  }, [loadAdminData]);
+
+  const handleRefresh = async () => {
+    await loadAdminData();
     toast.success('Data refreshed successfully');
   };
 
@@ -77,7 +116,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
       toast.success('Template imported successfully');
       importTemplateModalRef.current?.close();
-      router.refresh();
+      await loadAdminData();
     } catch (error: any) {
       toast.error(error.message || 'Failed to import template');
       throw error;
@@ -96,7 +135,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
       toast.success('Template updated successfully');
       setTemplateToViewEdit(null);
-      router.refresh();
+      await loadAdminData();
     } catch (error: any) {
       toast.error(error.message || 'Failed to update template');
       throw error;
@@ -131,7 +170,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
       toast.success('App imported successfully');
       importAppModalRef.current?.close();
-      router.refresh();
+      await loadAdminData();
     } catch (error: any) {
       toast.error(error.message || 'Failed to import app');
       throw error;
@@ -158,7 +197,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       toast.success('Template deleted successfully');
       setTemplateToDelete(null);
       setUninstallTemplate(true);
-      router.refresh();
+      await loadAdminData();
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete template');
     }
@@ -187,7 +226,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
       toast.success('App instance deleted successfully');
       setInstanceToDelete(null);
       setUninstallApp(true);
-      router.refresh();
+      await loadAdminData();
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete app instance');
     }
@@ -239,7 +278,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   <ImportTemplateForm
                     onSubmit={handleTemplateImport}
                     onError={handleError}
-                    instances={initialInstances}
+                    instances={instances}
                   />
                 </div>
               </Modal.Content>
@@ -249,15 +288,34 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </Modal>
         </div>
 
-        <TemplatesTable
-          templates={initialTemplates}
-          onView={handleViewTemplate}
-          onEdit={handleEditTemplate}
-          onDelete={handleDeleteTemplateClick}
-          headerBgColor={surfaceColors?.headerBgColor}
-          rowBgColor={surfaceColors?.rowBgColor}
-          rowAltBgColor={surfaceColors?.rowAltBgColor}
-        />
+        {isLoading && (
+          <div className="flex items-center justify-center gap-3 rounded-lg bg-white p-6 text-neural-04">
+            <ChaseSpinner color="primary" className="size-5" />
+            Loading templates...
+          </div>
+        )}
+
+        {!isLoading && loadError && (
+          <div className="flex flex-col items-center gap-4 rounded-lg bg-white p-6 text-center">
+            <p className="text-h5 text-black">Admin data did not load</p>
+            <p className="max-w-md text-neural-04">{loadError}</p>
+            <Button className="h-10 px-8" onClick={loadAdminData}>
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {!isLoading && !loadError && (
+          <TemplatesTable
+            templates={templates}
+            onView={handleViewTemplate}
+            onEdit={handleEditTemplate}
+            onDelete={handleDeleteTemplateClick}
+            headerBgColor={surfaceColors?.headerBgColor}
+            rowBgColor={surfaceColors?.rowBgColor}
+            rowAltBgColor={surfaceColors?.rowAltBgColor}
+          />
+        )}
       </div>
 
       {/* Template View/Edit Modal */}
@@ -269,7 +327,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           onClose={handleCloseModal}
           onSubmit={handleTemplateUpdate}
           onModeChange={handleModeChange}
-          instances={initialInstances}
+          instances={instances}
         />
       )}
 
@@ -298,13 +356,22 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </Modal>
         </div>
 
-        <InstancesTable
-          instances={initialInstances}
-          onDelete={handleDeleteInstanceClick}
-          headerBgColor={surfaceColors?.headerBgColor}
-          rowBgColor={surfaceColors?.rowBgColor}
-          rowAltBgColor={surfaceColors?.rowAltBgColor}
-        />
+        {isLoading && (
+          <div className="flex items-center justify-center gap-3 rounded-lg bg-white p-6 text-neural-04">
+            <ChaseSpinner color="primary" className="size-5" />
+            Loading instances...
+          </div>
+        )}
+
+        {!isLoading && !loadError && (
+          <InstancesTable
+            instances={instances}
+            onDelete={handleDeleteInstanceClick}
+            headerBgColor={surfaceColors?.headerBgColor}
+            rowBgColor={surfaceColors?.rowBgColor}
+            rowAltBgColor={surfaceColors?.rowAltBgColor}
+          />
+        )}
       </div>
 
       {/* Delete Template Confirmation Modal */}

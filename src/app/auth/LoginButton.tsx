@@ -12,26 +12,34 @@ const getApiUrl = () => {
   if (match) {
     return `${location.protocol}//${match[1]}-api.${match[2]}`;
   }
-  return null;
+
+  const [firstLabel, ...restLabels] = hostname.split('.');
+  if (!firstLabel || restLabels.length === 0 || firstLabel === 'launchpad') {
+    return null;
+  }
+
+  return `${location.protocol}//${firstLabel}-api.${restLabels.join('.')}`;
 };
 
 export const LoginButton: React.FC = () => {
   const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(false);
   const [showProcore, setShowProcore] = useState(false);
+  const [apiUrl, setApiUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const apiUrl = getApiUrl();
-    if (!apiUrl) return;
+    const nextApiUrl = getApiUrl();
+    setApiUrl(nextApiUrl);
+    if (!nextApiUrl) return;
 
-    fetch(`${apiUrl}/config`, { cache: 'no-store' })
+    fetch(`${nextApiUrl}/config`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         if (data?.keycloak?.idp_hint) {
           setShowProcore(true);
         }
       })
-      .catch(() => {});
+      .catch(() => undefined);
   }, []);
 
   /**
@@ -51,16 +59,14 @@ export const LoginButton: React.FC = () => {
   };
 
   const handleSignIn = async () => {
+    if (!apiUrl) {
+      return;
+    }
+
     try {
       setIsLoading(true);
 
-      /**
-       * Log for debugging
-       */
       const callbackUrl = getCallbackUrl();
-
-      // eslint-disable-next-line no-console
-      console.log('SignIn with callbackUrl:', callbackUrl);
 
       const result = await signIn('keycloak', {
         redirect: false,
@@ -83,6 +89,10 @@ export const LoginButton: React.FC = () => {
   };
 
   const handleProcoreSignIn = async () => {
+    if (!apiUrl) {
+      return;
+    }
+
     try {
       setIsLoading(true);
 
@@ -110,6 +120,7 @@ export const LoginButton: React.FC = () => {
         className="px-16 capitalize"
         onClick={handleSignIn}
         loading={isLoading}
+        disabled={!apiUrl}
       >
         Log in
       </Button>
