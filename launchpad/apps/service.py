@@ -61,6 +61,7 @@ class AppService:
     def __init__(self, app: "Launchpad"):
         self._db = app.db
         self._apps_api_client = app.apps_api_client
+        self._app_configurator = getattr(app, "app_configurator", None)
         self._instance_id = app.config.instance_id
         self._output_buffer: asyncio.Queue[InstalledApp] = asyncio.Queue()
 
@@ -624,6 +625,7 @@ class AppService:
         template_version = app_info["template_version"]
         app_name = app_info["name"]
         display_name = app_info["display_name"]
+        warnings: list[str] = []
 
         # Fetch app endpoints (main URL and external URLs)
         url = None
@@ -641,6 +643,18 @@ class AppService:
                 f"Failed to fetch endpoints for app {import_request.app_id}, "
                 "will use null url and empty external_url_list"
             )
+
+        if self._app_configurator is None:
+            warnings.append(
+                "Auth middleware was not configured: Apolo SDK configurator is unavailable"
+            )
+        else:
+            configuration_result = (
+                await self._app_configurator.configure_launchpad_auth(
+                    import_request.app_id
+                )
+            )
+            warnings.extend(configuration_result.warnings)
 
         # Create/update template using helper method
         # NOTE: We ignore import_request.name for app imports because the template
@@ -680,6 +694,7 @@ class AppService:
                 )
 
         await self._add_app_to_buffer(installed_app)
+        installed_app.warnings = warnings  # type: ignore[attr-defined]
         return installed_app
 
     async def _fetch_and_create_template(
