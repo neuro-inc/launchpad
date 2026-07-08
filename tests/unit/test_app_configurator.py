@@ -7,6 +7,7 @@ from uuid import uuid4
 import pytest
 
 from launchpad.ext.app_configurator import (
+    AUTH_INGRESS_MIDDLEWARE_TYPE,
     AppConfigurator,
     discover_ingress_http_paths,
     patch_ingress_http_auth,
@@ -87,7 +88,7 @@ def test_patch_ingress_http_auth_preserves_unrelated_input() -> None:
     assert updated_input["networking"]["ingress_http"]["auth"] == {
         "type": "custom_auth",
         "middleware": {
-            "__type__": "AuthIngressMiddleware",
+            "__type__": AUTH_INGRESS_MIDDLEWARE_TYPE,
             "name": "platform-launchpad-auth-middleware",
         },
     }
@@ -101,7 +102,7 @@ def test_patch_ingress_http_auth_replaces_existing_auth_only() -> None:
                 "auth": {
                     "type": "custom_auth",
                     "middleware": {
-                        "__type__": "AuthIngressMiddleware",
+                        "__type__": AUTH_INGRESS_MIDDLEWARE_TYPE,
                         "name": "old-middleware",
                     },
                 },
@@ -141,14 +142,14 @@ def test_patch_ingress_http_auth_warns_for_missing_path() -> None:
 @pytest.mark.asyncio
 async def test_app_configurator_calls_configure_when_input_changes() -> None:
     app_id = uuid4()
-    apps = SimpleNamespace()
-    apps.get = AsyncMock(
-        return_value=SimpleNamespace(
-            template_name="service-deployment",
-            template_version="v1",
-        )
+    apps_api_client = SimpleNamespace()
+    apps_api_client.get_by_id = AsyncMock(
+        return_value={
+            "template_name": "service-deployment",
+            "template_version": "v1",
+        }
     )
-    apps.get_input = AsyncMock(
+    apps_api_client.get_inputs = AsyncMock(
         return_value={
             "networking": {
                 "ingress_http": {
@@ -157,18 +158,14 @@ async def test_app_configurator_calls_configure_when_input_changes() -> None:
             },
         }
     )
-    apps.get_template = AsyncMock(
-        return_value=SimpleNamespace(
-            input={
-                "properties": {
-                    "networking": {"$ref": "#/$defs/NetworkingConfig"},
-                },
+    apps_api_client.get_template = AsyncMock(
+        return_value={
+            "input": {
+                "properties": {"networking": {"$ref": "#/$defs/NetworkingConfig"}},
                 "$defs": {
                     "NetworkingConfig": {
                         "type": "object",
-                        "properties": {
-                            "ingress_http": {"$ref": "#/$defs/IngressHttp"},
-                        },
+                        "properties": {"ingress_http": {"$ref": "#/$defs/IngressHttp"}},
                     },
                     "IngressHttp": {
                         "type": "object",
@@ -177,12 +174,12 @@ async def test_app_configurator_calls_configure_when_input_changes() -> None:
                     },
                 },
             }
-        )
+        }
     )
-    apps.configure = AsyncMock()
+    apps_api_client.configure_app = AsyncMock()
 
     configurator = AppConfigurator(
-        apps=cast(Any, apps),
+        apps_api_client=cast(Any, apps_api_client),
         auth_middleware_name="launchpad-middleware",
         launchpad_instance_id=uuid4(),
     )
@@ -191,12 +188,11 @@ async def test_app_configurator_calls_configure_when_input_changes() -> None:
 
     assert result.changed is True
     assert result.warnings == []
-    apps.configure.assert_awaited_once()
-    configure_payload = apps.configure.await_args.args[1]
-    assert configure_payload["template_name"] == "service-deployment"
-    assert configure_payload["template_version"] == "v1"
+    apps_api_client.configure_app.assert_awaited_once()
+    assert apps_api_client.configure_app.await_args.args[0] == app_id
+    configure_kwargs = apps_api_client.configure_app.await_args.kwargs
     assert (
-        configure_payload["input"]["networking"]["ingress_http"]["auth"]["middleware"][
+        configure_kwargs["inputs"]["networking"]["ingress_http"]["auth"]["middleware"][
             "name"
         ]
         == "launchpad-middleware"
@@ -212,33 +208,29 @@ async def test_app_configurator_skips_configure_when_input_is_unchanged() -> Non
                 "auth": {
                     "type": "custom_auth",
                     "middleware": {
-                        "__type__": "AuthIngressMiddleware",
+                        "__type__": AUTH_INGRESS_MIDDLEWARE_TYPE,
                         "name": "launchpad-middleware",
                     },
                 },
             },
         },
     }
-    apps = SimpleNamespace()
-    apps.get = AsyncMock(
-        return_value=SimpleNamespace(
-            template_name="service-deployment",
-            template_version="v1",
-        )
+    apps_api_client = SimpleNamespace()
+    apps_api_client.get_by_id = AsyncMock(
+        return_value={
+            "template_name": "service-deployment",
+            "template_version": "v1",
+        }
     )
-    apps.get_input = AsyncMock(return_value=configured_input)
-    apps.get_template = AsyncMock(
-        return_value=SimpleNamespace(
-            input={
-                "properties": {
-                    "networking": {"$ref": "#/$defs/NetworkingConfig"},
-                },
+    apps_api_client.get_inputs = AsyncMock(return_value=configured_input)
+    apps_api_client.get_template = AsyncMock(
+        return_value={
+            "input": {
+                "properties": {"networking": {"$ref": "#/$defs/NetworkingConfig"}},
                 "$defs": {
                     "NetworkingConfig": {
                         "type": "object",
-                        "properties": {
-                            "ingress_http": {"$ref": "#/$defs/IngressHttp"},
-                        },
+                        "properties": {"ingress_http": {"$ref": "#/$defs/IngressHttp"}},
                     },
                     "IngressHttp": {
                         "type": "object",
@@ -247,12 +239,12 @@ async def test_app_configurator_skips_configure_when_input_is_unchanged() -> Non
                     },
                 },
             }
-        )
+        }
     )
-    apps.configure = AsyncMock()
+    apps_api_client.configure_app = AsyncMock()
 
     configurator = AppConfigurator(
-        apps=cast(Any, apps),
+        apps_api_client=cast(Any, apps_api_client),
         auth_middleware_name="launchpad-middleware",
         launchpad_instance_id=uuid4(),
     )
@@ -261,4 +253,4 @@ async def test_app_configurator_skips_configure_when_input_is_unchanged() -> Non
 
     assert result.changed is False
     assert result.warnings == []
-    apps.configure.assert_not_awaited()
+    apps_api_client.configure_app.assert_not_awaited()

@@ -1,18 +1,17 @@
 import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from uuid import UUID
 
-
-if TYPE_CHECKING:
-    import apolo_sdk
+from launchpad.ext.apps_api import AppsApiClient
 
 
 logger = logging.getLogger(__name__)
 
 
 Path = tuple[str, ...]
+AUTH_INGRESS_MIDDLEWARE_TYPE = "AuthIngressMiddleware"
 
 
 @dataclass(frozen=True)
@@ -142,7 +141,7 @@ def patch_ingress_http_auth(
         "auth": {
             "type": "custom_auth",
             "middleware": {
-                "__type__": "AuthIngressMiddleware",
+                "__type__": AUTH_INGRESS_MIDDLEWARE_TYPE,
                 "name": auth_middleware_name,
             },
         }
@@ -173,11 +172,11 @@ def patch_ingress_http_auth(
 class AppConfigurator:
     def __init__(
         self,
-        apps: "apolo_sdk.Apps",
+        apps_api_client: AppsApiClient,
         auth_middleware_name: str,
         launchpad_instance_id: UUID | None,
     ):
-        self._apps = apps
+        self._apps_api_client = apps_api_client
         self._auth_middleware_name = auth_middleware_name
         self._launchpad_instance_id = launchpad_instance_id
 
@@ -188,22 +187,22 @@ class AppConfigurator:
         warnings: list[str] = []
 
         try:
-            app = await self._apps.get(str(app_id))
+            app = await self._apps_api_client.get_by_id(app_id)
         except Exception as e:
-            logger.warning("Failed to fetch app %s using SDK: %s", app_id, e)
+            logger.warning("Failed to fetch app %s from Apps API: %s", app_id, e)
             return AppConfigurationResult(
                 warnings=[
                     f"Auth middleware was not configured: failed to fetch app metadata for {app_id}"
                 ]
             )
 
-        template_name = app.template_name
-        template_version = app.template_version
+        template_name = app["template_name"]
+        template_version = app["template_version"]
 
         try:
-            current_input = await self._apps.get_input(str(app_id))
+            current_input = await self._apps_api_client.get_inputs(app_id)
         except Exception as e:
-            logger.warning("Failed to fetch app %s input using SDK: %s", app_id, e)
+            logger.warning("Failed to fetch app %s input from Apps API: %s", app_id, e)
             return AppConfigurationResult(
                 warnings=[
                     f"Auth middleware was not configured for {template_name}:{template_version}: failed to fetch current app input"
@@ -211,10 +210,12 @@ class AppConfigurator:
             )
 
         try:
-            template = await self._apps.get_template(template_name, template_version)
+            template = await self._apps_api_client.get_template(
+                template_name, template_version
+            )
         except Exception as e:
             logger.warning(
-                "Failed to fetch template schema for %s:%s using SDK: %s",
+                "Failed to fetch template schema for %s:%s from Apps API: %s",
                 template_name,
                 template_version,
                 e,
@@ -225,7 +226,7 @@ class AppConfigurator:
                 ]
             )
 
-        schema = getattr(template, "input", None)
+        schema = template.get("input")
         if not isinstance(schema, dict):
             return AppConfigurationResult(
                 warnings=[
@@ -274,13 +275,9 @@ class AppConfigurator:
 
         comment = f"Import into Launchpad {instance}: change auth middleware"
         try:
-            await self._apps.configure(
-                str(app_id),
-                {
-                    "template_name": template_name,
-                    "template_version": template_version,
-                    "input": updated_input,
-                },
+            await self._apps_api_client.configure_app(
+                app_id,
+                inputs=updated_input,
                 comment=comment,
             )
         except Exception as e:

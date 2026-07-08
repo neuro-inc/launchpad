@@ -4,7 +4,6 @@ import typing as t
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import aiohttp
-import apolo_sdk
 
 from launchpad.app import Launchpad
 from launchpad.apps.lifespan import init_internal_apps
@@ -51,17 +50,11 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
             org_name=app.config.apolo.org_name,
             project_name=app.config.apolo.project_name,
         )
-        app.apolo_sdk_client = None
-        app.app_configurator = None
-        try:
-            app.apolo_sdk_client = await stack.enter_async_context(apolo_sdk.get())
-            app.app_configurator = AppConfigurator(
-                apps=app.apolo_sdk_client.apps,
-                auth_middleware_name=app.config.apolo.auth_middleware_name,
-                launchpad_instance_id=app.config.instance_id,
-            )
-        except Exception as e:
-            logger.warning("Failed to initialize Apolo SDK client: %s", e)
+        app.app_configurator = AppConfigurator(
+            apps_api_client=app.apps_api_client,
+            auth_middleware_name=app.config.apolo.auth_middleware_name,
+            launchpad_instance_id=app.config.instance_id,
+        )
 
         app.app_service = AppService(app=app)
         app.oauth = Oauth(

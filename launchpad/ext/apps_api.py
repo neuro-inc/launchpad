@@ -98,6 +98,22 @@ class AppsApiClient:
             url=f"{self.v1_url}/instances/{app_id}",
         )
 
+    async def configure_app(
+        self,
+        app_id: UUID,
+        inputs: dict[str, Any],
+        comment: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"input": inputs}
+        if comment is not None:
+            payload["comment"] = comment
+
+        return await self._request(
+            method="PUT",
+            url=f"{self.v1_url}/instances/{app_id}",
+            json=payload,
+        )
+
     async def _request(
         self, method: str, url: str, *args: Any, **kwargs: Any
     ) -> dict[str, Any]:

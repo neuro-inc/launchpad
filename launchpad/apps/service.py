@@ -646,7 +646,7 @@ class AppService:
 
         if self._app_configurator is None:
             warnings.append(
-                "Auth middleware was not configured: Apolo SDK configurator is unavailable"
+                "Auth middleware was not configured: Apps API configurator is unavailable"
             )
         else:
             configuration_result = (
