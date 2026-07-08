@@ -30,7 +30,7 @@ export const proxy = async (request: NextRequest) => {
     });
   }
 
-  const isProtected = pathname !== PATH.AUTH;
+  const isProtected = pathname !== PATH.AUTH && pathname !== PATH.LOGOUT;
   const isAdminRoute = pathname.startsWith(PATH.ADMIN);
 
   const token = await getToken({
@@ -45,7 +45,7 @@ export const proxy = async (request: NextRequest) => {
     return NextResponse.redirect(url);
   }
 
-  if (token && !isProtected) {
+  if (token && pathname === PATH.AUTH) {
     const url = new URL(PATH.APPS, request.url);
 
     return NextResponse.redirect(url);
