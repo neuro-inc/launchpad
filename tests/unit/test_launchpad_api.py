@@ -1,4 +1,3 @@
-import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -67,17 +66,34 @@ async def test_launchpad_admin_api_builds_from_outputs() -> None:
     )
 
 
-async def test_launchpad_admin_api_delete_app_with_uninstall_parameter() -> None:
+async def test_launchpad_admin_api_delete_app_template_with_uninstall_parameter() -> (
+    None
+):
     http = AsyncMock()
     login_response = MagicMock()
     login_response.text = AsyncMock(return_value='{"access_token": "token"}')
     login_response.raise_for_status.return_value = None
     login_response.json = AsyncMock(return_value={"access_token": "token"})
+    list_response = MagicMock()
+    list_response.text = AsyncMock(return_value='{"items": []}')
+    list_response.raise_for_status.return_value = None
+    list_response.json = AsyncMock(
+        return_value={
+            "items": [
+                {
+                    "id": "template-id",
+                    "name": "custom-launchpad-name",
+                    "template_name": "test-template",
+                }
+            ]
+        }
+    )
     delete_response = MagicMock()
     delete_response.status = 204
     delete_response.text = AsyncMock(return_value="")
     delete_response.raise_for_status.return_value = None
     http.post.return_value = login_response
+    http.get.return_value = list_response
     http.delete.return_value = delete_response
 
     admin_api = LaunchpadAdminApi(
@@ -86,16 +102,21 @@ async def test_launchpad_admin_api_delete_app_with_uninstall_parameter() -> None
         username="admin",
         password="password",
     )
-    app_id = uuid.uuid4()
-    await admin_api.delete_app(app_id=app_id, uninstall=False)
+    await admin_api.delete_app_template("test-template", uninstall=False)
 
     http.post.assert_awaited_once_with(
         "https://launchpad-api.example.com/auth/token",
         json={"username": "admin", "password": "password"},
         ssl=False,
     )
+    http.get.assert_awaited_once_with(
+        "https://launchpad-api.example.com/api/v1/apps/templates",
+        params={"page": "1", "size": "100"},
+        headers={"Authorization": "Bearer token"},
+        ssl=False,
+    )
     http.delete.assert_awaited_once_with(
-        f"https://launchpad-api.example.com/api/v1/apps/instances/{app_id}",
+        "https://launchpad-api.example.com/api/v1/apps/templates/template-id",
         params={"uninstall": "false"},
         headers={"Authorization": "Bearer token"},
         ssl=False,
@@ -108,11 +129,26 @@ async def test_launchpad_admin_api_reuses_access_token() -> None:
     login_response.text = AsyncMock(return_value='{"access_token": "token"}')
     login_response.raise_for_status.return_value = None
     login_response.json = AsyncMock(return_value={"access_token": "token"})
+    list_response = MagicMock()
+    list_response.text = AsyncMock(return_value='{"items": []}')
+    list_response.raise_for_status.return_value = None
+    list_response.json = AsyncMock(
+        return_value={
+            "items": [
+                {
+                    "id": "template-id",
+                    "name": "custom-launchpad-name",
+                    "template_name": "test-template",
+                }
+            ]
+        }
+    )
     delete_response = MagicMock()
     delete_response.status = 204
     delete_response.text = AsyncMock(return_value="")
     delete_response.raise_for_status.return_value = None
     http.post.return_value = login_response
+    http.get.return_value = list_response
     http.delete.return_value = delete_response
 
     admin_api = LaunchpadAdminApi(
@@ -122,8 +158,8 @@ async def test_launchpad_admin_api_reuses_access_token() -> None:
         password="password",
     )
 
-    await admin_api.delete_app(app_id=uuid.uuid4(), uninstall=False)
-    await admin_api.delete_app(app_id=uuid.uuid4(), uninstall=True)
+    await admin_api.delete_app_template("test-template", uninstall=False)
+    await admin_api.delete_app_template("test-template", uninstall=True)
 
     http.post.assert_awaited_once()
 

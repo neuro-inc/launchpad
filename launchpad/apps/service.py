@@ -691,18 +691,18 @@ class AppService:
 
         await self._add_app_to_buffer(installed_app)
         warnings.extend(
-            await self._delete_app_from_launchpad(
-                app_id=import_request.app_id,
+            await self._delete_app_template_from_launchpad(
+                template_name=template.template_name,
                 previous_launchpad_instance_ids=configuration_result.previous_launchpad_instance_ids,
             )
         )
         installed_app.warnings = warnings  # type: ignore[attr-defined]
         return installed_app
 
-    async def _delete_app_from_launchpad(
+    async def _delete_app_template_from_launchpad(
         self,
         *,
-        app_id: UUID,
+        template_name: str,
         previous_launchpad_instance_ids: list[UUID],
     ) -> list[str]:
         warnings: list[str] = []
@@ -719,7 +719,10 @@ class AppService:
                     project_name=self._apps_api_client.project_name,
                     outputs=outputs,
                 )
-                await previous_launchpad_admin.delete_app(app_id, uninstall=False)
+                await previous_launchpad_admin.delete_app_template(
+                    template_name,
+                    uninstall=False,
+                )
             except (AppsApiError, LaunchpadApiError) as e:
                 warnings.append(
                     "Previous Launchpad cleanup was not completed for "

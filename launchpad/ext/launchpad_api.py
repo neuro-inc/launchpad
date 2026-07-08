@@ -154,16 +154,37 @@ class LaunchpadAdminApi:
             self._access_token = await self._login()
         return self._access_token
 
-    async def delete_app(self, app_id: UUID, *, uninstall: bool) -> None:
+    async def _authorized_get(self, path: str, **kwargs: Any) -> Any:
         access_token = await self._get_access_token()
-        response = await self._http.delete(
-            f"{self._base_url}/api/v1/apps/instances/{app_id}",
-            params={"uninstall": str(uninstall).lower()},
+        response = await self._http.get(
+            f"{self._base_url}{path}",
             headers={"Authorization": f"Bearer {access_token}"},
             ssl=False,
+            **kwargs,
+        )
+        raw_response = await response.text(errors="ignore")
+        try:
+            response.raise_for_status()
+        except ClientResponseError as e:
+            logger.warning(
+                "Launchpad admin GET %s failed with status %s: %s",
+                path,
+                e.status,
+                raw_response,
+            )
+            raise LaunchpadApiError("Launchpad admin GET request failed") from e
+        return await response.json()
+
+    async def _authorized_delete(self, path: str, **kwargs: Any) -> None:
+        access_token = await self._get_access_token()
+        response = await self._http.delete(
+            f"{self._base_url}{path}",
+            headers={"Authorization": f"Bearer {access_token}"},
+            ssl=False,
+            **kwargs,
         )
         if response.status == 404:
-            logger.info("App %s is not present in Launchpad, skipping delete", app_id)
+            logger.info("Launchpad resource %s is not present, skipping delete", path)
             return
 
         raw_response = await response.text(errors="ignore")
@@ -171,8 +192,39 @@ class LaunchpadAdminApi:
             response.raise_for_status()
         except ClientResponseError as e:
             logger.warning(
-                "Launchpad app delete failed with status %s: %s",
+                "Launchpad admin DELETE %s failed with status %s: %s",
+                path,
                 e.status,
                 raw_response,
             )
-            raise LaunchpadApiError("Launchpad delete app request failed") from e
+            raise LaunchpadApiError("Launchpad admin DELETE request failed") from e
+
+    async def list_templates(self) -> list[dict[str, Any]]:
+        payload = await self._authorized_get(
+            "/api/v1/apps/templates",
+            params={"page": "1", "size": "100"},
+        )
+        items = payload.get("items") if isinstance(payload, dict) else None
+        if not isinstance(items, list):
+            raise LaunchpadApiError("Launchpad templates response is malformed")
+        return [item for item in items if isinstance(item, dict)]
+
+    async def delete_app_template(self, template_name: str, *, uninstall: bool) -> None:
+        templates = await self.list_templates()
+        template_id = None
+        for template in templates:
+            if template.get("template_name") == template_name:
+                template_id = template.get("id")
+                break
+
+        if not isinstance(template_id, str):
+            logger.info(
+                "Template %s is not present in Launchpad, skipping delete",
+                template_name,
+            )
+            return
+
+        await self._authorized_delete(
+            f"/api/v1/apps/templates/{template_id}",
+            params={"uninstall": str(uninstall).lower()},
+        )
