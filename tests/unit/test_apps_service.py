@@ -38,6 +38,7 @@ def mock_launchpad_app(
 ) -> MagicMock:
     app = MagicMock(spec=Launchpad)
     app.apps_api_client = mock_apps_api_client
+    app.app_configurator = AsyncMock()
     app.db = mock_db_session_maker
     app.config = MagicMock(spec=Config)
     app.config.instance_id = uuid.uuid4()

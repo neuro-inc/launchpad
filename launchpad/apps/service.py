@@ -61,7 +61,7 @@ class AppService:
     def __init__(self, app: "Launchpad"):
         self._db = app.db
         self._apps_api_client = app.apps_api_client
-        self._app_configurator = getattr(app, "app_configurator", None)
+        self._app_configurator = app.app_configurator
         self._instance_id = app.config.instance_id
         self._output_buffer: asyncio.Queue[InstalledApp] = asyncio.Queue()
 
@@ -644,17 +644,10 @@ class AppService:
                 "will use null url and empty external_url_list"
             )
 
-        if self._app_configurator is None:
-            warnings.append(
-                "Auth middleware was not configured: Apps API configurator is unavailable"
-            )
-        else:
-            configuration_result = (
-                await self._app_configurator.configure_launchpad_auth(
-                    import_request.app_id
-                )
-            )
-            warnings.extend(configuration_result.warnings)
+        configuration_result = await self._app_configurator.configure_launchpad_auth(
+            import_request.app_id
+        )
+        warnings.extend(configuration_result.warnings)
 
         # Create/update template using helper method
         # NOTE: We ignore import_request.name for app imports because the template

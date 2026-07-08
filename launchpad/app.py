@@ -20,6 +20,6 @@ class Launchpad(FastAPI):
     db: async_sessionmaker[AsyncSession]
     http: aiohttp.ClientSession
     apps_api_client: AppsApiClient
-    app_configurator: AppConfigurator | None
+    app_configurator: AppConfigurator
     app_service: "AppService"
     oauth: "Oauth"
