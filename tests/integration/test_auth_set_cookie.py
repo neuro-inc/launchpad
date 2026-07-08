@@ -97,3 +97,26 @@ def app(
 @pytest.fixture
 def client(app: FastAPI) -> TestClient:
     return TestClient(app)
+
+
+def test_logout_clears_auth_cookies(client: TestClient) -> None:
+    response = client.post("/auth/logout")
+
+    assert response.status_code == 200
+
+    set_cookie_headers = response.headers.get_list("set-cookie")
+
+    assert any(
+        "launchpad-" in header
+        and "-token=" in header
+        and "Max-Age=0" in header
+        and "Domain=.mock-base.com" in header
+        for header in set_cookie_headers
+    )
+    assert any(
+        "launchpad-" in header
+        and "-code-verifier=" in header
+        and "Max-Age=0" in header
+        and "Domain=.mock-base.com" in header
+        for header in set_cookie_headers
+    )

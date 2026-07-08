@@ -344,6 +344,7 @@ async def callback(request: Request, oauth: DepOauth) -> Response:
 
 
 @auth_router.post("/logout", status_code=200)
-async def logout(response: Response, oauth: DepOauth) -> Response:
+async def logout(oauth: DepOauth) -> Response:
+    response = Response(status_code=200)
     oauth.logout(response)
-    return Response()
+    return response
