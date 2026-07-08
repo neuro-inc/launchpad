@@ -196,11 +196,20 @@ def mock_apps_api_client() -> AsyncMock:
     return mock_client
 
 
+@pytest.fixture
+def mock_apolo_client() -> AsyncMock:
+    mock_client = AsyncMock()
+    mock_client.secrets.get.return_value = b"mock-secret"
+    mock_client.close.return_value = None
+    return mock_client
+
+
 @pytest.fixture(scope="function")
 def app_client(
     config: Config,
     mock_auth_dependency: Any,
     mock_apps_api_client: AsyncMock,
+    mock_apolo_client: AsyncMock,
 ) -> Iterator[TestClient]:
     """
     Create test client with transactional database isolation.
@@ -212,8 +221,14 @@ def app_client(
     # Patch sync_db to skip alembic migrations (tables already exist)
     with patch("launchpad.app_factory.sync_db"):
         # Patch AppsApiClient to return our mock
-        with patch("launchpad.lifespan.AppsApiClient") as mock_api_client_class:
+        with (
+            patch("launchpad.lifespan.AppsApiClient") as mock_api_client_class,
+            patch("launchpad.lifespan.ApoloClientFactory") as mock_apolo_factory_class,
+        ):
             mock_api_client_class.return_value = mock_apps_api_client
+            mock_apolo_factory_class.return_value.get = AsyncMock(
+                return_value=mock_apolo_client
+            )
 
             # Create the app (uses real PostgreSQL from config)
             app = create_app(config)
