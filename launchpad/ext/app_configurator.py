@@ -18,6 +18,7 @@ AUTH_INGRESS_MIDDLEWARE_TYPE = "AuthIngressMiddleware"
 class AppConfigurationResult:
     changed: bool = False
     warnings: list[str] = field(default_factory=list)
+    previous_launchpad_instance_ids: list[UUID] = field(default_factory=list)
 
 
 def _format_path(path: Path) -> str:
@@ -169,6 +170,46 @@ def patch_ingress_http_auth(
     return updated_input, patched_paths, warnings
 
 
+def _extract_auth_middleware_names(
+    current_input: dict[str, Any], paths: list[Path]
+) -> set[str]:
+    middleware_names: set[str] = set()
+
+    for path in paths:
+        target = _get_path_value(current_input, path)
+        if not isinstance(target, dict):
+            continue
+
+        auth = target.get("auth")
+        if not isinstance(auth, dict):
+            continue
+
+        middleware = auth.get("middleware")
+        if not isinstance(middleware, dict):
+            continue
+
+        middleware_name = middleware.get("name")
+        if isinstance(middleware_name, str) and middleware_name:
+            middleware_names.add(middleware_name)
+
+    return middleware_names
+
+
+def _extract_launchpad_instance_id_from_middleware_name(
+    middleware_name: str,
+) -> UUID | None:
+    prefix = "platform-launchpad-"
+    suffix = "-auth-middleware"
+    if not middleware_name.startswith(prefix) or not middleware_name.endswith(suffix):
+        return None
+
+    raw_instance_id = middleware_name[len(prefix) : -len(suffix)]
+    try:
+        return UUID(raw_instance_id)
+    except ValueError:
+        return None
+
+
 class AppConfigurator:
     def __init__(
         self,
@@ -242,6 +283,18 @@ class AppConfigurator:
                 ]
             )
 
+        previous_launchpad_instance_ids = [
+            instance_id
+            for middleware_name in _extract_auth_middleware_names(current_input, paths)
+            if (
+                instance_id := _extract_launchpad_instance_id_from_middleware_name(
+                    middleware_name
+                )
+            )
+            is not None
+            and instance_id != self._launchpad_instance_id
+        ]
+
         updated_input, patched_paths, patch_warnings = patch_ingress_http_auth(
             current_input=current_input,
             paths=paths,
@@ -263,7 +316,10 @@ class AppConfigurator:
                 app_id,
                 patched_paths,
             )
-            return AppConfigurationResult(warnings=warnings)
+            return AppConfigurationResult(
+                warnings=warnings,
+                previous_launchpad_instance_ids=previous_launchpad_instance_ids,
+            )
 
         if self._launchpad_instance_id is None:
             warnings.append(
@@ -298,4 +354,8 @@ class AppConfigurator:
             app_id,
             patched_paths,
         )
-        return AppConfigurationResult(changed=True, warnings=warnings)
+        return AppConfigurationResult(
+            changed=True,
+            warnings=warnings,
+            previous_launchpad_instance_ids=previous_launchpad_instance_ids,
+        )

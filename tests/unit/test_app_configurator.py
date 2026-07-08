@@ -142,6 +142,7 @@ def test_patch_ingress_http_auth_warns_for_missing_path() -> None:
 @pytest.mark.asyncio
 async def test_app_configurator_calls_configure_when_input_changes() -> None:
     app_id = uuid4()
+    previous_launchpad_id = uuid4()
     apps_api_client = SimpleNamespace()
     apps_api_client.get_by_id = AsyncMock(
         return_value={
@@ -154,6 +155,13 @@ async def test_app_configurator_calls_configure_when_input_changes() -> None:
             "networking": {
                 "ingress_http": {
                     "path": "/",
+                    "auth": {
+                        "type": "custom_auth",
+                        "middleware": {
+                            "__type__": AUTH_INGRESS_MIDDLEWARE_TYPE,
+                            "name": f"platform-launchpad-{previous_launchpad_id.hex}-auth-middleware",
+                        },
+                    },
                 },
             },
         }
@@ -188,6 +196,7 @@ async def test_app_configurator_calls_configure_when_input_changes() -> None:
 
     assert result.changed is True
     assert result.warnings == []
+    assert result.previous_launchpad_instance_ids == [previous_launchpad_id]
     apps_api_client.configure_app.assert_awaited_once()
     assert apps_api_client.configure_app.await_args.args[0] == app_id
     configure_kwargs = apps_api_client.configure_app.await_args.kwargs

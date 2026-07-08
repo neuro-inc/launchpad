@@ -49,6 +49,7 @@ from launchpad.apps.template_storage import (
 )
 from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import AppsApiError, NotFound
+from launchpad.ext.launchpad_api import LaunchpadAdminApi, LaunchpadApiError
 
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,8 @@ HEALTHY_STATUSES = {"queued", "progressing", "healthy"}
 class AppService:
     def __init__(self, app: "Launchpad"):
         self._db = app.db
+        self._http = app.http
+        self._apolo_client = app.apolo_client
         self._apps_api_client = app.apps_api_client
         self._app_configurator = app.app_configurator
         self._instance_id = app.config.instance_id
@@ -687,8 +690,43 @@ class AppService:
                 )
 
         await self._add_app_to_buffer(installed_app)
+        warnings.extend(
+            await self._delete_app_from_launchpad(
+                app_id=import_request.app_id,
+                previous_launchpad_instance_ids=configuration_result.previous_launchpad_instance_ids,
+            )
+        )
         installed_app.warnings = warnings  # type: ignore[attr-defined]
         return installed_app
+
+    async def _delete_app_from_launchpad(
+        self,
+        *,
+        app_id: UUID,
+        previous_launchpad_instance_ids: list[UUID],
+    ) -> list[str]:
+        warnings: list[str] = []
+        for previous_launchpad_instance_id in previous_launchpad_instance_ids:
+            try:
+                outputs = await self._apps_api_client.get_outputs(
+                    previous_launchpad_instance_id
+                )
+                previous_launchpad_admin = await LaunchpadAdminApi.from_outputs(
+                    http=self._http,
+                    apolo_client=self._apolo_client,
+                    cluster_name=self._apps_api_client.cluster,
+                    org_name=self._apps_api_client.org_name,
+                    project_name=self._apps_api_client.project_name,
+                    outputs=outputs,
+                )
+                await previous_launchpad_admin.delete_app(app_id, uninstall=False)
+            except (AppsApiError, LaunchpadApiError) as e:
+                warnings.append(
+                    "Previous Launchpad cleanup was not completed for "
+                    f"{previous_launchpad_instance_id}: {e}"
+                )
+
+        return warnings
 
     async def _fetch_and_create_template(
         self,

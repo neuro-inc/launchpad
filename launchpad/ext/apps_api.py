@@ -47,6 +47,18 @@ class AppsApiClient:
         return f"{self._base_url}/v2"
 
     @property
+    def cluster(self) -> str:
+        return self._cluster
+
+    @property
+    def org_name(self) -> str:
+        return self._org_name
+
+    @property
+    def project_name(self) -> str:
+        return self._project_name
+
+    @property
     def default_params(self) -> dict[str, str]:
         return {
             "cluster": self._cluster,

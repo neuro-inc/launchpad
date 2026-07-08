@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 
 import aiohttp
+from apolo_sdk import Client as ApoloClient
 from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -19,6 +20,7 @@ class Launchpad(FastAPI):
     db_engine: AsyncEngine
     db: async_sessionmaker[AsyncSession]
     http: aiohttp.ClientSession
+    apolo_client: ApoloClient
     apps_api_client: AppsApiClient
     app_configurator: AppConfigurator
     app_service: "AppService"

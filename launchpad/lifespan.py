@@ -4,6 +4,7 @@ import typing as t
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import aiohttp
+from apolo_sdk import Factory as ApoloClientFactory
 
 from launchpad.app import Launchpad
 from launchpad.apps.lifespan import init_internal_apps
@@ -38,10 +39,20 @@ async def create_aiohttp_session(app: Launchpad) -> t.AsyncIterator[None]:
 
 
 @asynccontextmanager
+async def create_apolo_client(app: Launchpad) -> t.AsyncIterator[None]:
+    app.apolo_client = await ApoloClientFactory().get()
+    try:
+        yield
+    finally:
+        await app.apolo_client.close()
+
+
+@asynccontextmanager
 async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
     async with AsyncExitStack() as stack:
         await stack.enter_async_context(create_db(app))
         await stack.enter_async_context(create_aiohttp_session(app))
+        await stack.enter_async_context(create_apolo_client(app))
         app.apps_api_client = AppsApiClient(
             http=app.http,
             base_url=app.config.apolo.apps_api_url,
