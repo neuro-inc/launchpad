@@ -47,6 +47,18 @@ class AppsApiClient:
         return f"{self._base_url}/v2"
 
     @property
+    def cluster(self) -> str:
+        return self._cluster
+
+    @property
+    def org_name(self) -> str:
+        return self._org_name
+
+    @property
+    def project_name(self) -> str:
+        return self._project_name
+
+    @property
     def default_params(self) -> dict[str, str]:
         return {
             "cluster": self._cluster,
@@ -96,6 +108,22 @@ class AppsApiClient:
         await self._request(
             method="DELETE",
             url=f"{self.v1_url}/instances/{app_id}",
+        )
+
+    async def configure_app(
+        self,
+        app_id: UUID,
+        inputs: dict[str, Any],
+        comment: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"input": inputs}
+        if comment is not None:
+            payload["comment"] = comment
+
+        return await self._request(
+            method="PUT",
+            url=f"{self.v1_url}/instances/{app_id}",
+            json=payload,
         )
 
     async def _request(

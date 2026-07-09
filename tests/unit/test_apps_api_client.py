@@ -289,6 +289,36 @@ async def test_delete_app_not_found(
         await apps_api_client.delete_app(app_id)
 
 
+async def test_configure_app_sends_reconfigure_payload(
+    apps_api_client: AppsApiClient, app_id: UUID, mock_http_session: AsyncMock
+) -> None:
+    mock_response = MagicMock()
+    mock_response.text = AsyncMock(return_value='{"id": "app"}')
+    mock_response.raise_for_status.return_value = None
+    mock_response.json = AsyncMock(return_value={"id": str(app_id)})
+    mock_http_session.request.return_value = mock_response
+
+    inputs = {"networking": {"ingress_http": {"auth": {"type": "custom_auth"}}}}
+
+    result = await apps_api_client.configure_app(
+        app_id=app_id,
+        inputs=inputs,
+        comment="Import into Launchpad abc: change auth middleware",
+    )
+
+    assert result == {"id": str(app_id)}
+    mock_http_session.request.assert_awaited_once_with(
+        "PUT",
+        f"https://api.example.com/v1/cluster/test-cluster/org/test-org/project/test-project/instances/{app_id}",
+        headers={"Authorization": "Bearer test-token"},
+        ssl=False,
+        json={
+            "input": inputs,
+            "comment": "Import into Launchpad abc: change auth middleware",
+        },
+    )
+
+
 async def test_get_app_endpoints_not_found(
     apps_api_client: AppsApiClient, app_id: UUID, mock_http_session: AsyncMock
 ) -> None:

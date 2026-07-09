@@ -4,6 +4,7 @@ import typing as t
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import aiohttp
+from apolo_sdk import Factory as ApoloClientFactory
 
 from launchpad.app import Launchpad
 from launchpad.apps.lifespan import init_internal_apps
@@ -11,6 +12,7 @@ from launchpad.apps.service import AppService
 from launchpad.apps.template_storage import seed_templates
 from launchpad.auth.oauth import Oauth
 from launchpad.db.lifespan import create_db
+from launchpad.ext.app_configurator import AppConfigurator
 from launchpad.ext.apps_api import AppsApiClient
 
 
@@ -37,10 +39,20 @@ async def create_aiohttp_session(app: Launchpad) -> t.AsyncIterator[None]:
 
 
 @asynccontextmanager
+async def create_apolo_client(app: Launchpad) -> t.AsyncIterator[None]:
+    app.apolo_client = await ApoloClientFactory().get()
+    try:
+        yield
+    finally:
+        await app.apolo_client.close()
+
+
+@asynccontextmanager
 async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
     async with AsyncExitStack() as stack:
         await stack.enter_async_context(create_db(app))
         await stack.enter_async_context(create_aiohttp_session(app))
+        await stack.enter_async_context(create_apolo_client(app))
         app.apps_api_client = AppsApiClient(
             http=app.http,
             base_url=app.config.apolo.apps_api_url,
@@ -49,6 +61,12 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
             org_name=app.config.apolo.org_name,
             project_name=app.config.apolo.project_name,
         )
+        app.app_configurator = AppConfigurator(
+            apps_api_client=app.apps_api_client,
+            auth_middleware_name=app.config.apolo.auth_middleware_name,
+            launchpad_instance_id=app.config.instance_id,
+        )
+
         app.app_service = AppService(app=app)
         app.oauth = Oauth(
             http=app.http,

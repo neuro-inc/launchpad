@@ -118,3 +118,4 @@ class LaunchpadInstalledAppRead(BaseModel):
     user_id: str | None
     url: str | None
     external_url_list: list[str]
+    warnings: list[str] = Field(default_factory=list)

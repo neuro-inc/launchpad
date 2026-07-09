@@ -398,6 +398,26 @@ async def view_delete_template(
     await app_service.delete_template_by_id(template_id, uninstall)
 
 
+@apps_router.delete(
+    "/templates/by-instance/{app_id}",
+    status_code=HTTP_204_NO_CONTENT,
+)
+async def view_delete_template_by_instance(
+    app_id: UUID,
+    app_service: DepAppService,
+    user: AdminAuth,
+    uninstall: bool = True,
+) -> None:
+    """
+    Delete the template associated with an imported app instance.
+
+    This endpoint requires admin authentication. It resolves the local template
+    from the selected app instance and deletes the template and its tracked
+    instances without relying on user-editable template names in the request.
+    """
+    await app_service.delete_template_by_app_id(app_id, uninstall)
+
+
 @apps_router.delete("/instances/{app_id}", status_code=HTTP_204_NO_CONTENT)
 async def view_delete_instance(
     app_id: UUID,

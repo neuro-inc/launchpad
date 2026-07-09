@@ -11,6 +11,7 @@ from launchpad.apps.registry.base import App
 from launchpad.apps.service import AppService
 from launchpad.config import Config
 from launchpad.ext.apps_api import AppsApiClient
+from launchpad.ext.launchpad_api import LaunchpadAdminApi
 
 
 @pytest.fixture
@@ -37,7 +38,10 @@ def mock_launchpad_app(
     mock_apps_api_client: AsyncMock, mock_db_session_maker: MagicMock
 ) -> MagicMock:
     app = MagicMock(spec=Launchpad)
+    app.http = AsyncMock()
+    app.apolo_client = MagicMock()
     app.apps_api_client = mock_apps_api_client
+    app.app_configurator = AsyncMock()
     app.db = mock_db_session_maker
     app.config = MagicMock(spec=Config)
     app.config.instance_id = uuid.uuid4()
@@ -168,3 +172,40 @@ async def test_app_service_delete_app_not_found(
         mock_delete_app.assert_called_once_with(
             mock_db_session_maker.return_value.__aenter__.return_value, app_id
         )
+
+
+async def test_delete_app_from_previous_launchpad_falls_back_to_instance_delete(
+    app_service: AppService,
+    mock_apps_api_client: AsyncMock,
+    app_id: UUID,
+) -> None:
+    previous_launchpad_id = uuid.uuid4()
+    mock_apps_api_client.cluster = "test-cluster"
+    mock_apps_api_client.org_name = "test-org"
+    mock_apps_api_client.project_name = "test-project"
+    mock_apps_api_client.get_outputs.return_value = {"admin_api": {}, "admin_user": {}}
+
+    previous_launchpad_admin = AsyncMock(spec=LaunchpadAdminApi)
+    previous_launchpad_admin.delete_app_template_by_app_id.return_value = False
+
+    with patch(
+        "launchpad.apps.service.LaunchpadAdminApi.from_outputs",
+        new=AsyncMock(return_value=previous_launchpad_admin),
+    ):
+        warnings = await app_service._delete_app_from_previous_launchpad(
+            app_id=app_id,
+            previous_launchpad_instance_ids=[previous_launchpad_id],
+        )
+
+    previous_launchpad_admin.delete_app_template_by_app_id.assert_awaited_once_with(
+        app_id,
+        uninstall=False,
+    )
+    previous_launchpad_admin.delete_app.assert_awaited_once_with(
+        app_id,
+        uninstall=False,
+    )
+    assert warnings == [
+        f"This app template was not deleted from previous Launchpad {previous_launchpad_id}; "
+        f"please delete this app template manually there (without uninstall)."
+    ]
