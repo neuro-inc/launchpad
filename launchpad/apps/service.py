@@ -736,16 +736,16 @@ class AppService:
 
                 await previous_launchpad_admin.delete_app(app_id, uninstall=False)
                 warning = (
-                    "Previous Launchpad template cleanup by app id was not completed "
-                    f"for {previous_launchpad_instance_id}; deleted app instance only"
+                    f"This app template was not deleted from previous Launchpad {previous_launchpad_instance_id}; "
+                    f"please delete app template manually there (without uninstall)."
                 )
                 if template_cleanup_error is not None:
                     warning = f"{warning}: {template_cleanup_error}"
                 warnings.append(warning)
             except (AppsApiError, LaunchpadApiError) as e:
                 warnings.append(
-                    "Previous Launchpad cleanup was not completed for "
-                    f"{previous_launchpad_instance_id}: {e}"
+                    f"This app was not deleted from previous Launchpad {previous_launchpad_instance_id}: "
+                    f" {e}. Please perform cleanup manually."
                 )
 
         return warnings
