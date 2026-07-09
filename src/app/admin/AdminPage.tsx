@@ -163,12 +163,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
       // Convert camelCase to snake_case for API
       const apiData = formatToSnakeCase(data);
 
-      await request('/api/v1/apps/import', {
+      const importedApp = await request<InstalledApp>('/api/v1/apps/import', {
         method: 'POST',
         body: JSON.stringify(apiData),
       });
 
-      toast.success('App imported successfully');
+      const warnings = importedApp.warnings ?? [];
+
+      toast.success(
+        warnings.length > 0
+          ? 'App imported with warnings'
+          : 'App imported successfully',
+      );
+      warnings.forEach((warning) => {
+        toast.warning(warning);
+      });
       importAppModalRef.current?.close();
       await loadAdminData();
     } catch (error: any) {

@@ -47,6 +47,7 @@ export type InstalledApp = {
   userId: string | null;
   url: string | null;
   templateName: string;
+  warnings?: string[];
 };
 
 export type UnimportedInstance = {
