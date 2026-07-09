@@ -576,3 +576,48 @@ class TestDeleteTemplate:
         instances = instances_response.json()["items"]
         non_internal = [item for item in instances if not item["is_internal"]]
         assert len(non_internal) == 0
+
+    def test_delete_template_by_instance_no_uninstall(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        import_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "by-instance-delete-test",
+                "template_version": "1.0.0",
+                "verbose_name": "By Instance Delete Test",
+            },
+        )
+        assert import_response.status_code == 200
+
+        install_response = app_client.post("/api/v1/apps/by-instance-delete-test")
+        assert install_response.status_code == 200
+
+        instances_response = app_client.get("/api/v1/apps/instances")
+        instances = instances_response.json()["items"]
+        installed_app = next(
+            item
+            for item in instances
+            if item["launchpad_app_name"] == "by-instance-delete-test"
+        )
+
+        delete_response = app_client.delete(
+            f"/api/v1/apps/templates/by-instance/{installed_app['app_id']}",
+            params={"uninstall": False},
+        )
+        assert delete_response.status_code == 204
+
+        mock_apps_api_client.delete_app.assert_not_called()
+
+        pool_response = app_client.get("/api/v1/apps")
+        pool_apps = {
+            item["launchpad_app_name"] for item in pool_response.json()["items"]
+        }
+        assert "by-instance-delete-test" not in pool_apps
+
+        instances_response = app_client.get("/api/v1/apps/instances")
+        instances = instances_response.json()["items"]
+        assert all(
+            item["launchpad_app_name"] != "by-instance-delete-test"
+            for item in instances
+        )

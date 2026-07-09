@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -66,34 +67,18 @@ async def test_launchpad_admin_api_builds_from_outputs() -> None:
     )
 
 
-async def test_launchpad_admin_api_delete_app_template_with_uninstall_parameter() -> (
-    None
-):
+async def test_launchpad_admin_api_delete_app_template_by_app_id() -> None:
     http = AsyncMock()
+    app_id = uuid.uuid4()
     login_response = MagicMock()
     login_response.text = AsyncMock(return_value='{"access_token": "token"}')
     login_response.raise_for_status.return_value = None
     login_response.json = AsyncMock(return_value={"access_token": "token"})
-    list_response = MagicMock()
-    list_response.text = AsyncMock(return_value='{"items": []}')
-    list_response.raise_for_status.return_value = None
-    list_response.json = AsyncMock(
-        return_value={
-            "items": [
-                {
-                    "id": "template-id",
-                    "name": "custom-launchpad-name",
-                    "template_name": "test-template",
-                }
-            ]
-        }
-    )
     delete_response = MagicMock()
     delete_response.status = 204
     delete_response.text = AsyncMock(return_value="")
     delete_response.raise_for_status.return_value = None
     http.post.return_value = login_response
-    http.get.return_value = list_response
     http.delete.return_value = delete_response
 
     admin_api = LaunchpadAdminApi(
@@ -102,21 +87,16 @@ async def test_launchpad_admin_api_delete_app_template_with_uninstall_parameter(
         username="admin",
         password="password",
     )
-    await admin_api.delete_app_template("test-template", uninstall=False)
+    deleted = await admin_api.delete_app_template_by_app_id(app_id, uninstall=False)
 
+    assert deleted is True
     http.post.assert_awaited_once_with(
         "https://launchpad-api.example.com/auth/token",
         json={"username": "admin", "password": "password"},
         ssl=False,
     )
-    http.get.assert_awaited_once_with(
-        "https://launchpad-api.example.com/api/v1/apps/templates",
-        params={"page": "1", "size": "100"},
-        headers={"Authorization": "Bearer token"},
-        ssl=False,
-    )
     http.delete.assert_awaited_once_with(
-        "https://launchpad-api.example.com/api/v1/apps/templates/template-id",
+        f"https://launchpad-api.example.com/api/v1/apps/templates/by-instance/{app_id}",
         params={"uninstall": "false"},
         headers={"Authorization": "Bearer token"},
         ssl=False,
@@ -129,26 +109,11 @@ async def test_launchpad_admin_api_reuses_access_token() -> None:
     login_response.text = AsyncMock(return_value='{"access_token": "token"}')
     login_response.raise_for_status.return_value = None
     login_response.json = AsyncMock(return_value={"access_token": "token"})
-    list_response = MagicMock()
-    list_response.text = AsyncMock(return_value='{"items": []}')
-    list_response.raise_for_status.return_value = None
-    list_response.json = AsyncMock(
-        return_value={
-            "items": [
-                {
-                    "id": "template-id",
-                    "name": "custom-launchpad-name",
-                    "template_name": "test-template",
-                }
-            ]
-        }
-    )
     delete_response = MagicMock()
     delete_response.status = 204
     delete_response.text = AsyncMock(return_value="")
     delete_response.raise_for_status.return_value = None
     http.post.return_value = login_response
-    http.get.return_value = list_response
     http.delete.return_value = delete_response
 
     admin_api = LaunchpadAdminApi(
@@ -158,10 +123,37 @@ async def test_launchpad_admin_api_reuses_access_token() -> None:
         password="password",
     )
 
-    await admin_api.delete_app_template("test-template", uninstall=False)
-    await admin_api.delete_app_template("test-template", uninstall=True)
+    await admin_api.delete_app_template_by_app_id(uuid.uuid4(), uninstall=False)
+    await admin_api.delete_app(uuid.uuid4(), uninstall=False)
 
     http.post.assert_awaited_once()
+
+
+async def test_launchpad_admin_api_delete_app_template_by_app_id_returns_false_on_404() -> (
+    None
+):
+    http = AsyncMock()
+    app_id = uuid.uuid4()
+    login_response = MagicMock()
+    login_response.text = AsyncMock(return_value='{"access_token": "token"}')
+    login_response.raise_for_status.return_value = None
+    login_response.json = AsyncMock(return_value={"access_token": "token"})
+    delete_response = MagicMock()
+    delete_response.status = 404
+    delete_response.text = AsyncMock(return_value="")
+    http.post.return_value = login_response
+    http.delete.return_value = delete_response
+
+    admin_api = LaunchpadAdminApi(
+        http=http,
+        base_url="https://launchpad-api.example.com",
+        username="admin",
+        password="password",
+    )
+
+    deleted = await admin_api.delete_app_template_by_app_id(app_id, uninstall=False)
+
+    assert deleted is False
 
 
 async def test_launchpad_admin_api_warns_when_secret_cannot_be_resolved() -> None:

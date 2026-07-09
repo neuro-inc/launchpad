@@ -691,18 +691,18 @@ class AppService:
 
         await self._add_app_to_buffer(installed_app)
         warnings.extend(
-            await self._delete_app_template_from_launchpad(
-                template_name=template.template_name,
+            await self._delete_app_from_previous_launchpad(
+                app_id=import_request.app_id,
                 previous_launchpad_instance_ids=configuration_result.previous_launchpad_instance_ids,
             )
         )
         installed_app.warnings = warnings  # type: ignore[attr-defined]
         return installed_app
 
-    async def _delete_app_template_from_launchpad(
+    async def _delete_app_from_previous_launchpad(
         self,
         *,
-        template_name: str,
+        app_id: UUID,
         previous_launchpad_instance_ids: list[UUID],
     ) -> list[str]:
         warnings: list[str] = []
@@ -719,10 +719,29 @@ class AppService:
                     project_name=self._apps_api_client.project_name,
                     outputs=outputs,
                 )
-                await previous_launchpad_admin.delete_app_template(
-                    template_name,
-                    uninstall=False,
+                template_cleanup_error = None
+                try:
+                    template_deleted = (
+                        await previous_launchpad_admin.delete_app_template_by_app_id(
+                            app_id,
+                            uninstall=False,
+                        )
+                    )
+                except LaunchpadApiError as e:
+                    template_deleted = False
+                    template_cleanup_error = e
+
+                if template_deleted:
+                    continue
+
+                await previous_launchpad_admin.delete_app(app_id, uninstall=False)
+                warning = (
+                    "Previous Launchpad template cleanup by app id was not completed "
+                    f"for {previous_launchpad_instance_id}; deleted app instance only"
                 )
+                if template_cleanup_error is not None:
+                    warning = f"{warning}: {template_cleanup_error}"
+                warnings.append(warning)
             except (AppsApiError, LaunchpadApiError) as e:
                 warnings.append(
                     "Previous Launchpad cleanup was not completed for "
@@ -1064,6 +1083,21 @@ class AppService:
                 await delete_template(db, template_id)
 
         logger.info(f"Successfully deleted template {template.name} and all instances")
+
+    async def delete_template_by_app_id(self, app_id: UUID, uninstall: bool) -> None:
+        async with self._db() as db:
+            installed_app = await select_app(db, id=app_id)
+
+        if installed_app is None:
+            raise NotFound(f"App instance with id {app_id} not found")
+
+        async with self._db() as db:
+            template = await select_template(db, name=installed_app.template_name)
+
+        if template is None:
+            raise NotFound(f"Template for app instance with id {app_id} not found")
+
+        await self.delete_template_by_id(template.id, uninstall=uninstall)
 
     async def is_healthy(
         self,
