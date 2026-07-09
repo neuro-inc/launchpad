@@ -206,6 +206,6 @@ async def test_delete_app_from_previous_launchpad_falls_back_to_instance_delete(
         uninstall=False,
     )
     assert warnings == [
-        "Previous Launchpad template cleanup by app id was not completed "
-        f"for {previous_launchpad_id}; deleted app instance only"
+        f"This app template was not deleted from previous Launchpad {previous_launchpad_id}; "
+        f"please delete this app template manually there (without uninstall)."
     ]
