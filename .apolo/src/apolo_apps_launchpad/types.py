@@ -434,28 +434,6 @@ BackgroundApoloFilesImagePath = ApoloFilesImagePath.customize(
 )
 
 
-class CssFileApoloFilesPath(ApoloFilesPath):
-    model_config = ConfigDict(
-        protected_namespaces=(),
-        json_schema_extra=SchemaExtraMetadata(
-            title="Apolo Files CSS Path",
-            description="Specify a CSS file from Apolo Storage.",
-        ).as_json_schema_extra(),
-    )
-    path: str = Field(
-        ...,
-        json_schema_extra=FileFilterExtraSchema(
-            title="Storage Path",
-            description=(
-                "Provide the Apolo Storage path starting with `storage:` "
-                "to locate your CSS file."
-            ),
-            accept_ext=[".css"],
-            max_size_kb=500,
-        ).as_json_schema_extra(),
-    )
-
-
 class LauchpadBrandingConfig(AbstractAppFieldType):
     model_config = ConfigDict(
         protected_namespaces=(),
@@ -479,11 +457,13 @@ class LauchpadBrandingConfig(AbstractAppFieldType):
             description="Use custom favicon image from Apolo Storage for Lauchpad.",
         ).as_json_schema_extra(),
     )
-    css_file: CssFileApoloFilesPath | None = Field(
+    css_file: ApoloFilesPath | None = Field(
         None,
-        json_schema_extra=SchemaExtraMetadata(
+        json_schema_extra=FileFilterExtraSchema(
             title="Custom CSS",
             description="Use a custom CSS file from Apolo Storage for Launchpad.",
+            accept_ext=[".css"],
+            max_size_kb=500,
         ).as_json_schema_extra(),
     )
     title: str | None = Field(
