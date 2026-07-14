@@ -24,6 +24,7 @@ from apolo_apps_launchpad.types import (
     LauchpadBrandingConfig,
     LogoFileApoloFilesImagePath,
     FavIconFileApoloFilesImagePath,
+    CssFileApoloFilesPath,
     BackgroundApoloFilesImagePath,
     PostgresConfig,
     PreConfiguredEmbeddingsModels,
@@ -826,6 +827,9 @@ async def test_launchpad_values_generation__brand(apolo_client):
                 favicon_file=FavIconFileApoloFilesImagePath(
                     path="storage://cluster/org/project/app-assets/favicon.ico"
                 ),
+                css_file=CssFileApoloFilesPath(
+                    path="storage://cluster/org/project/app-assets/custom.css"
+                ),
                 title="My Custom Launchpad",
                 background=BackgroundApoloFilesImagePath(
                     path="storage://cluster/org/project/app-assets/background.png"
@@ -970,6 +974,11 @@ async def test_launchpad_values_generation__brand(apolo_client):
                     {
                         "storage_uri": "storage://cluster/org/project/app-assets/favicon.ico",
                         "mount_path": "/etc/launchpad/branding/favicon",
+                        "mount_mode": "rw",
+                    },
+                    {
+                        "storage_uri": "storage://cluster/org/project/app-assets/custom.css",
+                        "mount_path": "/etc/launchpad/branding/css",
                         "mount_mode": "rw",
                     },
                     {

@@ -196,6 +196,34 @@
       "x-title": "Color",
       "x-type": "ColorPicker"
     },
+    "CssFileApoloFilesPath": {
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string",
+          "x-accept-ext": [
+            ".css"
+          ],
+          "x-description": "Provide the Apolo Storage path starting with `storage:` to locate your CSS file.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-max-size-kb": 500.0,
+          "x-meta-type": "inline",
+          "x-title": "Storage Path"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "CssFileApoloFilesPath",
+      "type": "object",
+      "x-description": "Specify a CSS file from Apolo Storage.",
+      "x-is-advanced-field": false,
+      "x-is-configurable": true,
+      "x-meta-type": "inline",
+      "x-title": "Apolo Files CSS Path",
+      "x-type": "CssFileApoloFilesPath"
+    },
     "CustomLLMModel": {
       "properties": {
         "model_name": {
@@ -494,6 +522,22 @@
           "x-is-configurable": true,
           "x-meta-type": "inline",
           "x-title": "Favicon Image"
+        },
+        "css_file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CssFileApoloFilesPath"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "x-description": "Use a custom CSS file from Apolo Storage for Launchpad.",
+          "x-is-advanced-field": false,
+          "x-is-configurable": true,
+          "x-meta-type": "inline",
+          "x-title": "Custom CSS"
         },
         "title": {
           "anyOf": [

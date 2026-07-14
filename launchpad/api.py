@@ -66,12 +66,14 @@ async def view_get_config(request: Request) -> dict[str, Any]:
     branding_dir = app.config.branding.branding_dir
     logo_exists = _branding_file_exists(branding_dir / "logo")
     favicon_exists = _branding_file_exists(branding_dir / "favicon")
+    css_exists = _branding_file_exists(branding_dir / "css")
     background_exists = _branding_file_exists(branding_dir / "background")
 
     # Build branding URLs
     base_url = str(request.url_for("view_get_config")).rsplit("/config", 1)[0]
     logo_url = f"{base_url}/branding/logo" if logo_exists else None
     favicon_url = f"{base_url}/branding/favicon" if favicon_exists else None
+    css_url = f"{base_url}/branding/css" if css_exists else None
     background_url = f"{base_url}/branding/background" if background_exists else None
 
     return {
@@ -82,6 +84,7 @@ async def view_get_config(request: Request) -> dict[str, Any]:
         "branding": {
             "logo_url": logo_url,
             "favicon_url": favicon_url,
+            "css_url": css_url,
             "background_url": background_url,
             "title": app.config.branding.title,
             "background": app.config.branding.background,
@@ -136,5 +139,20 @@ async def get_branding_background(request: Request) -> FileResponse:
     return FileResponse(
         path=background_path,
         media_type=media_type,
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@root_router.get("/branding/css")
+async def get_branding_css(request: Request) -> FileResponse:
+    app: Launchpad = request.app
+    css_path = app.config.branding.branding_dir / "css"
+
+    if not _branding_file_exists(css_path):
+        raise HTTPException(status_code=404, detail="CSS file not found")
+
+    return FileResponse(
+        path=css_path,
+        media_type="text/css",
         headers={"Cache-Control": "public, max-age=3600"},
     )

@@ -29,6 +29,7 @@ def test_config_endpoint(app_client: TestClient, config: Config) -> None:
         "branding": {
             "logo_url": f"{app_client.base_url}/branding/logo",
             "favicon_url": f"{app_client.base_url}/branding/favicon",
+            "css_url": f"{app_client.base_url}/branding/css",
             "background_url": f"{app_client.base_url}/branding/background",
             "title": "Test Title",
             "background": "12345",
@@ -59,11 +60,21 @@ def test_config_endpoint_ignores_stale_branding_files(
         "branding": {
             "logo_url": None,
             "favicon_url": f"{app_client.base_url}/branding/favicon",
+            "css_url": f"{app_client.base_url}/branding/css",
             "background_url": f"{app_client.base_url}/branding/background",
             "title": "Test Title",
             "background": "12345",
         },
     }
+
+
+def test_branding_css_endpoint_is_public(app_client: TestClient) -> None:
+    response = app_client.get("/branding/css")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/css; charset=utf-8"
+    assert response.headers["cache-control"] == "public, max-age=3600"
+    assert response.text == "body { color: #123456; }\n"
 
 
 def test_cors_middleware(app_client: TestClient, config: Config) -> None:
