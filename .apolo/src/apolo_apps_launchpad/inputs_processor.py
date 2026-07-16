@@ -33,7 +33,7 @@ from apolo_app_types.protocols.postgres import (
     PostgresInputs,
 )
 
-from .consts import APP_SECRET_KEYS
+from .consts import APP_SECRET_KEYS, AUTH_RESPONSE_HEADERS
 from .types import (
     ApoloFilesImagePath,
     ColorPicker,
@@ -503,6 +503,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         return {
             **values,
+            "authResponseHeaders": list(AUTH_RESPONSE_HEADERS),
             "image": {"tag": os.getenv("APP_IMAGE_TAG", "latest")},
             "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": kc_realm_import_config_map_name,
