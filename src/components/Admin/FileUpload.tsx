@@ -107,7 +107,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   return (
-    <div className="space-y-4">
+    <div
+      className="launchpad-admin-file-upload space-y-4"
+      data-section="file-upload"
+      data-state={fileName ? 'selected' : 'empty'}
+    >
       <div
         role="button"
         tabIndex={0}
@@ -123,23 +127,25 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           }
         }}
         className={clsx(
-          'rounded-lg border-2 border-dashed p-8',
+          'launchpad-admin-file-dropzone rounded-lg border-2 border-dashed p-8',
           'flex flex-col items-center justify-center',
           'cursor-pointer transition-colors',
           isDragging
             ? 'border-primary bg-primary-light'
             : 'border-neutral-300 hover:border-primary-medium hover:bg-neutral-50',
         )}
+        data-action="select-file"
+        data-state={isDragging ? 'dragging' : 'idle'}
       >
         <Icon
           icon={faCloudArrowUp}
-          className="mb-4 text-neutral-400"
+          className="launchpad-admin-file-upload-icon mb-4 text-neutral-400"
           size="3x"
         />
-        <p className="mb-2 text-body text-neutral-700">
+        <p className="launchpad-admin-file-upload-prompt mb-2 text-body text-neutral-700">
           Drag and drop a file here, or click to browse
         </p>
-        <p className="text-caption text-neutral-500">
+        <p className="launchpad-admin-file-upload-help text-caption text-neutral-500">
           Accepts: {acceptedFormats.join(', ')} (max {maxSizeMB}MB)
         </p>
         <input
@@ -147,22 +153,33 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           type="file"
           accept={acceptedFormats.join(',')}
           onChange={handleFileSelect}
-          className="hidden"
+          className="launchpad-admin-file-input hidden"
+          data-action="upload-file"
         />
       </div>
 
       {fileName && (
-        <div className="flex items-center justify-between rounded-lg bg-neutral-100 p-3">
-          <div className="flex items-center">
-            <Icon icon={faCircleCheck} className="mr-2 text-primary" />
-            <span className="text-body text-neutral-700">{fileName}</span>
+        <div
+          className="launchpad-admin-selected-file flex items-center justify-between rounded-lg bg-neutral-100 p-3"
+          data-section="selected-file"
+          data-file-name={fileName}
+        >
+          <div className="launchpad-admin-selected-file-details flex items-center">
+            <Icon
+              icon={faCircleCheck}
+              className="launchpad-admin-selected-file-icon mr-2 text-primary"
+            />
+            <span className="launchpad-admin-selected-file-name text-body text-neutral-700">
+              {fileName}
+            </span>
           </div>
           <Button
             type="button"
             onClick={handleClear}
             theme={false}
             variant="ghost"
-            className="text-neutral-500 hover:text-neutral-700"
+            className="launchpad-admin-clear-file-button text-neutral-500 hover:text-neutral-700"
+            data-action="clear-file"
             aria-label="Clear file"
             icon={faXmark}
           />

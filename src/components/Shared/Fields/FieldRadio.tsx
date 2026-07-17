@@ -35,25 +35,33 @@ export const FieldRadio = React.forwardRef<HTMLInputElement, Props>(
     const { content, ...slots } = getSlots<'note' | 'error'>(children);
 
     return (
-      <FieldContainer className={containerClassName}>
+      <FieldContainer
+        className={cn('launchpad-field--radio', containerClassName)}
+        data-field={props.name}
+        data-invalid={Boolean(error) || undefined}
+      >
         <label
           htmlFor={id}
           className={cn(
-            'group flex cursor-pointer items-center gap-2',
+            'launchpad-radio group flex cursor-pointer items-center gap-2',
             { 'pointer-events-none': disabled },
             className,
           )}
+          data-disabled={disabled || undefined}
         >
           <input
             {...props}
             ref={ref}
             id={id}
             type="radio"
-            className="peer hidden"
+            className="launchpad-radio__input peer hidden"
+            data-invalid={Boolean(error) || undefined}
             disabled={disabled}
           />
-          <div className="size-5 rounded-full border-2 border-neural-03 bg-background transition-colors group-hover:border-primary-light peer-checked:border-[6px] peer-checked:border-primary peer-checked:bg-neural-01 peer-disabled:border-neural-03" />
-          <span className="peer-disabled:text-neural-03">{content}</span>
+          <div className="launchpad-radio__indicator size-5 rounded-full border-2 border-neural-03 bg-background transition-colors group-hover:border-primary-light peer-checked:border-[6px] peer-checked:border-primary peer-checked:bg-neural-01 peer-disabled:border-neural-03" />
+          <span className="launchpad-radio__label peer-disabled:text-neural-03">
+            {content}
+          </span>
         </label>
 
         <Render if={!!error}>

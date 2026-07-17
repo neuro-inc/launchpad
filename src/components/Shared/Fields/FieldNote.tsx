@@ -10,7 +10,10 @@ type Props = {
 export const FieldNote = ({ className, children }: Props) => (
   <Render if={children}>
     <p
-      className={cn('mt-2 w-full pl-2 text-caption text-neural-04', className)}
+      className={cn(
+        'launchpad-field__note mt-2 w-full pl-2 text-caption text-neural-04',
+        className,
+      )}
     >
       {children}
     </p>

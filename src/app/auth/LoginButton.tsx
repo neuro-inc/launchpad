@@ -115,9 +115,10 @@ export const LoginButton: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="launchpad-auth-page__actions flex flex-col items-center gap-2">
       <Button
-        className="px-16 capitalize"
+        className="launchpad-auth-page__login-button px-16 capitalize"
+        data-action="login"
         onClick={handleSignIn}
         loading={isLoading}
         disabled={!apiUrl}

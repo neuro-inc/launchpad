@@ -50,7 +50,11 @@ export const FieldSelect = React.forwardRef<HTMLSelectElement, Props>(
     const getSelectItems = () => {
       if (options) {
         return options.map(({ value, text }) => (
-          <option key={value} value={value}>
+          <option
+            key={value}
+            value={value}
+            className="launchpad-select__option"
+          >
             {text}
           </option>
         ));
@@ -60,20 +64,29 @@ export const FieldSelect = React.forwardRef<HTMLSelectElement, Props>(
     };
 
     return (
-      <FieldContainer className={containerClassName}>
+      <FieldContainer
+        className={clsx('launchpad-field--select', containerClassName)}
+        data-field={name}
+        data-invalid={Boolean(error) || undefined}
+      >
         <select
           {...props}
           className={fieldVariants({
             variant,
             error: !!error,
             label: !!label,
-            className,
+            className: clsx(
+              'launchpad-field__control launchpad-select',
+              className,
+            ),
           })}
           ref={ref}
           name={name}
           required={required}
           id={id}
           disabled={disabled}
+          data-invalid={Boolean(error) || undefined}
+          data-variant={variant}
         >
           {getSelectItems()}
         </select>
@@ -88,7 +101,7 @@ export const FieldSelect = React.forwardRef<HTMLSelectElement, Props>(
         <Icon
           icon={faCaretDown}
           className={clsx(
-            'pointer-events-none absolute right-4 top-4 text-[16px] text-neural-04',
+            'launchpad-select__icon pointer-events-none absolute right-4 top-4 text-[16px] text-neural-04',
             { 'text-neural-02': disabled },
           )}
         />

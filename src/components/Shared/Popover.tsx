@@ -4,7 +4,7 @@ import { PopoverContentProps } from '@radix-ui/react-popover';
 import * as PopoverUI from '@radix-ui/react-popover';
 
 import { VariantProps } from '@typings';
-import { getSlots, tv } from '@utils';
+import { cn, getSlots, tv } from '@utils';
 
 import { Button } from './Button';
 import { Render } from './Render';
@@ -68,7 +68,11 @@ export const Popover = ({
   return (
     <PopoverUI.Root open={open} onOpenChange={onOpenChange}>
       <PopoverUI.Trigger asChild>
-        <Button theme disabled={disabled} className={triggerClassName}>
+        <Button
+          theme
+          disabled={disabled}
+          className={cn('launchpad-popover__trigger', triggerClassName)}
+        >
           {trigger}
         </Button>
       </PopoverUI.Trigger>
@@ -79,11 +83,19 @@ export const Popover = ({
           sideOffset={sideOffset}
           align={align}
           alignOffset={alignOffset}
-          className={variants({ side, className })}
+          className={variants({
+            side,
+            className: cn(
+              'launchpad-popover launchpad-popover__content',
+              className,
+            ),
+          })}
         >
-          <div className="flex flex-col gap-2.5">{content}</div>
+          <div className="launchpad-popover__body flex flex-col gap-2.5">
+            {content}
+          </div>
           <Render if={showArrow}>
-            <PopoverUI.Arrow className="fill-white" />
+            <PopoverUI.Arrow className="launchpad-popover__arrow fill-white" />
           </Render>
         </PopoverUI.Content>
       </PopoverUI.Portal>

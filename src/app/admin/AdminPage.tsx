@@ -262,28 +262,54 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
   };
 
   return (
-    <>
+    <div
+      id="launchpad-admin-page"
+      className="launchpad-admin-page"
+      data-section="admin"
+    >
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-h2 font-bold">Admin Panel</h1>
-        <Button onClick={handleRefresh} variant="primary">
+      <div
+        className="launchpad-admin-header mb-8 flex items-center justify-between"
+        data-section="admin-header"
+      >
+        <h1
+          id="launchpad-admin-title"
+          className="launchpad-admin-title text-h2 font-bold"
+        >
+          Admin Panel
+        </h1>
+        <Button
+          className="launchpad-admin-refresh-button"
+          data-action="refresh-admin-data"
+          onClick={handleRefresh}
+          variant="primary"
+        >
           Refresh Data
         </Button>
       </div>
 
       {/* Templates Section */}
-      <div className="mb-8">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-h4 font-bold">App Templates</h2>
+      <section
+        id="launchpad-admin-templates-section"
+        className="launchpad-admin-section launchpad-admin-templates-section mb-8"
+        data-section="templates"
+      >
+        <div className="launchpad-admin-section-header mb-4 flex items-center justify-between">
+          <h2 className="launchpad-admin-section-title text-h4 font-bold">
+            App Templates
+          </h2>
           <Modal
             ref={importTemplateModalRef}
             content={
               <Modal.Content
-                className="max-h-[90vh] w-[90vw] max-w-4xl"
+                className="launchpad-admin-modal launchpad-admin-import-template-modal max-h-[90vh] w-[90vw] max-w-4xl"
                 title="Import Template"
                 subtitle="Add a new template to the system"
               >
-                <div className="py-6">
+                <div
+                  className="launchpad-admin-modal-body py-6"
+                  data-section="import-template"
+                >
                   <ImportTemplateForm
                     onSubmit={handleTemplateImport}
                     onError={handleError}
@@ -293,22 +319,49 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
               </Modal.Content>
             }
           >
-            <Button variant="primary">Import Template</Button>
+            <Button
+              className="launchpad-admin-import-template-button"
+              data-action="open-import-template"
+              variant="primary"
+            >
+              Import Template
+            </Button>
           </Modal>
         </div>
 
         {isLoading && (
-          <div className="flex items-center justify-center gap-3 rounded-lg bg-white p-6 text-neural-04">
-            <ChaseSpinner color="primary" className="size-5" />
-            Loading templates...
+          <div
+            className="launchpad-admin-loading-state launchpad-admin-templates-loading flex items-center justify-center gap-3 rounded-lg bg-white p-6 text-neural-04"
+            data-section="templates-loading-state"
+            data-state="loading"
+          >
+            <ChaseSpinner
+              color="primary"
+              className="launchpad-admin-loading-spinner size-5"
+            />
+            <span className="launchpad-admin-loading-message">
+              Loading templates...
+            </span>
           </div>
         )}
 
         {!isLoading && loadError && (
-          <div className="flex flex-col items-center gap-4 rounded-lg bg-white p-6 text-center">
-            <p className="text-h5 text-black">Admin data did not load</p>
-            <p className="max-w-md text-neural-04">{loadError}</p>
-            <Button className="h-10 px-8" onClick={loadAdminData}>
+          <div
+            className="launchpad-admin-error-state launchpad-admin-data-error flex flex-col items-center gap-4 rounded-lg bg-white p-6 text-center"
+            data-section="admin-data-error"
+            data-state="error"
+          >
+            <p className="launchpad-admin-error-title text-h5 text-black">
+              Admin data did not load
+            </p>
+            <p className="launchpad-admin-error-message max-w-md text-neural-04">
+              {loadError}
+            </p>
+            <Button
+              className="launchpad-admin-retry-button h-10 px-8"
+              data-action="retry-admin-data"
+              onClick={loadAdminData}
+            >
               Retry
             </Button>
           </div>
@@ -325,7 +378,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
             rowAltBgColor={surfaceColors?.rowAltBgColor}
           />
         )}
-      </div>
+      </section>
 
       {/* Template View/Edit Modal */}
       {templateToViewEdit && (
@@ -341,18 +394,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
       )}
 
       {/* App Instances Section */}
-      <div className="mb-8">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-h4 font-bold">App Instances</h2>
+      <section
+        id="launchpad-admin-instances-section"
+        className="launchpad-admin-section launchpad-admin-instances-section mb-8"
+        data-section="instances"
+      >
+        <div className="launchpad-admin-section-header mb-4 flex items-center justify-between">
+          <h2 className="launchpad-admin-section-title text-h4 font-bold">
+            App Instances
+          </h2>
           <Modal
             ref={importAppModalRef}
             content={
               <Modal.Content
-                className="max-h-[90vh] w-[90vw] max-w-4xl"
+                className="launchpad-admin-modal launchpad-admin-import-app-modal max-h-[90vh] w-[90vw] max-w-4xl"
                 title="Import App Instance"
                 subtitle="Import an existing app instance into the system"
               >
-                <div className="py-6">
+                <div
+                  className="launchpad-admin-modal-body py-6"
+                  data-section="import-app"
+                >
                   <ImportAppForm
                     onSubmit={handleAppImport}
                     onError={handleError}
@@ -361,14 +423,29 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
               </Modal.Content>
             }
           >
-            <Button variant="primary">Import App Instance</Button>
+            <Button
+              className="launchpad-admin-import-app-button"
+              data-action="open-import-app"
+              variant="primary"
+            >
+              Import App Instance
+            </Button>
           </Modal>
         </div>
 
         {isLoading && (
-          <div className="flex items-center justify-center gap-3 rounded-lg bg-white p-6 text-neural-04">
-            <ChaseSpinner color="primary" className="size-5" />
-            Loading instances...
+          <div
+            className="launchpad-admin-loading-state launchpad-admin-instances-loading flex items-center justify-center gap-3 rounded-lg bg-white p-6 text-neural-04"
+            data-section="instances-loading-state"
+            data-state="loading"
+          >
+            <ChaseSpinner
+              color="primary"
+              className="launchpad-admin-loading-spinner size-5"
+            />
+            <span className="launchpad-admin-loading-message">
+              Loading instances...
+            </span>
           </div>
         )}
 
@@ -381,7 +458,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
             rowAltBgColor={surfaceColors?.rowAltBgColor}
           />
         )}
-      </div>
+      </section>
 
       {/* Delete Template Confirmation Modal */}
       {templateToDelete && (
@@ -400,7 +477,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
             name="uninstallTemplate"
             checked={uninstallTemplate}
             onChange={(event) => setUninstallTemplate(event.target.checked)}
-            className="text-neural-06"
+            className="launchpad-admin-uninstall-template-checkbox text-neural-06"
+            containerClassName="launchpad-admin-confirmation-option"
+            data-action="toggle-uninstall-template-apps"
           >
             uninstall related apps
           </Field.Checkbox>
@@ -424,12 +503,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
             name="uninstallApp"
             checked={uninstallApp}
             onChange={(event) => setUninstallApp(event.target.checked)}
-            className="text-neural-06"
+            className="launchpad-admin-uninstall-app-checkbox text-neural-06"
+            containerClassName="launchpad-admin-confirmation-option"
+            data-action="toggle-uninstall-app"
           >
             uninstall app
           </Field.Checkbox>
         </ConfirmationModal>
       )}
-    </>
+    </div>
   );
 };

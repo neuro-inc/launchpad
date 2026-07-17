@@ -26,35 +26,61 @@ export const AppModal: React.FC<Props> = ({
     text,
     url,
   }: App['documentationUrls'][number]) => (
-    <AppItemLink external key={url} to={url} title={text} />
+    <AppItemLink
+      external
+      key={url}
+      to={url}
+      title={text}
+      className="launchpad-app-modal__link"
+    />
   );
 
   const makeReferenceLink = ({ text, url }: App['externalUrls'][number]) => (
-    <AppItemLink icon={faLink} key={url} to={url} title={text} />
+    <AppItemLink
+      icon={faLink}
+      key={url}
+      to={url}
+      title={text}
+      className="launchpad-app-modal__link"
+    />
   );
 
   return (
-    <div className="relative flex w-[800px] max-w-full flex-col gap-8 overflow-auto rounded-2xl bg-white p-14 sm:px-4 md:px-8">
-      <div className="relative flex min-w-0 gap-9 sm:gap-5">
-        <div className="flex size-[160px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neural-02 bg-white sm:size-20">
+    <div
+      className="launchpad-app-modal relative flex w-[800px] max-w-full flex-col gap-8 overflow-auto rounded-2xl bg-white p-14 sm:px-4 md:px-8"
+      data-app-name={launchpadAppName}
+      data-modal="app-details"
+    >
+      <div className="launchpad-app-modal__hero relative flex min-w-0 gap-9 sm:gap-5">
+        <div className="launchpad-app-modal__logo-wrapper flex size-[160px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neural-02 bg-white sm:size-20">
           <Render if={logo}>
-            <Image transition src={logo} width={160} height={160} alt="Logo" />
+            <Image
+              transition
+              src={logo}
+              width={160}
+              height={160}
+              alt="Logo"
+              className="launchpad-app-modal__logo"
+            />
           </Render>
           <Render if={!logo}>
-            <Logo.Icon className="size-28" />
+            <Logo.Icon className="launchpad-app-modal__logo-fallback size-28" />
           </Render>
         </div>
 
-        <div className="flex basis-full flex-col gap-3">
-          <p className="text-h4">{title}</p>
+        <div className="launchpad-app-modal__info flex basis-full flex-col gap-3">
+          <p className="launchpad-app-modal__title text-h4">{title}</p>
           <Render if={descriptionShort}>
-            <p className="text-neural-04 sm:-mt-2">{descriptionShort}</p>
+            <p className="launchpad-app-modal__short-description text-neural-04 sm:-mt-2">
+              {descriptionShort}
+            </p>
           </Render>
-          <div className="mt-auto flex justify-end">
+          <div className="launchpad-app-modal__actions mt-auto flex justify-end">
             <Link
               blank
               external
-              className="px-10 sm:w-full"
+              className="launchpad-app-modal__open px-10 sm:w-full"
+              data-action="open"
               href={path.app(launchpadAppName)}
             >
               Open
@@ -63,17 +89,29 @@ export const AppModal: React.FC<Props> = ({
         </div>
       </div>
       <Render if={descriptionLong}>
-        <p className="text-neural-04">{descriptionLong}</p>
+        <p className="launchpad-app-modal__long-description text-neural-04">
+          {descriptionLong}
+        </p>
       </Render>
       <Render if={documentationUrls}>
-        <div className="flex flex-col gap-3">
-          <p className="text-h6">Documentation</p>
+        <div
+          className="launchpad-app-modal__section flex flex-col gap-3"
+          data-section="documentation"
+        >
+          <p className="launchpad-app-modal__section-title text-h6">
+            Documentation
+          </p>
           {documentationUrls.map(makeDocumentationLink)}
         </div>
       </Render>
       <Render if={externalUrls}>
-        <div className="flex flex-col gap-3">
-          <p className="text-h6">References</p>
+        <div
+          className="launchpad-app-modal__section flex flex-col gap-3"
+          data-section="references"
+        >
+          <p className="launchpad-app-modal__section-title text-h6">
+            References
+          </p>
           {externalUrls.map(makeReferenceLink)}
         </div>
       </Render>

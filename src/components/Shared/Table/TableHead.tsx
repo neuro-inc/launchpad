@@ -1,15 +1,14 @@
 import clsx from 'clsx';
 
-type Props = {
-  className?: string;
-  style?: React.CSSProperties;
+type Props = React.ThHTMLAttributes<HTMLTableCellElement> & {
   children?: React.ReactNode;
 };
 
-export const TableHead = ({ className, style, children }: Props) => (
+export const TableHead = ({ className, style, children, ...props }: Props) => (
   <th
+    {...props}
     className={clsx(
-      'sticky top-0 z-10 p-4 text-left font-400 text-black',
+      'launchpad-table__head sticky top-0 z-10 p-4 text-left font-400 text-black',
       className,
     )}
     style={style}

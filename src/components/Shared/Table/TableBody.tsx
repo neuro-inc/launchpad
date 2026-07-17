@@ -1,10 +1,11 @@
 import { cn } from '@utils';
 
-type Props = {
-  className?: string;
+type Props = React.HTMLAttributes<HTMLTableSectionElement> & {
   children?: React.ReactNode;
 };
 
-export const TableBody = ({ className, children }: Props) => (
-  <tbody className={cn('contents', className)}>{children}</tbody>
+export const TableBody = ({ className, children, ...props }: Props) => (
+  <tbody {...props} className={cn('launchpad-table__body contents', className)}>
+    {children}
+  </tbody>
 );

@@ -22,10 +22,16 @@ type Props = VariantProps<typeof variants> & {
 };
 
 export const ChaseSpinner = ({ className, color }: Props) => {
-  const chaseDotClassName = cn(variants({ color }));
+  const chaseDotClassName = cn('launchpad-spinner__dot', variants({ color }));
 
   return (
-    <div className={cn(`chase-spinner relative size-6`, className)}>
+    <div
+      className={cn(
+        'chase-spinner launchpad-spinner relative size-6',
+        className,
+      )}
+      data-color={color ?? 'white'}
+    >
       <div className={chaseDotClassName} />
       <div className={chaseDotClassName} />
       <div className={chaseDotClassName} />

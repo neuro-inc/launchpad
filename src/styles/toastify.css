@@ -1,5 +1,5 @@
 .Toastify {
-  flex: 0 1 auto !important;
+  flex: 0 1 auto;
 }
 .Toastify__toast-container {
   max-width: 360px;

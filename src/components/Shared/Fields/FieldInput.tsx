@@ -27,6 +27,7 @@ export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
     {
       disabled,
       required,
+      name,
       autoComplete = 'off',
       className,
       containerClassName,
@@ -57,17 +58,27 @@ export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
     };
 
     return (
-      <FieldContainer className={containerClassName}>
+      <FieldContainer
+        className={clsx('launchpad-field--input', containerClassName)}
+        data-field={name}
+        data-invalid={Boolean(error) || undefined}
+      >
         <input
           {...props}
           ref={ref}
           id={id}
+          name={name}
           className={fieldVariants({
             variant,
             error: !!error,
             label: !!label,
-            className,
+            className: clsx(
+              'launchpad-field__control launchpad-input',
+              className,
+            ),
           })}
+          data-invalid={Boolean(error) || undefined}
+          data-variant={variant}
           autoComplete={autoComplete}
           disabled={disabled}
           placeholder={placeholder}
@@ -79,7 +90,11 @@ export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
           required={required}
           className={labelClassName}
         >
-          <span className={clsx({ 'flex items-center gap-2': !!tooltip })}>
+          <span
+            className={clsx('launchpad-field__label-content', {
+              'flex items-center gap-2': !!tooltip,
+            })}
+          >
             {label}
             {tooltip && (
               <Tooltip side="top">
@@ -88,7 +103,9 @@ export const FieldInput = React.forwardRef<HTMLInputElement, Props>(
                   icon={faCircleInfo}
                   className="text-neural-04 hover:text-neural-06"
                 />
-                <span className="text-caption">{tooltip}</span>
+                <span className="launchpad-field__tooltip text-caption">
+                  {tooltip}
+                </span>
               </Tooltip>
             )}
           </span>

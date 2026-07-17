@@ -46,10 +46,14 @@ export const Link = ({
 }: Props) => {
   const isWithIcon = !!icon || checkIsComponentWithIconChild(children);
   const classNames = theme
-    ? cn(buttonVariants({ variant, withIcon: isWithIcon, className }), {
-        'pointer-events-none': disabled,
-      })
-    : className;
+    ? cn(
+        'launchpad-link',
+        buttonVariants({ variant, withIcon: isWithIcon, className }),
+        {
+          'pointer-events-none': disabled,
+        },
+      )
+    : cn('launchpad-link', className);
 
   if (external) {
     const { blank, ...anchorProps } =
@@ -61,6 +65,9 @@ export const Link = ({
       className: classNames,
       target,
       disabled,
+      'data-disabled': disabled || undefined,
+      'data-external': true,
+      'data-variant': variant ?? (theme ? 'primary' : 'unstyled'),
     } as AnchorHTMLAttributes<HTMLAnchorElement>;
 
     return (
@@ -75,11 +82,14 @@ export const Link = ({
     ...props,
     className: classNames,
     disabled,
+    'data-disabled': disabled || undefined,
+    'data-external': false,
+    'data-variant': variant ?? (theme ? 'primary' : 'unstyled'),
   };
 
   return (
     <RouterLink {...options}>
-      <Icon icon={icon} className="text-20" />
+      <Icon icon={icon} className="launchpad-link__icon text-20" />
       {children}
     </RouterLink>
   );

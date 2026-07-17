@@ -25,7 +25,7 @@ export default async function Page() {
 
   return (
     <Layout>
-      <Layout.Container className="py-8">
+      <Layout.Container className="launchpad-admin-page-container py-8">
         <AdminPage surfaceColors={surfaceColors} />
       </Layout.Container>
     </Layout>

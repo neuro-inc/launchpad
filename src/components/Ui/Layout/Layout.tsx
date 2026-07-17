@@ -37,7 +37,7 @@ export const Layout = async ({ className, children }: Props) => {
     : { session: null, apiUrl: null };
 
   return (
-    <LayoutWrapper className="flex flex-1 flex-col">
+    <LayoutWrapper className="launchpad-layout flex flex-1 flex-col">
       {authBootstrap.apiUrl && (
         <LayoutCookieSync
           token={authBootstrap.session?.accessToken}
@@ -46,7 +46,10 @@ export const Layout = async ({ className, children }: Props) => {
         />
       )}
       <LayoutHeader session={authBootstrap.session} />
-      <main className={clsx('flex flex-1 flex-col', className)}>
+      <main
+        id="launchpad-main"
+        className={clsx('launchpad-main flex flex-1 flex-col', className)}
+      >
         {children}
       </main>
     </LayoutWrapper>

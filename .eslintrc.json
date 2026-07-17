@@ -55,6 +55,7 @@
       "skipClassAttribute": false,
       "whitelist": [
         "(text|leading)\\-\\d+$",
+        "launchpad-[\\w-]+$",
         "space-(before|after|both)",
         "fade",
         "splide__[\\w\\-]+$"

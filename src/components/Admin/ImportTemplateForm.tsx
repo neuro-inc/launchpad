@@ -179,24 +179,33 @@ export const ImportTemplateForm = forwardRef<
       <form
         ref={ref}
         onSubmit={handleFormSubmit(onSubmitForm)}
-        className="space-y-6"
+        className="launchpad-admin-form launchpad-admin-import-template-form space-y-6"
+        data-section="import-template-form"
+        data-form-mode={mode}
+        data-read-only={isReadOnly ? 'true' : 'false'}
+        data-record-id={editingTemplate?.id}
       >
         {/* Info Banner - Only show when not in modal */}
         {!isInModal && (
-          <div className="rounded-lg bg-primary-subtle p-4">
+          <div
+            className="launchpad-admin-form-banner launchpad-admin-template-form-banner rounded-lg bg-primary-subtle p-4"
+            data-section="template-form-banner"
+          >
             {editingTemplate ? (
-              <div className="flex items-center justify-between">
-                <p className="text-body text-neutral-700">
+              <div className="launchpad-admin-form-banner-content flex items-center justify-between">
+                <p className="launchpad-admin-template-summary text-body text-neutral-700">
                   <strong>{isEditMode ? 'Editing' : 'Viewing'}:</strong>{' '}
                   {editingTemplate.verboseName} ({editingTemplate.templateName}{' '}
                   v{editingTemplate.templateVersion})
                 </p>
                 {!isEditMode && onCancel && (
-                  <div className="flex gap-2">
+                  <div className="launchpad-admin-form-banner-actions flex gap-2">
                     <Button
                       type="button"
                       onClick={() => setIsEditMode(true)}
                       variant="primary"
+                      className="launchpad-admin-template-edit-button"
+                      data-action="edit-template"
                     >
                       Edit
                     </Button>
@@ -204,6 +213,8 @@ export const ImportTemplateForm = forwardRef<
                       type="button"
                       onClick={onCancel}
                       variant="secondary"
+                      className="launchpad-admin-template-close-button"
+                      data-action="close-template"
                     >
                       Close
                     </Button>
@@ -211,7 +222,7 @@ export const ImportTemplateForm = forwardRef<
                 )}
               </div>
             ) : (
-              <p className="text-body text-neutral-700">
+              <p className="launchpad-admin-template-form-note text-body text-neutral-700">
                 <strong>Note:</strong> Empty fields will be automatically filled
                 with information from the Apolo Apps API when available.
               </p>
@@ -221,17 +232,22 @@ export const ImportTemplateForm = forwardRef<
 
         {/* Mode Toggle - Only show when not in read-only view and not editing in modal */}
         {!isReadOnly && !(isInModal && editingTemplate) && (
-          <div className="flex gap-0 border-b border-neutral-300">
+          <div
+            className="launchpad-admin-form-mode-toggle flex gap-0 border-b border-neutral-300"
+            data-section="template-input-mode"
+          >
             <Button
               type="button"
               onClick={() => setMode('manual')}
               theme={false}
               stopPropagation={false}
-              className={`relative cursor-pointer border-0 bg-transparent px-6 pb-3 pt-2 text-body font-medium transition-colors hover:bg-neutral-100 ${
+              className={`launchpad-admin-form-mode-button relative cursor-pointer border-0 bg-transparent px-6 pb-3 pt-2 text-body font-medium transition-colors hover:bg-neutral-100 ${
                 mode === 'manual'
                   ? 'text-primary after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-primary'
                   : 'text-neutral-600'
               }`}
+              data-action="select-manual-entry"
+              data-state={mode === 'manual' ? 'active' : 'inactive'}
             >
               Manual Entry
             </Button>
@@ -240,11 +256,13 @@ export const ImportTemplateForm = forwardRef<
               onClick={() => setMode('file')}
               theme={false}
               stopPropagation={false}
-              className={`relative cursor-pointer border-0 bg-transparent px-6 pb-3 pt-2 text-body font-medium transition-colors hover:bg-neutral-100 ${
+              className={`launchpad-admin-form-mode-button relative cursor-pointer border-0 bg-transparent px-6 pb-3 pt-2 text-body font-medium transition-colors hover:bg-neutral-100 ${
                 mode === 'file'
                   ? 'text-primary after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-primary'
                   : 'text-neutral-600'
               }`}
+              data-action="select-file-upload"
+              data-state={mode === 'file' ? 'active' : 'inactive'}
             >
               Upload File
             </Button>
@@ -257,18 +275,23 @@ export const ImportTemplateForm = forwardRef<
         )}
 
         {/* Form Fields */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-1">
+        <div
+          className="launchpad-admin-form-fields grid grid-cols-2 gap-4 sm:grid-cols-1"
+          data-section="form-fields"
+        >
           <Field.Input
             variant="static"
             label="Template Name"
             required
             type="text"
             {...register('templateName')}
-            className={
-              editingTemplate
-                ? 'cursor-not-allowed bg-neutral-100 text-neutral-600'
-                : ''
-            }
+            className={cn(
+              'launchpad-admin-form-control launchpad-admin-template-field-template-name',
+              editingTemplate &&
+                'cursor-not-allowed bg-neutral-100 text-neutral-600',
+            )}
+            containerClassName="launchpad-admin-form-field launchpad-admin-form-field-template-name"
+            data-field-slot="template-name"
             readOnly={!!editingTemplate}
             disabled={!!editingTemplate}
             error={errors.templateName?.message}
@@ -285,11 +308,13 @@ export const ImportTemplateForm = forwardRef<
             required
             type="text"
             {...register('templateVersion')}
-            className={
-              editingTemplate
-                ? 'cursor-not-allowed bg-neutral-100 text-neutral-600'
-                : ''
-            }
+            className={cn(
+              'launchpad-admin-form-control launchpad-admin-template-field-template-version',
+              editingTemplate &&
+                'cursor-not-allowed bg-neutral-100 text-neutral-600',
+            )}
+            containerClassName="launchpad-admin-form-field launchpad-admin-form-field-template-version"
+            data-field-slot="template-version"
             readOnly={!!editingTemplate}
             disabled={!!editingTemplate}
             error={errors.templateVersion?.message}
@@ -306,11 +331,13 @@ export const ImportTemplateForm = forwardRef<
             tooltip="This internal name is different from the Apolo Template Name and allows admins to import the same Apolo Template with different configurations (similar to importing multiple Service Deployments as custom apps to Launchpad)"
             type="text"
             {...register('name')}
-            className={
-              editingTemplate || isReadOnly
-                ? 'cursor-not-allowed bg-neutral-100 text-neutral-600'
-                : ''
-            }
+            className={cn(
+              'launchpad-admin-form-control launchpad-admin-template-field-name',
+              (editingTemplate || isReadOnly) &&
+                'cursor-not-allowed bg-neutral-100 text-neutral-600',
+            )}
+            containerClassName="launchpad-admin-form-field launchpad-admin-form-field-name"
+            data-field-slot="name"
             readOnly={!!editingTemplate || isReadOnly || undefined}
             disabled={!!editingTemplate || undefined}
             error={errors.name?.message}
@@ -327,72 +354,108 @@ export const ImportTemplateForm = forwardRef<
             tooltip="User-friendly name shown in the UI as the app name"
             type="text"
             {...register('verboseName')}
-            className={isReadOnly ? 'bg-neutral-50 text-neutral-700' : ''}
+            className={cn(
+              'launchpad-admin-form-control launchpad-admin-template-field-display-name',
+              isReadOnly && 'bg-neutral-50 text-neutral-700',
+            )}
+            containerClassName="launchpad-admin-form-field launchpad-admin-form-field-display-name"
+            data-field-slot="display-name"
             readOnly={isReadOnly || undefined}
             error={errors.verboseName?.message}
           />
 
-          <div className="col-span-2 sm:col-span-1">
+          <div
+            className="launchpad-admin-form-field launchpad-admin-form-field-logo col-span-2 sm:col-span-1"
+            data-field-slot="logo"
+          >
             <Field.Input
               variant="static"
               label="Logo URL"
               type="url"
               {...register('logo')}
-              className={isReadOnly ? 'bg-neutral-50 text-neutral-700' : ''}
+              className={cn(
+                'launchpad-admin-form-control launchpad-admin-template-field-logo',
+                isReadOnly && 'bg-neutral-50 text-neutral-700',
+              )}
+              containerClassName="launchpad-admin-field-container"
               placeholder={isReadOnly ? '' : 'https://...'}
               readOnly={isReadOnly || undefined}
               error={errors.logo?.message}
             />
           </div>
 
-          <div className="col-span-2 sm:col-span-1">
+          <div
+            className="launchpad-admin-form-field launchpad-admin-form-field-short-description col-span-2 sm:col-span-1"
+            data-field-slot="short-description"
+          >
             <Field.Textarea
               variant="static"
               label="Short Description"
               {...register('descriptionShort')}
               rows={2}
-              className={isReadOnly ? 'bg-neutral-50 text-neutral-700' : ''}
+              className={cn(
+                'launchpad-admin-form-control launchpad-admin-template-field-short-description',
+                isReadOnly && 'bg-neutral-50 text-neutral-700',
+              )}
+              containerClassName="launchpad-admin-field-container"
               readOnly={isReadOnly || undefined}
               error={errors.descriptionShort?.message}
             />
           </div>
 
-          <div className="col-span-2 sm:col-span-1">
+          <div
+            className="launchpad-admin-form-field launchpad-admin-form-field-long-description col-span-2 sm:col-span-1"
+            data-field-slot="long-description"
+          >
             <Field.Textarea
               variant="static"
               label="Long Description"
               {...register('descriptionLong')}
               rows={4}
-              className={isReadOnly ? 'bg-neutral-50 text-neutral-700' : ''}
+              className={cn(
+                'launchpad-admin-form-control launchpad-admin-template-field-long-description',
+                isReadOnly && 'bg-neutral-50 text-neutral-700',
+              )}
+              containerClassName="launchpad-admin-field-container"
               readOnly={isReadOnly || undefined}
               error={errors.descriptionLong?.message}
             />
           </div>
 
-          <div className="col-span-2 sm:col-span-1">
+          <div
+            className="launchpad-admin-form-field launchpad-admin-form-field-tags col-span-2 sm:col-span-1"
+            data-field-slot="tags"
+          >
             <Field.Input
               variant="static"
               label="Tags (comma-separated)"
               type="text"
               {...register('tags')}
-              className={isReadOnly ? 'bg-neutral-50 text-neutral-700' : ''}
+              className={cn(
+                'launchpad-admin-form-control launchpad-admin-template-field-tags',
+                isReadOnly && 'bg-neutral-50 text-neutral-700',
+              )}
+              containerClassName="launchpad-admin-field-container"
               placeholder={isReadOnly ? '' : 'tag1, tag2, tag3'}
               readOnly={isReadOnly || undefined}
               error={errors.tags?.message}
             />
           </div>
 
-          <div className="col-span-2 sm:col-span-1">
+          <div
+            className="launchpad-admin-form-field launchpad-admin-form-field-input col-span-2 sm:col-span-1"
+            data-field-slot="input"
+          >
             <Field.Textarea
               variant="static"
               label="Input (JSON)"
               {...register('input')}
               rows={6}
-              className={
-                isReadOnly
-                  ? 'bg-neutral-50 font-mono text-caption text-neutral-700'
-                  : 'font-mono text-caption'
-              }
+              className={cn(
+                'launchpad-admin-form-control launchpad-admin-template-field-input font-mono text-caption',
+                isReadOnly && 'bg-neutral-50 text-neutral-700',
+              )}
+              containerClassName="launchpad-admin-field-container"
               placeholder={
                 isReadOnly
                   ? ''
@@ -404,26 +467,41 @@ export const ImportTemplateForm = forwardRef<
             />
           </div>
 
-          <div className="col-span-2 sm:col-span-1">
-            <div className="space-y-3">
+          <div
+            className="launchpad-admin-form-field launchpad-admin-form-field-flags col-span-2 sm:col-span-1"
+            data-section="template-flags"
+          >
+            <div className="launchpad-admin-checkbox-group space-y-3">
               <label
-                className={`flex items-start ${isReadOnly || templateHasInstances ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                className={cn(
+                  'launchpad-admin-checkbox-label flex items-start',
+                  isReadOnly || templateHasInstances
+                    ? 'cursor-not-allowed opacity-60'
+                    : 'cursor-pointer',
+                )}
+                data-field-slot="internal"
               >
                 <input
                   type="checkbox"
                   {...register('isInternal')}
                   disabled={isReadOnly || templateHasInstances}
-                  className={cn('flex cursor-pointer items-start', {
-                    'cursor-not-allowed opacity-60': isReadOnly,
-                  })}
+                  className={cn(
+                    'launchpad-admin-checkbox launchpad-admin-template-field-internal flex cursor-pointer items-start',
+                    {
+                      'cursor-not-allowed opacity-60': isReadOnly,
+                    },
+                  )}
+                  data-action="toggle-internal"
                 />
-                <div>
-                  <span className="text-body font-medium">Internal</span>
-                  <p className="text-caption text-neutral-600">
+                <div className="launchpad-admin-checkbox-content">
+                  <span className="launchpad-admin-checkbox-title text-body font-medium">
+                    Internal
+                  </span>
+                  <p className="launchpad-admin-checkbox-description text-caption text-neutral-600">
                     Mark this template as internal (hidden from public app pool)
                   </p>
                   {templateHasInstances && !isReadOnly && (
-                    <p className="mt-1 text-caption text-warning">
+                    <p className="launchpad-admin-field-warning mt-1 text-caption text-warning">
                       Cannot edit: This template has associated instances
                     </p>
                   )}
@@ -431,17 +509,30 @@ export const ImportTemplateForm = forwardRef<
               </label>
 
               <label
-                className={`flex items-start ${isReadOnly || templateHasInstances ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                className={cn(
+                  'launchpad-admin-checkbox-label flex items-start',
+                  isReadOnly || templateHasInstances
+                    ? 'cursor-not-allowed opacity-60'
+                    : 'cursor-pointer',
+                )}
+                data-field-slot="shared"
               >
                 <input
                   type="checkbox"
                   {...register('isShared')}
-                  className={`mr-3 mt-1 ${isReadOnly || templateHasInstances ? 'cursor-not-allowed' : ''}`}
+                  className={cn(
+                    'launchpad-admin-checkbox launchpad-admin-template-field-shared mr-3 mt-1',
+                    (isReadOnly || templateHasInstances) &&
+                      'cursor-not-allowed',
+                  )}
                   disabled={isReadOnly || templateHasInstances}
+                  data-action="toggle-shared"
                 />
-                <div>
-                  <span className="text-body font-medium">Shared</span>
-                  <p className="text-caption text-neutral-600">
+                <div className="launchpad-admin-checkbox-content">
+                  <span className="launchpad-admin-checkbox-title text-body font-medium">
+                    Shared
+                  </span>
+                  <p className="launchpad-admin-checkbox-description text-caption text-neutral-600">
                     <strong>Shared:</strong> A single instance is shared by all
                     users.
                     <br />
@@ -449,7 +540,7 @@ export const ImportTemplateForm = forwardRef<
                     each user that accesses it.
                   </p>
                   {templateHasInstances && !isReadOnly && (
-                    <p className="mt-1 text-caption text-warning">
+                    <p className="launchpad-admin-field-warning mt-1 text-caption text-warning">
                       Cannot edit: This template has associated instances
                     </p>
                   )}
@@ -461,18 +552,29 @@ export const ImportTemplateForm = forwardRef<
 
         {/* Submit Button - Only show when not in read-only mode and not in modal */}
         {!isReadOnly && !isInModal && (
-          <div className="flex justify-end gap-3">
+          <div
+            className="launchpad-admin-form-actions flex justify-end gap-3"
+            data-section="form-actions"
+          >
             {editingTemplate && onCancel && (
               <Button
                 type="button"
                 onClick={onCancel}
                 disabled={loading}
-                className="bg-neutral-200 text-neutral-700 hover:bg-neutral-300"
+                className="launchpad-admin-form-cancel-button bg-neutral-200 text-neutral-700 hover:bg-neutral-300"
+                data-action="cancel-template-form"
               >
                 Cancel
               </Button>
             )}
-            <Button type="submit" disabled={loading}>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="launchpad-admin-form-submit-button"
+              data-action={
+                editingTemplate ? 'update-template' : 'import-template'
+              }
+            >
               {(() => {
                 if (loading) {
                   return editingTemplate ? 'Updating...' : 'Importing...';

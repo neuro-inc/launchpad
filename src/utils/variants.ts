@@ -45,7 +45,7 @@ export const fieldVariants = tv({
       true: 'pt-2',
     },
     error: {
-      true: '!border-error',
+      true: 'border-error hover:border-error focus:border-error',
     },
   },
   defaultVariants: {

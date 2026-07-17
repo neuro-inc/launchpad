@@ -1,5 +1,5 @@
 import { VariantProps } from '@typings';
-import { isNumber, isString, tv } from '@utils';
+import { cn, isNumber, isString, tv } from '@utils';
 
 const variants = tv({
   base: 'w-full text-error text-caption pl-2',
@@ -24,7 +24,14 @@ export const FieldError = ({ className, variant, children }: Props) => {
     isString(children) || isNumber(children) ? (children as string) : undefined;
 
   return (
-    <p className={variants({ variant, className })} title={title}>
+    <p
+      className={variants({
+        variant,
+        className: cn('launchpad-field__error', className),
+      })}
+      data-variant={variant ?? 'static'}
+      title={title}
+    >
       {children}
     </p>
   );

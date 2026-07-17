@@ -35,31 +35,37 @@ export const FieldCheckbox = forwardRef<HTMLInputElement, Props>(
     const { content, ...slots } = getSlots<'note' | 'error'>(children);
 
     return (
-      <FieldContainer className={containerClassName}>
+      <FieldContainer
+        className={cn('launchpad-field--checkbox', containerClassName)}
+        data-field={name}
+        data-invalid={Boolean(error) || undefined}
+      >
         <label
           htmlFor={name}
           className={cn(
-            'group flex cursor-pointer items-start gap-2 text-body text-neural-04',
+            'launchpad-checkbox group flex cursor-pointer items-start gap-2 text-body text-neural-04',
             className,
           )}
+          data-disabled={disabled || undefined}
         >
           <input
             {...props}
             type="checkbox"
             ref={ref}
             id={name}
-            className="peer absolute opacity-0"
+            className="launchpad-checkbox__input peer absolute opacity-0"
+            data-invalid={Boolean(error) || undefined}
             name={name}
             disabled={disabled}
           />
           <Icon
             className={clsx(
-              'relative top-px rounded-[4px] border border-neural-02 bg-transparent pt-0.5 text-[16px] text-transparent transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-white',
+              'launchpad-checkbox__indicator relative top-px rounded-[4px] border border-neural-02 bg-transparent pt-0.5 text-[16px] text-transparent transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-white',
               { 'border-error': !!error },
             )}
             icon={faCheck}
           />
-          <span>{content}</span>
+          <span className="launchpad-checkbox__label">{content}</span>
         </label>
         <Slot slot={slots.error}>
           <FieldError>{error}</FieldError>

@@ -91,12 +91,25 @@ type Props = {
 export default async function RootLayout({ children }: Props) {
   const config = await getConfig();
   const backgroundStyle = getBackgroundStyle(config.background);
+  const hasImageBackground = Boolean(backgroundStyle?.backgroundImage);
+  const backgroundVariables = backgroundStyle
+    ? ({
+        '--launchpad-background': backgroundStyle.background,
+        '--launchpad-background-image': backgroundStyle.backgroundImage,
+        '--launchpad-background-size': backgroundStyle.backgroundSize,
+        '--launchpad-background-position': backgroundStyle.backgroundPosition,
+        '--launchpad-background-repeat': backgroundStyle.backgroundRepeat,
+      } as React.CSSProperties)
+    : undefined;
 
   return (
     <html
+      id="launchpad-root"
       lang="en"
-      className="bg-background"
-      style={backgroundStyle}
+      className={cn('launchpad-root', {
+        'launchpad-background--image': hasImageBackground,
+      })}
+      style={backgroundVariables}
       suppressHydrationWarning
     >
       <head>
@@ -110,12 +123,22 @@ export default async function RootLayout({ children }: Props) {
         )}
       </head>
       <body
-        className={cn(inter.className, 'overflow-hidden')}
-        style={backgroundStyle}
+        id="launchpad-body"
+        className={cn(inter.className, 'launchpad-body overflow-hidden', {
+          'launchpad-background--image': hasImageBackground,
+        })}
         suppressHydrationWarning
       >
         <NuqsAdapter>{children}</NuqsAdapter>
         <ToastContainer />
+        {config.cssUrl && (
+          <link
+            id="launchpad-custom-stylesheet"
+            rel="stylesheet"
+            href={config.cssUrl}
+            precedence="launchpad-custom"
+          />
+        )}
       </body>
     </html>
   );

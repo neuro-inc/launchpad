@@ -4,7 +4,7 @@ import { useSession } from 'next-auth/react';
 
 import { User } from '@typings';
 import { useConfig } from '@hooks/useConfig';
-import { isObject } from '@utils';
+import { cn, isObject } from '@utils';
 import { isAdmin } from '@utils/helpers';
 
 import { Render, Theme } from '@components';
@@ -27,25 +27,29 @@ export const LayoutHeaderClient: React.FC<Props> = ({ className }) => {
   const userIsAdmin = session ? isAdmin(session) : false;
 
   return (
-    <header className={className}>
-      <Layout.Container className="flex items-center justify-between py-9">
-        <div className="flex items-center gap-3">
-          {config.logoUrl ? (
-            <Image
-              src={config.logoUrl}
-              alt="Logo"
-              height={40}
-              width={40}
-              className="h-10 w-auto object-contain"
-              style={{ width: 'auto', height: '40px' }}
-              priority
-            />
-          ) : (
-            <Theme.Logo className="h-10 w-auto text-black" />
-          )}
+    <header id="launchpad-header" className={cn('launchpad-header', className)}>
+      <Layout.Container className="launchpad-header__container flex items-center justify-between py-9">
+        <div
+          className="launchpad-header__brand flex items-center gap-3"
+          data-logo={config.logoUrl ? 'custom' : 'default'}
+        >
+          <div className="launchpad-header__logo-wrapper flex items-center">
+            {config.logoUrl ? (
+              <Image
+                src={config.logoUrl}
+                alt="Logo"
+                height={40}
+                width={40}
+                className="launchpad-header__logo h-10 w-auto object-contain"
+                priority
+              />
+            ) : (
+              <Theme.Logo className="launchpad-header__logo launchpad-header__logo--default h-10 w-auto text-black" />
+            )}
+          </div>
 
           <Render if={!!config.title}>
-            <p className="text-h6">{config.title}</p>
+            <p className="launchpad-header__title text-h6">{config.title}</p>
           </Render>
         </div>
 

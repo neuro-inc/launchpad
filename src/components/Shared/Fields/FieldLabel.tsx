@@ -39,9 +39,17 @@ export const FieldLabel = ({
 
   return (
     <label
-      className={cn(variants({ variant, disabled }), className, {
-        'required-label': required,
-      })}
+      className={cn(
+        'launchpad-field__label',
+        variants({ variant, disabled }),
+        className,
+        {
+          'required-label': required,
+        },
+      )}
+      data-disabled={disabled || undefined}
+      data-required={required || undefined}
+      data-variant={variant ?? 'static'}
       htmlFor={htmlFor}
     >
       {children}

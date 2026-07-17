@@ -25,7 +25,7 @@ export const AppTags = ({
   })();
 
   const makeTag = (tag: string) => (
-    <Badge className="text-body-small" key={tag}>
+    <Badge className="launchpad-app-card__tag text-body-small" key={tag}>
       {tag}
     </Badge>
   );
@@ -35,10 +35,12 @@ export const AppTags = ({
   }
 
   return (
-    <div className="flex shrink-0 gap-1">
+    <div className="launchpad-app-card__tags flex shrink-0 gap-1">
       {visibleTags.map(makeTag)}
       <Render if={!!otherTags.length}>
-        <Badge className="text-body-small">+{otherTags.length}</Badge>
+        <Badge className="launchpad-app-card__tag-overflow text-body-small">
+          +{otherTags.length}
+        </Badge>
       </Render>
     </div>
   );

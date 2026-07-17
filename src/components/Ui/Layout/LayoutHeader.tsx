@@ -3,7 +3,7 @@ import { Session } from 'next-auth';
 
 import { User } from '@typings';
 import { getConfig } from '@actions/server.actions';
-import { isObject } from '@utils';
+import { cn, isObject } from '@utils';
 import { isAdmin } from '@utils/helpers';
 
 import { Render, Theme } from '@components';
@@ -26,30 +26,39 @@ export const LayoutHeader: React.FC<Props> = async ({ className, session }) => {
   const userIsAdmin = session ? isAdmin(session) : false;
 
   return (
-    <header className={className}>
-      <Layout.Container className="flex items-center justify-between py-9">
-        <Link href="/" className="transition-opacity hover:opacity-75">
-          {config.logoUrl ? (
-            <div className="flex items-center gap-4">
-              <div className="flex items-center">
+    <header id="launchpad-header" className={cn('launchpad-header', className)}>
+      <Layout.Container className="launchpad-header__container flex items-center justify-between py-9">
+        <Link
+          href="/"
+          className="launchpad-header__brand-link transition-opacity hover:opacity-75"
+          data-logo={config.logoUrl ? 'custom' : 'default'}
+        >
+          <div className="launchpad-header__brand flex items-center gap-4">
+            <div className="launchpad-header__logo-wrapper flex items-center">
+              {config.logoUrl ? (
                 <Image
                   src={config.logoUrl}
                   alt="Logo"
                   height={40}
                   width={40}
-                  className="h-10 w-auto object-contain"
-                  style={{ width: 'auto', height: '40px' }}
+                  className="launchpad-header__logo h-10 w-auto object-contain"
                   priority
                 />
-              </div>
-
-              <Render if={isAuthenticated && Boolean(config.title)}>
-                <p className="text-h6">{config.title}</p>
-              </Render>
+              ) : (
+                <Theme.Logo className="launchpad-header__logo launchpad-header__logo--default h-10 w-auto text-black" />
+              )}
             </div>
-          ) : (
-            <Theme.Logo className="h-10 w-auto text-black" />
-          )}
+
+            <Render
+              if={
+                Boolean(config.logoUrl) &&
+                isAuthenticated &&
+                Boolean(config.title)
+              }
+            >
+              <p className="launchpad-header__title text-h6">{config.title}</p>
+            </Render>
+          </div>
         </Link>
 
         <Render if={isAuthenticated}>

@@ -18,6 +18,7 @@ import { FieldSelectItem as SelectItem } from './FieldSelectItem';
 type Props = Omit<VariantProps<typeof fieldVariants>, 'error'> & {
   value?: string;
   defaultValue?: string;
+  name?: string;
   required?: boolean;
   disabled?: boolean;
   label?: string;
@@ -46,6 +47,7 @@ export const FieldCustomSelect = forwardRef<HTMLButtonElement, Props>(
       required,
       label,
       value,
+      name,
       disabled,
       placeholder,
       className,
@@ -81,30 +83,49 @@ export const FieldCustomSelect = forwardRef<HTMLButtonElement, Props>(
     };
 
     return (
-      <FieldContainer className={containerClassName}>
+      <FieldContainer
+        className={cn('launchpad-field--custom-select', containerClassName)}
+        data-field={name}
+        data-invalid={Boolean(error) || undefined}
+      >
         <FieldLabel required={required} for={id} className={labelClassName}>
           {label}
         </FieldLabel>
-        <Select.Root {...props} value={value} onValueChange={onChange}>
+        <Select.Root
+          {...props}
+          name={name}
+          value={value}
+          onValueChange={onChange}
+        >
           <Select.Trigger
+            id={id}
             disabled={disabled}
             className={cn(
               fieldVariants({ className, error: !!error }),
-              'flex w-full items-center justify-between gap-2',
+              'launchpad-field__control launchpad-select launchpad-select__trigger flex w-full items-center justify-between gap-2',
               { 'pointer-events-none opacity-50': disabled },
             )}
+            data-invalid={Boolean(error) || undefined}
             ref={ref}
           >
             <Select.Value
+              className="launchpad-select__value"
               placeholder={
                 <Slot slot={slots.placeholder}>
-                  <span>{placeholder}</span>
+                  <span className="launchpad-select__placeholder">
+                    {placeholder}
+                  </span>
                 </Slot>
               }
             >
               <Slot slot={slots.value} />
             </Select.Value>
-            <Select.Icon className={cn('text-neural-03', iconClassName)}>
+            <Select.Icon
+              className={cn(
+                'launchpad-select__icon text-neural-03',
+                iconClassName,
+              )}
+            >
               <Icon className="inline-flex" icon={faChevronDown} />
             </Select.Icon>
           </Select.Trigger>
@@ -113,11 +134,13 @@ export const FieldCustomSelect = forwardRef<HTMLButtonElement, Props>(
               position="popper"
               sideOffset={8}
               className={cn(
-                'z-30 rounded-xl bg-white p-1.5 shadow-[0px_8px_24px_-4px_rgba(24,39,75,0.08),0px_6px_12px_-6px_rgba(24,39,75,0.12)] data-[state=closed]:duration-300 data-[state=open]:duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in data-[state=closed]:slide-out-to-bottom-1 data-[state=open]:slide-in-from-bottom-1',
+                'launchpad-select__dropdown z-30 rounded-xl bg-white p-1.5 shadow-[0px_8px_24px_-4px_rgba(24,39,75,0.08),0px_6px_12px_-6px_rgba(24,39,75,0.12)] data-[state=closed]:duration-300 data-[state=open]:duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in data-[state=closed]:slide-out-to-bottom-1 data-[state=open]:slide-in-from-bottom-1',
                 dropdownClassName,
               )}
             >
-              <Select.Viewport>{getSelectItems()}</Select.Viewport>
+              <Select.Viewport className="launchpad-select__viewport">
+                {getSelectItems()}
+              </Select.Viewport>
             </Select.Content>
           </Select.Portal>
         </Select.Root>

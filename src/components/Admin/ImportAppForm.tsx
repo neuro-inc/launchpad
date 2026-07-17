@@ -106,11 +106,19 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
 
   // If instance selected, show the form
   return (
-    <form onSubmit={handleFormSubmit(onSubmitForm)} className="space-y-6">
+    <form
+      onSubmit={handleFormSubmit(onSubmitForm)}
+      className="launchpad-admin-form launchpad-admin-import-app-form space-y-6"
+      data-section="import-app-form"
+      data-record-id={selectedInstance.id}
+    >
       {/* Info Banner */}
-      <div className="rounded-lg bg-primary-subtle p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-body text-neutral-700">
+      <div
+        className="launchpad-admin-form-banner launchpad-admin-selected-app-banner rounded-lg bg-primary-subtle p-4"
+        data-section="selected-app"
+      >
+        <div className="launchpad-admin-form-banner-content flex items-center justify-between">
+          <p className="launchpad-admin-selected-app-summary text-body text-neutral-700">
             <strong>Selected App:</strong> {selectedInstance.displayName} (
             {selectedInstance.templateName} v{selectedInstance.templateVersion})
           </p>
@@ -118,7 +126,8 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
             type="button"
             onClick={handleBackToList}
             variant="secondary"
-            className="text-caption"
+            className="launchpad-admin-back-to-app-list-button text-caption"
+            data-action="back-to-app-list"
           >
             Back to List
           </Button>
@@ -126,15 +135,22 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
       </div>
 
       {/* Form Fields */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-1">
-        <div className="col-span-2 sm:col-span-1">
+      <div
+        className="launchpad-admin-form-fields grid grid-cols-2 gap-4 sm:grid-cols-1"
+        data-section="form-fields"
+      >
+        <div
+          className="launchpad-admin-form-field launchpad-admin-form-field-app-id col-span-2 sm:col-span-1"
+          data-field-slot="app-id"
+        >
           <Field.Input
             variant="static"
             label="App ID (UUID)"
             required
             type="text"
             {...register('appId')}
-            className="cursor-not-allowed bg-neutral-100 font-mono text-caption text-neutral-600"
+            className="launchpad-admin-form-control launchpad-admin-app-field-app-id cursor-not-allowed bg-neutral-100 font-mono text-caption text-neutral-600"
+            containerClassName="launchpad-admin-field-container"
             readOnly
             disabled
             error={errors.appId?.message}
@@ -148,6 +164,9 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
           tooltip="Internal identifier used in the system"
           type="text"
           {...register('name')}
+          className="launchpad-admin-form-control launchpad-admin-app-field-name"
+          containerClassName="launchpad-admin-form-field launchpad-admin-form-field-name"
+          data-field-slot="name"
           error={errors.name?.message}
         />
 
@@ -157,61 +176,90 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
           tooltip="User-friendly name shown in the UI as the app name"
           type="text"
           {...register('verboseName')}
+          className="launchpad-admin-form-control launchpad-admin-app-field-display-name"
+          containerClassName="launchpad-admin-form-field launchpad-admin-form-field-display-name"
+          data-field-slot="display-name"
           error={errors.verboseName?.message}
         />
 
-        <div className="col-span-2 sm:col-span-1">
+        <div
+          className="launchpad-admin-form-field launchpad-admin-form-field-logo col-span-2 sm:col-span-1"
+          data-field-slot="logo"
+        >
           <Field.Input
             variant="static"
             label="Logo URL"
             type="url"
             {...register('logo')}
+            className="launchpad-admin-form-control launchpad-admin-app-field-logo"
+            containerClassName="launchpad-admin-field-container"
             placeholder="https://..."
             error={errors.logo?.message}
           />
         </div>
 
-        <div className="col-span-2 sm:col-span-1">
+        <div
+          className="launchpad-admin-form-field launchpad-admin-form-field-short-description col-span-2 sm:col-span-1"
+          data-field-slot="short-description"
+        >
           <Field.Textarea
             variant="static"
             label="Short Description"
             {...register('descriptionShort')}
+            className="launchpad-admin-form-control launchpad-admin-app-field-short-description"
+            containerClassName="launchpad-admin-field-container"
             rows={2}
             error={errors.descriptionShort?.message}
           />
         </div>
 
-        <div className="col-span-2 sm:col-span-1">
+        <div
+          className="launchpad-admin-form-field launchpad-admin-form-field-long-description col-span-2 sm:col-span-1"
+          data-field-slot="long-description"
+        >
           <Field.Textarea
             variant="static"
             label="Long Description"
             {...register('descriptionLong')}
+            className="launchpad-admin-form-control launchpad-admin-app-field-long-description"
+            containerClassName="launchpad-admin-field-container"
             rows={4}
             error={errors.descriptionLong?.message}
           />
         </div>
 
-        <div className="col-span-2 sm:col-span-1">
+        <div
+          className="launchpad-admin-form-field launchpad-admin-form-field-tags col-span-2 sm:col-span-1"
+          data-field-slot="tags"
+        >
           <Field.Input
             variant="static"
             label="Tags (comma-separated)"
             type="text"
             {...register('tags')}
+            className="launchpad-admin-form-control launchpad-admin-app-field-tags"
+            containerClassName="launchpad-admin-field-container"
             placeholder="tag1, tag2, tag3"
             error={errors.tags?.message}
           />
         </div>
 
-        <div className="col-span-2 sm:col-span-1">
-          <label className="flex cursor-pointer items-start">
+        <div
+          className="launchpad-admin-form-field launchpad-admin-form-field-internal col-span-2 sm:col-span-1"
+          data-field-slot="internal"
+        >
+          <label className="launchpad-admin-checkbox-label flex cursor-pointer items-start">
             <input
               type="checkbox"
               {...register('isInternal')}
-              className="mr-3 mt-1"
+              className="launchpad-admin-checkbox launchpad-admin-app-field-internal mr-3 mt-1"
+              data-action="toggle-internal"
             />
-            <div>
-              <span className="text-body font-medium">Internal</span>
-              <p className="text-caption text-neutral-600">
+            <div className="launchpad-admin-checkbox-content">
+              <span className="launchpad-admin-checkbox-title text-body font-medium">
+                Internal
+              </span>
+              <p className="launchpad-admin-checkbox-description text-caption text-neutral-600">
                 This app will not appear in the app list to users. This is
                 enabled automatically if the app does not expose a main public
                 web page.
@@ -222,16 +270,26 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
       </div>
 
       {/* Submit Button */}
-      <div className="flex justify-end gap-3">
+      <div
+        className="launchpad-admin-form-actions flex justify-end gap-3"
+        data-section="form-actions"
+      >
         <Button
           type="button"
           onClick={handleBackToList}
           disabled={loading}
           variant="secondary"
+          className="launchpad-admin-form-cancel-button"
+          data-action="cancel-import-app"
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={loading}>
+        <Button
+          type="submit"
+          disabled={loading}
+          className="launchpad-admin-form-submit-button"
+          data-action="submit-import-app"
+        >
           {loading ? 'Importing...' : 'Import App'}
         </Button>
       </div>

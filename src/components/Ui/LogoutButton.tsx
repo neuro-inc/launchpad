@@ -30,13 +30,17 @@ export const LogoutButton = () => {
   return (
     <Button
       variant="ghost-error"
-      className="-mb-4 mt-1 w-full justify-start pl-0 text-body"
+      className="launchpad-user-panel__logout -mb-4 mt-1 w-full justify-start pl-0 text-body"
+      data-action="logout"
       onClick={handleLogout}
       loading={isLoggingOut}
       disabled={isLoggingOut}
     >
-      <Icon icon={faArrowRightFromBracket} className="text-[20px]" />
-      <span>Log out</span>
+      <Icon
+        icon={faArrowRightFromBracket}
+        className="launchpad-user-panel__logout-icon text-[20px]"
+      />
+      <span className="launchpad-user-panel__logout-label">Log out</span>
     </Button>
   );
 };

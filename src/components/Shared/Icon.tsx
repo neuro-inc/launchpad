@@ -19,7 +19,7 @@ export const Icon = ({ className, icon, ...props }: Props) => {
   return (
     <span
       className={cn(
-        'flex size-6 shrink-0 items-center justify-center',
+        'launchpad-icon flex size-6 shrink-0 items-center justify-center',
         className,
       )}
     >

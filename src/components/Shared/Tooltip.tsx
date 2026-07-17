@@ -3,7 +3,7 @@ import { TooltipContentProps } from '@radix-ui/react-tooltip';
 import * as TooltipUI from '@radix-ui/react-tooltip';
 
 import { VariantProps } from '@typings';
-import { getSlots, tv } from '@utils';
+import { cn, getSlots, tv } from '@utils';
 
 import { Render } from './Render';
 
@@ -60,10 +60,18 @@ export const Tooltip = ({
   return (
     <TooltipUI.Provider delayDuration={delayDuration}>
       <TooltipUI.Root open={isOpen}>
-        <TooltipUI.Trigger asChild>{trigger}</TooltipUI.Trigger>
+        <TooltipUI.Trigger asChild className="launchpad-tooltip__trigger">
+          {trigger}
+        </TooltipUI.Trigger>
         <TooltipUI.Portal>
           <TooltipUI.Content
-            className={variants({ side, className })}
+            className={variants({
+              side,
+              className: cn(
+                'launchpad-tooltip launchpad-tooltip__content',
+                className,
+              ),
+            })}
             side={side}
             sideOffset={sideOffset}
             align={align}
@@ -71,7 +79,7 @@ export const Tooltip = ({
           >
             {content}
             <Render if={showArrow}>
-              <TooltipUI.Arrow className="fill-white" />
+              <TooltipUI.Arrow className="launchpad-tooltip__arrow fill-white" />
             </Render>
           </TooltipUI.Content>
         </TooltipUI.Portal>

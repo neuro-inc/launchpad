@@ -31,7 +31,7 @@ export const ModalContent = ({
   return (
     <div
       className={cn(
-        'relative max-w-full overflow-auto rounded-2xl bg-white',
+        'launchpad-modal__content relative max-w-full overflow-auto rounded-2xl bg-white',
         className,
       )}
     >
@@ -40,7 +40,9 @@ export const ModalContent = ({
           <ModalHeader subtitle={subtitle}>{title}</ModalHeader>
         </Render>
       </Slot>
-      <div className={clsx('px-8', { contents })}>{content}</div>
+      <div className={clsx('launchpad-modal__body px-8', { contents })}>
+        {content}
+      </div>
       {footer}
     </div>
   );
