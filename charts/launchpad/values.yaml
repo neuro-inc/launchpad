@@ -30,6 +30,9 @@ labels:
 # Platform handles mounting via labels/annotations
 branding: {}
 
+# Populated by the app install preprocessor with headers owned by Launchpad auth.
+authResponseHeaders: null
+
 
 podLabels: {}
 podAnnotations: {}

@@ -1,8 +1,18 @@
 HEADER_X_FORWARDED_HOST = "x-forwarded-host"
 HEADER_X_FORWARDED_URI = "x-forwarded-uri"
 
-# headers used to bypass auth in a downstream apps
-HEADER_X_AUTH_REQUEST_EMAIL = "X-Auth-Request-Email"
-HEADER_X_AUTH_REQUEST_USERNAME = "X-Auth-Request-Preferred-Username"
-HEADER_X_AUTH_REQUEST_GROUPS = "X-Auth-Request-Groups"
-HEADER_X_AUTH_REQUEST_ROLES = "X-Auth-Request-Roles"
+# Keep synchronized with AUTH_RESPONSE_HEADERS in
+# .apolo/src/apolo_apps_launchpad/consts.py.
+AUTH_RESPONSE_HEADERS = (
+    "X-Auth-Request-Email",
+    "X-Auth-Request-Preferred-Username",
+    "X-Auth-Request-Groups",
+    "X-Auth-Request-Roles",
+)
+
+(
+    HEADER_X_AUTH_REQUEST_EMAIL,
+    HEADER_X_AUTH_REQUEST_USERNAME,
+    HEADER_X_AUTH_REQUEST_GROUPS,
+    HEADER_X_AUTH_REQUEST_ROLES,
+) = AUTH_RESPONSE_HEADERS

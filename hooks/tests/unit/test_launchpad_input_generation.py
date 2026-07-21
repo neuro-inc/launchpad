@@ -786,6 +786,12 @@ async def test_launchpad_values_generation__min(apolo_client):
         "affinity": expected_affinity,
         "podLabels": expected_pod_labels,
         "apolo_app_id": APP_ID,
+        "authResponseHeaders": [
+            "X-Auth-Request-Email",
+            "X-Auth-Request-Preferred-Username",
+            "X-Auth-Request-Groups",
+            "X-Auth-Request-Roles",
+        ],
         "dbPassword": f"keycloak-db-pswd-{APP_ID}-value",
         "dbSecretName": f"launchpad-{APP_ID}-db-secret",
         "postgresql": {
@@ -825,6 +831,9 @@ async def test_launchpad_values_generation__brand(apolo_client):
                 ),
                 favicon_file=FavIconFileApoloFilesImagePath(
                     path="storage://cluster/org/project/app-assets/favicon.ico"
+                ),
+                css_file=ApoloFilesPath(
+                    path="storage://cluster/org/project/app-assets/custom.css"
                 ),
                 title="My Custom Launchpad",
                 background=BackgroundApoloFilesImagePath(
@@ -973,6 +982,11 @@ async def test_launchpad_values_generation__brand(apolo_client):
                         "mount_mode": "rw",
                     },
                     {
+                        "storage_uri": "storage://cluster/org/project/app-assets/custom.css",
+                        "mount_path": "/etc/launchpad/branding/css",
+                        "mount_mode": "rw",
+                    },
+                    {
                         "storage_uri": "storage://cluster/org/project/app-assets/background.png",
                         "mount_path": "/etc/launchpad/branding/background",
                         "mount_mode": "rw",
@@ -981,6 +995,12 @@ async def test_launchpad_values_generation__brand(apolo_client):
             ),
         },
         "apolo_app_id": APP_ID,
+        "authResponseHeaders": [
+            "X-Auth-Request-Email",
+            "X-Auth-Request-Preferred-Username",
+            "X-Auth-Request-Groups",
+            "X-Auth-Request-Roles",
+        ],
         "dbPassword": f"keycloak-db-pswd-{APP_ID}-value",
         "dbSecretName": f"launchpad-{APP_ID}-db-secret",
         "postgresql": {

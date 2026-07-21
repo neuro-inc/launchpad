@@ -1,3 +1,4 @@
+{{- $authResponseHeaders := required "authResponseHeaders must be provided by the install preprocessor" .Values.authResponseHeaders -}}
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -12,4 +13,5 @@ spec:
   forwardAuth:
     address: {{ include "launchpad.apiDomainWithProtocol" . }}/auth/authorize
     trustForwardHeader: true
-    authResponseHeadersRegex: ^X-
+    authResponseHeaders:
+      {{- toYaml $authResponseHeaders | nindent 6 }}

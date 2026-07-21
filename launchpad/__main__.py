@@ -14,5 +14,6 @@ if __name__ == "__main__":
         port=config.server.port,
         host=config.server.host,
         proxy_headers=True,
+        forwarded_allow_ips="*",
         log_config=None,
     )

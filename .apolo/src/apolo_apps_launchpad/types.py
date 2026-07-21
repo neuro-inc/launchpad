@@ -457,6 +457,15 @@ class LauchpadBrandingConfig(AbstractAppFieldType):
             description="Use custom favicon image from Apolo Storage for Lauchpad.",
         ).as_json_schema_extra(),
     )
+    css_file: ApoloFilesPath | None = Field(
+        None,
+        json_schema_extra=FileFilterExtraSchema(
+            title="Custom CSS",
+            description="Use a custom CSS file from Apolo Storage for Launchpad.",
+            accept_ext=[".css"],
+            max_size_kb=500,
+        ).as_json_schema_extra(),
+    )
     title: str | None = Field(
         None,
         json_schema_extra=SchemaExtraMetadata(

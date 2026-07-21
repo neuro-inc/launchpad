@@ -33,7 +33,7 @@ from apolo_app_types.protocols.postgres import (
     PostgresInputs,
 )
 
-from .consts import APP_SECRET_KEYS
+from .consts import APP_SECRET_KEYS, AUTH_RESPONSE_HEADERS
 from .types import (
     ApoloFilesImagePath,
     ColorPicker,
@@ -280,6 +280,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         if input_.branding and (
             input_.branding.logo_file
             or input_.branding.favicon_file
+            or input_.branding.css_file
             or (
                 input_.branding.background
                 and isinstance(input_.branding.background, ApoloFilesImagePath)
@@ -289,7 +290,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         lauchpad_file_mounts = []
 
-        if needs_branding_mounts:
+        if needs_branding_mounts and input_.branding:
             if input_.branding.logo_file:
                 lauchpad_file_mounts.append(
                     ApoloFilesMount(
@@ -305,6 +306,14 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                             ApoloFilesPath, input_.branding.favicon_file
                         ),
                         mount_path=MountPath(path=f"{BRANDING_DIR_LAUNCHPAD}/favicon"),
+                    )
+                )
+
+            if input_.branding.css_file:
+                lauchpad_file_mounts.append(
+                    ApoloFilesMount(
+                        storage_uri=t.cast(ApoloFilesPath, input_.branding.css_file),
+                        mount_path=MountPath(path=f"{BRANDING_DIR_LAUNCHPAD}/css"),
                     )
                 )
 
@@ -494,6 +503,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         return {
             **values,
+            "authResponseHeaders": list(AUTH_RESPONSE_HEADERS),
             "image": {"tag": os.getenv("APP_IMAGE_TAG", "latest")},
             "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": kc_realm_import_config_map_name,
