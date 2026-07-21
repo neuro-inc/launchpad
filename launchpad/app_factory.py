@@ -1,10 +1,8 @@
 from typing import Any, TypedDict
 
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
 from fastapi_pagination import add_pagination
 from fastapi_pagination.utils import disable_installed_extensions_check
-from starlette.responses import JSONResponse
 
 from launchpad.api import root_router
 from launchpad.app import Launchpad
@@ -14,7 +12,6 @@ from launchpad.lifespan import lifespan
 
 
 class AppConfig(TypedDict):
-    default_response_class: type[JSONResponse]
     openapi_url: str | None
     docs_url: str | None
     redoc_url: str | None
@@ -27,7 +24,6 @@ def create_app(config: Config) -> Launchpad:
     sync_db(dsn=config.postgres.dsn)
 
     app_kwargs: AppConfig = {
-        "default_response_class": ORJSONResponse,
         "openapi_url": "/openapi/openapi.json",
         "docs_url": "/openapi/v1/docs",
         "redoc_url": "/openapi/v1/redoc",
