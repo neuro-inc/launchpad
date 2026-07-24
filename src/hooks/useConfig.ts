@@ -16,6 +16,7 @@ export function useConfig(): LaunchpadConfig {
           faviconUrl: data.faviconUrl ?? DEFAULT_CONFIG.faviconUrl,
           title: data.title ?? DEFAULT_CONFIG.title,
           background: data.background ?? DEFAULT_CONFIG.background,
+          cssUrl: data.cssUrl ?? DEFAULT_CONFIG.cssUrl,
         });
       })
       .catch((error) => {

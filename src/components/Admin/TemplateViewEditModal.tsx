@@ -86,7 +86,7 @@ export const TemplateViewEditModal: React.FC<TemplateViewEditModalProps> = ({
 
   const modalContent = (
     <Modal.Content
-      className="max-h-[90vh] w-[90vw] max-w-4xl"
+      className="launchpad-admin-modal launchpad-admin-template-details-modal max-h-[90vh] w-[90vw] max-w-4xl"
       title={
         mode === 'view'
           ? `View Template: ${template.verboseName}`
@@ -94,9 +94,18 @@ export const TemplateViewEditModal: React.FC<TemplateViewEditModalProps> = ({
       }
       subtitle={`${template.templateName} v${template.templateVersion}`}
     >
-      <div className="py-6">
+      <div
+        className="launchpad-admin-template-details-body py-6"
+        data-section="template-details"
+        data-mode={mode}
+        data-record-id={template.id}
+        data-record-name={template.name}
+      >
         {error && (
-          <div className="mb-4 rounded-lg bg-error-light p-4 text-error-dark">
+          <div
+            className="launchpad-admin-form-error mb-4 rounded-lg bg-error-light p-4 text-error-dark"
+            data-state="error"
+          >
             {error}
           </div>
         )}
@@ -113,91 +122,151 @@ export const TemplateViewEditModal: React.FC<TemplateViewEditModalProps> = ({
 
         {/* Related Instances Section - Only show in view mode */}
         {mode === 'view' && (
-          <div className="mt-8 border-t border-neural-02 pt-6">
-            <h3 className="mb-4 text-h5 font-medium">
+          <section
+            className="launchpad-admin-related-instances mt-8 border-t border-neural-02 pt-6"
+            data-section="related-instances"
+          >
+            <h3 className="launchpad-admin-related-instances-title mb-4 text-h5 font-medium">
               Related App Instances ({relatedInstances.length})
             </h3>
             {relatedInstances.length === 0 ? (
-              <p className="text-body text-neural-05">
+              <p
+                className="launchpad-admin-empty-state launchpad-admin-related-instances-empty text-body text-neural-05"
+                data-state="empty"
+              >
                 No app instances are using this template.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table className="w-full grid-cols-[2fr_1.5fr_1fr_1fr]">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.Head className="border-b border-neural-03 bg-neural-01 text-caption">
+              <div className="launchpad-admin-table-wrapper launchpad-admin-related-instances-table-wrapper overflow-x-auto">
+                <Table className="launchpad-admin-table launchpad-admin-related-instances-table w-full grid-cols-[2fr_1.5fr_1fr_1fr]">
+                  <Table.Header className="launchpad-admin-table-header">
+                    <Table.Row className="launchpad-admin-table-header-row">
+                      <Table.Head
+                        className="launchpad-admin-table-header-cell launchpad-admin-column-app-name border-b border-neural-03 bg-neural-01 text-caption"
+                        data-column="app-name"
+                      >
                         App Name
                       </Table.Head>
-                      <Table.Head className="border-b border-neural-03 bg-neural-01 text-caption">
+                      <Table.Head
+                        className="launchpad-admin-table-header-cell launchpad-admin-column-launchpad-name border-b border-neural-03 bg-neural-01 text-caption"
+                        data-column="launchpad-name"
+                      >
                         Launchpad Name
                       </Table.Head>
-                      <Table.Head className="border-b border-neural-03 bg-neural-01 text-caption">
+                      <Table.Head
+                        className="launchpad-admin-table-header-cell launchpad-admin-column-user-id border-b border-neural-03 bg-neural-01 text-caption"
+                        data-column="user-id"
+                      >
                         User ID
                       </Table.Head>
-                      <Table.Head className="border-b border-neural-03 bg-neural-01 text-caption">
+                      <Table.Head
+                        className="launchpad-admin-table-header-cell launchpad-admin-column-url border-b border-neural-03 bg-neural-01 text-caption"
+                        data-column="url"
+                      >
                         URL
                       </Table.Head>
                     </Table.Row>
                   </Table.Header>
-                  <Table.Body>
-                    {relatedInstances.map((instance, index) => (
-                      <Table.Row
-                        key={instance.id || `${instance.appId}-${index}`}
-                      >
-                        <Table.Cell className="border-b border-neural-02">
-                          <div className="text-body font-medium">
-                            {instance.appName}
-                          </div>
-                          <div className="text-caption text-neural-05">
-                            ID: {instance.appId}
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell className="border-b border-neural-02">
-                          <div className="text-body">
-                            {instance.launchpadAppName}
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell className="border-b border-neural-02">
-                          <div className="text-body text-neural-06">
-                            {instance.userId || '-'}
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell className="border-b border-neural-02">
-                          {instance.url ? (
-                            <a
-                              href={instance.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-body text-primary underline hover:text-primary-dark"
-                            >
-                              Open
-                            </a>
-                          ) : (
-                            <span className="text-caption text-neural-05">
-                              -
-                            </span>
-                          )}
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
+                  <Table.Body className="launchpad-admin-table-body launchpad-admin-related-instances-table-body">
+                    {relatedInstances.map((instance, index) => {
+                      const recordId = instance.id || instance.appId || index;
+
+                      return (
+                        <Table.Row
+                          key={instance.id || `${instance.appId}-${index}`}
+                          className="launchpad-admin-table-row launchpad-admin-related-instance-row contents"
+                          data-record-id={recordId}
+                          data-record-name={
+                            instance.launchpadAppName || instance.appName
+                          }
+                          data-record-type="instance"
+                        >
+                          <Table.Cell
+                            className="launchpad-admin-table-cell launchpad-admin-related-instance-cell launchpad-admin-related-instance-cell-app-name border-b border-neural-02"
+                            data-column="app-name"
+                          >
+                            <div className="launchpad-admin-cell-content">
+                              <div className="launchpad-admin-instance-app-name text-body font-medium">
+                                {instance.appName}
+                              </div>
+                              <div className="launchpad-admin-instance-app-id text-caption text-neural-05">
+                                ID: {instance.appId}
+                              </div>
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell
+                            className="launchpad-admin-table-cell launchpad-admin-related-instance-cell launchpad-admin-related-instance-cell-launchpad-name border-b border-neural-02"
+                            data-column="launchpad-name"
+                          >
+                            <div className="launchpad-admin-cell-content launchpad-admin-instance-launchpad-name text-body">
+                              {instance.launchpadAppName}
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell
+                            className="launchpad-admin-table-cell launchpad-admin-related-instance-cell launchpad-admin-related-instance-cell-user-id border-b border-neural-02"
+                            data-column="user-id"
+                          >
+                            <div className="launchpad-admin-cell-content launchpad-admin-instance-user-id text-body text-neural-06">
+                              {instance.userId || '-'}
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell
+                            className="launchpad-admin-table-cell launchpad-admin-related-instance-cell launchpad-admin-related-instance-cell-url border-b border-neural-02"
+                            data-column="url"
+                          >
+                            <div className="launchpad-admin-cell-content">
+                              {instance.url ? (
+                                <a
+                                  href={instance.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="launchpad-admin-instance-link text-body text-primary underline hover:text-primary-dark"
+                                  data-action="open-instance"
+                                  data-record-id={recordId}
+                                >
+                                  Open
+                                </a>
+                              ) : (
+                                <span className="text-caption text-neural-05">
+                                  -
+                                </span>
+                              )}
+                            </div>
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })}
                   </Table.Body>
                 </Table>
               </div>
             )}
-          </div>
+          </section>
         )}
       </div>
-      <Modal.Footer sticky>
-        <Button variant="secondary" onClick={handleCancel}>
+      <Modal.Footer className="launchpad-admin-template-details-footer" sticky>
+        <Button
+          className="launchpad-admin-template-details-cancel"
+          data-action={
+            mode === 'edit' ? 'cancel-template-edit' : 'close-template'
+          }
+          variant="secondary"
+          onClick={handleCancel}
+        >
           {mode === 'edit' ? 'Cancel' : 'Close'}
         </Button>
         {mode === 'view' ? (
-          <Button variant="primary" onClick={handleEditClick}>
+          <Button
+            className="launchpad-admin-template-details-edit"
+            data-action="edit-template"
+            variant="primary"
+            onClick={handleEditClick}
+          >
             Edit
           </Button>
         ) : (
           <Button
+            className="launchpad-admin-template-details-save"
+            data-action="save-template"
             variant="primary"
             onClick={handleSaveClick}
             disabled={isSubmitting}

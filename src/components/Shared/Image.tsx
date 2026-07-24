@@ -49,6 +49,7 @@ export const Image: React.FC<Props> = ({
       // Disable optimization for custom domains
       unoptimized={!isOptimized}
       className={clsx(
+        'launchpad-image',
         {
           'opacity-0 transition-opacity duration-1000': transition,
         },

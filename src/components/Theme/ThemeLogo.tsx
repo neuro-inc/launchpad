@@ -1,3 +1,5 @@
+import { cn } from '@utils';
+
 import { Logo } from '@components/Ui/Logo';
 
 type Props = {
@@ -5,5 +7,5 @@ type Props = {
 };
 
 export const ThemeLogo = ({ className }: Props) => {
-  return <Logo className={className} />;
+  return <Logo className={cn('launchpad-theme-logo', className)} />;
 };

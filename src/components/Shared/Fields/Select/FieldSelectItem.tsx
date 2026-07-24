@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import * as Select from '@radix-ui/react-select';
 
 import { VariantProps } from '@typings';
-import { tv } from '@utils';
+import { cn, tv } from '@utils';
 
 const variants = tv({
   variants: {
@@ -33,9 +33,16 @@ export const FieldSelectItem = forwardRef<HTMLDivElement, Props>(
       <Select.Item
         ref={ref}
         value={value}
-        className={variants({ variant, size, className })}
+        className={variants({
+          variant,
+          size,
+          className: cn('launchpad-select__item', className),
+        })}
+        data-value={value}
       >
-        <Select.ItemText>{children}</Select.ItemText>
+        <Select.ItemText className="launchpad-select__item-text">
+          {children}
+        </Select.ItemText>
       </Select.Item>
     );
   },

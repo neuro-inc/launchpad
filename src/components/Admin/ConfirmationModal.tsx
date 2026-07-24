@@ -52,30 +52,51 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   };
 
   const modalContent = (
-    <Modal.Content className="max-w-lg" title={title}>
-      <div className="space-y-4">
-        <p className="text-body text-neural-06">{message}</p>
+    <Modal.Content
+      className="launchpad-admin-modal launchpad-admin-confirmation-modal max-w-lg"
+      title={title}
+    >
+      <div
+        className="launchpad-admin-confirmation-body space-y-4"
+        data-section="confirmation"
+        data-variant={variant}
+      >
+        <p className="launchpad-admin-confirmation-message text-body text-neural-06">
+          {message}
+        </p>
 
         {warningMessage && (
-          <div className="flex gap-3 rounded-lg border border-error bg-error-subtle p-4">
+          <div
+            className="launchpad-admin-confirmation-warning flex gap-3 rounded-lg border border-error bg-error-subtle p-4"
+            data-section="warning"
+          >
             <Icon
               icon={faTriangleExclamation}
-              className="mt-0.5 text-error"
+              className="launchpad-admin-confirmation-warning-icon mt-0.5 text-error"
               size="lg"
             />
-            <p className="text-body text-error-dark">{warningMessage}</p>
+            <p className="launchpad-admin-confirmation-warning-message text-body text-error-dark">
+              {warningMessage}
+            </p>
           </div>
         )}
 
         {children}
       </div>
 
-      <Modal.Footer>
-        <div className="flex justify-end gap-3">
-          <Button variant="ghost" onClick={handleCancel}>
+      <Modal.Footer className="launchpad-admin-confirmation-footer">
+        <div className="launchpad-admin-confirmation-actions flex justify-end gap-3">
+          <Button
+            className="launchpad-admin-confirmation-cancel"
+            data-action="cancel-confirmation"
+            variant="ghost"
+            onClick={handleCancel}
+          >
             {cancelLabel}
           </Button>
           <Button
+            className="launchpad-admin-confirmation-confirm"
+            data-action="confirm"
             variant={variant === 'danger' ? 'error' : 'primary'}
             onClick={handleConfirm}
           >

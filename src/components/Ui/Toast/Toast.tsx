@@ -5,5 +5,5 @@ type Props = {
 };
 
 export const Toast = ({ children }: Props) => {
-  return <div className="flex">{children}</div>;
+  return <div className="launchpad-toast__content flex">{children}</div>;
 };

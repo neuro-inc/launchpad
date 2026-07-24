@@ -1,8 +1,10 @@
 import { AnyFunction } from '@typings';
 import { cn, noop } from '@utils';
 
-type Props = {
-  className?: string;
+type Props = Omit<
+  React.HTMLAttributes<HTMLTableRowElement>,
+  'onClick' | 'onDoubleClick'
+> & {
   children?: React.ReactNode;
   onClick?: AnyFunction;
   onDoubleClick?: AnyFunction;
@@ -13,9 +15,11 @@ export const TableRow = ({
   children,
   onClick = noop,
   onDoubleClick = noop,
+  ...props
 }: Props) => (
   <tr
-    className={cn('contents', className)}
+    {...props}
+    className={cn('launchpad-table__row contents', className)}
     onClick={onClick}
     onDoubleClick={onDoubleClick}
   >

@@ -9,7 +9,8 @@ type Props = {
 export const Logo = ({ className }: Props) => {
   return (
     <svg
-      className={cn('h-[198px] w-[32px] text-black', className)}
+      className={cn('launchpad-logo h-[198px] w-[32px] text-black', className)}
+      data-variant="full"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 198 32"
       fill="currentColor"

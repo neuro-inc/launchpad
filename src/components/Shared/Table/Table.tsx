@@ -6,15 +6,15 @@ import { TableHead } from './TableHead';
 import { TableHeader } from './TableHeader';
 import { TableRow } from './TableRow';
 
-type Props = {
-  className?: string;
+type Props = React.TableHTMLAttributes<HTMLTableElement> & {
   children?: React.ReactNode;
 };
 
-export const Table = ({ className, children }: Props) => (
+export const Table = ({ className, children, ...props }: Props) => (
   <table
+    {...props}
     className={cn(
-      'grid border-collapse overflow-hidden rounded-lg bg-white',
+      'launchpad-table grid border-collapse overflow-hidden rounded-lg bg-white',
       className,
     )}
   >

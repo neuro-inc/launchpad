@@ -7,7 +7,11 @@ type Props = {
 export const LogoIcon: React.FC<Props> = ({ className }) => {
   return (
     <svg
-      className={cn('size-8 text-black', className)}
+      className={cn(
+        'launchpad-logo launchpad-logo--icon size-8 text-black',
+        className,
+      )}
+      data-variant="icon"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 32 32"
       fill="currentColor"

@@ -29,26 +29,40 @@ export const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   }, [controlledIsOpen]);
 
   return (
-    <div className="mb-6 rounded-lg border border-neutral-300">
+    <div
+      className="launchpad-admin-collapsible-section mb-6 rounded-lg border border-neutral-300"
+      data-section="collapsible"
+      data-state={isOpen ? 'open' : 'closed'}
+      data-title={title}
+    >
       <Button
         theme={false}
         onClick={() => setIsOpen(!isOpen)}
         className={clsx(
-          'flex w-full items-center justify-between p-4',
+          'launchpad-admin-collapsible-trigger flex w-full items-center justify-between p-4',
           'text-left text-h5 font-medium',
           'transition-colors hover:bg-neutral-100',
           'focus:outline-none focus:ring-2 focus:ring-primary',
         )}
+        data-action="toggle-section"
         aria-expanded={isOpen}
       >
-        <span>{title}</span>
+        <span className="launchpad-admin-collapsible-title">{title}</span>
         <Icon
           icon={faChevronDown}
-          className={clsx('transition-transform', isOpen && 'rotate-180')}
+          className={clsx(
+            'launchpad-admin-collapsible-icon transition-transform',
+            isOpen && 'rotate-180',
+          )}
         />
       </Button>
       {isOpen && (
-        <div className="border-t border-neutral-300 p-4">{children}</div>
+        <div
+          className="launchpad-admin-collapsible-content border-t border-neutral-300 p-4"
+          data-section="collapsible-content"
+        >
+          {children}
+        </div>
       )}
     </div>
   );

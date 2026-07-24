@@ -10,9 +10,9 @@ export const AppsPage: React.FC = async () => {
 
   const appTileColor = getBrighterColor(config.background, 80);
 
-  const appTileStyle = appTileColor
-    ? ({ backgroundColor: appTileColor } as React.CSSProperties)
-    : undefined;
+  const appTileStyle = {
+    '--launchpad-app-card-background': appTileColor || '#ffffff',
+  } as React.CSSProperties;
 
   return (
     <Layout>

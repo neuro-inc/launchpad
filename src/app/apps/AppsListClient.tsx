@@ -21,7 +21,8 @@ const AppsLoading: React.FC<{ tileStyle?: React.CSSProperties }> = ({
     <div
       // eslint-disable-next-line react/no-array-index-key
       key={index}
-      className="min-h-[240px] animate-pulse rounded-xl bg-white/80 p-6"
+      className="launchpad-app-card launchpad-app-card--loading min-h-[240px] animate-pulse rounded-xl p-6"
+      data-state="loading"
       style={tileStyle}
     >
       <div className="flex gap-3">
@@ -67,7 +68,11 @@ export const AppsListClient: React.FC<Props> = ({ tileStyle }) => {
   }, [loadApps]);
 
   return (
-    <Layout.Container className="grid grid-cols-3 gap-6 pb-10 sm:grid-cols-1 md:grid-cols-2 hd:gap-4">
+    <Layout.Container
+      id="launchpad-apps-page"
+      className="launchpad-apps-page launchpad-app-grid grid grid-cols-3 gap-6 pb-10 sm:grid-cols-1 md:grid-cols-2 hd:gap-4"
+      data-page="apps"
+    >
       {isLoading && <AppsLoading tileStyle={tileStyle} />}
 
       {!isLoading &&
@@ -76,17 +81,29 @@ export const AppsListClient: React.FC<Props> = ({ tileStyle }) => {
         ))}
 
       {!isLoading && error && (
-        <div className="col-span-full flex min-h-[240px] flex-col items-center justify-center gap-4 rounded-xl bg-white p-6 text-center">
+        <div
+          className="launchpad-app-card launchpad-app-grid__error col-span-full flex min-h-[240px] flex-col items-center justify-center gap-4 rounded-xl p-6 text-center"
+          data-state="error"
+          style={tileStyle}
+        >
           <p className="text-h5 text-black">Applications did not load</p>
           <p className="max-w-md text-neural-04">{error}</p>
-          <Button className="h-10 px-8" onClick={loadApps}>
+          <Button
+            className="launchpad-app-grid__retry h-10 px-8"
+            data-action="retry"
+            onClick={loadApps}
+          >
             Retry
           </Button>
         </div>
       )}
 
       {!isLoading && !error && apps.length === 0 && (
-        <div className="col-span-full flex min-h-[240px] items-center justify-center rounded-xl bg-white p-6 text-center text-neural-04">
+        <div
+          className="launchpad-app-card launchpad-app-grid__empty col-span-full flex min-h-[240px] items-center justify-center rounded-xl p-6 text-center text-neural-04"
+          data-state="empty"
+          style={tileStyle}
+        >
           No applications available.
         </div>
       )}

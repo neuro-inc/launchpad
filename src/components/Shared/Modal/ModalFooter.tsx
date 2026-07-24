@@ -34,11 +34,17 @@ export const ModalFooter = ({ className, sticky, children }: Props) => {
   return (
     <div
       ref={ref}
-      className={cn('flex justify-end gap-4 p-8', className, {
-        'sticky -bottom-px z-30 transition-colors border-t border-transparent bg-inherit before:absolute before:bg-gradient-to-t before:from-white before:h-20 before:inset-x-0 before:bottom-full before:-translate-y-px before:pointer-events-none before:opacity-0 before:transition-opacity':
-          sticky,
-        'border-neural-02 before:opacity-100': isPinned,
-      })}
+      className={cn(
+        'launchpad-modal__footer flex justify-end gap-4 p-8',
+        className,
+        {
+          'sticky -bottom-px z-30 transition-colors border-t border-transparent bg-inherit before:absolute before:bg-gradient-to-t before:from-white before:h-20 before:inset-x-0 before:bottom-full before:-translate-y-px before:pointer-events-none before:opacity-0 before:transition-opacity':
+            sticky,
+          'border-neural-02 before:opacity-100': isPinned,
+        },
+      )}
+      data-pinned={isPinned || undefined}
+      data-sticky={sticky || undefined}
     >
       {children}
     </div>

@@ -1,5 +1,5 @@
 import { VariantProps } from '@typings';
-import { tv } from '@utils';
+import { cn, tv } from '@utils';
 
 const variants = tv({
   base: 'rounded-full px-3 py-1 text-footnote-large inline-flex items-center shrink-0',
@@ -23,5 +23,15 @@ type Props = VariantProps<typeof variants> & {
 };
 
 export const Badge = ({ className, variant, children }: Props) => {
-  return <div className={variants({ variant, className })}>{children}</div>;
+  return (
+    <div
+      className={variants({
+        variant,
+        className: cn('launchpad-badge', className),
+      })}
+      data-variant={variant ?? 'grey'}
+    >
+      {children}
+    </div>
+  );
 };

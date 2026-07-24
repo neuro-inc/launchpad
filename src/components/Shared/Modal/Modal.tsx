@@ -108,16 +108,20 @@ const ModalComponent = forwardRef<ModalRef, Props>(
     return (
       <Dialog.Root open={isOpen} onOpenChange={handleOpenChange}>
         {children && (
-          <Dialog.Trigger asChild disabled={disabled}>
+          <Dialog.Trigger
+            asChild
+            disabled={disabled}
+            className="launchpad-modal__trigger"
+          >
             {children}
           </Dialog.Trigger>
         )}
         <Dialog.Portal container={containerRef?.current}>
-          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in" />
+          <Dialog.Overlay className="launchpad-modal__overlay fixed inset-0 z-40 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=open]:fade-in" />
           <Dialog.Content
             onPointerDownOutside={handlePointerDownOutside}
             className={cn(
-              'fixed left-1/2 top-1/2 z-50 flex max-h-full max-w-full -translate-x-1/2 -translate-y-1/2 p-2 outline-none data-[state=closed]:animate-modal-out data-[state=open]:animate-modal-in',
+              'launchpad-modal launchpad-modal__dialog fixed left-1/2 top-1/2 z-50 flex max-h-full max-w-full -translate-x-1/2 -translate-y-1/2 p-2 outline-none data-[state=closed]:animate-modal-out data-[state=open]:animate-modal-in',
               className,
             )}
           >
@@ -130,9 +134,13 @@ const ModalComponent = forwardRef<ModalRef, Props>(
               <Dialog.Close asChild onClick={handleClose}>
                 <Button
                   theme
-                  className="absolute right-7 top-7 z-30 text-[20px] text-neural-03 outline-none transition-colors hover:text-black"
+                  className="launchpad-modal__close absolute right-7 top-7 z-30 text-[20px] text-neural-03 outline-none transition-colors hover:text-black"
+                  data-action="close"
                 >
-                  <Icon icon={faXmark} />
+                  <Icon
+                    icon={faXmark}
+                    className="launchpad-modal__close-icon"
+                  />
                 </Button>
               </Dialog.Close>
             )}

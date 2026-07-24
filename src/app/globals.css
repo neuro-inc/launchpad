@@ -8,6 +8,25 @@ body {
   @apply text-rebecca;
 }
 
+:where(#launchpad-root, #launchpad-body) {
+  background: var(--launchpad-background, #f1f1f3);
+}
+
+:where(.launchpad-background--image) {
+  background-image: var(--launchpad-background-image);
+  background-position: var(--launchpad-background-position);
+  background-repeat: var(--launchpad-background-repeat);
+  background-size: var(--launchpad-background-size);
+}
+
+:where(.launchpad-app-card) {
+  background-color: var(--launchpad-app-card-background, #ffffff);
+}
+
+.launchpad-admin-surface {
+  background-color: var(--launchpad-admin-surface-background);
+}
+
 .space-before::before,
 .space-after::after,
 .space-both:before,

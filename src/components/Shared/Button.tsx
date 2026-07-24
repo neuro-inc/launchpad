@@ -41,10 +41,14 @@ export const Button = forwardRef<HTMLButtonElement, Props>(
     const isWithIcon = !!icon || checkIsComponentWithIconChild(children);
 
     const classNames = theme
-      ? className
-      : cn(buttonVariants({ variant, withIcon: isWithIcon, className }), {
-          'pointer-events-none': loading || disabled,
-        });
+      ? cn('launchpad-button', className)
+      : cn(
+          'launchpad-button',
+          buttonVariants({ variant, withIcon: isWithIcon, className }),
+          {
+            'pointer-events-none': loading || disabled,
+          },
+        );
 
     const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
       if (stopPropagation) {
@@ -84,16 +88,21 @@ export const Button = forwardRef<HTMLButtonElement, Props>(
         type={type}
         disabled={disabled}
         className={classNames}
+        data-loading={isLoading || undefined}
+        data-status={isLoading ? 'loading' : disabled ? 'disabled' : 'idle'}
+        data-variant={variant ?? (theme ? 'unstyled' : 'primary')}
+        data-with-icon={isWithIcon || undefined}
+        aria-busy={isLoading || undefined}
         onClick={handleClick}
         ref={ref}
       >
         {isLoading && (
           <ChaseSpinner
-            className="absolute right-4 transition-all"
+            className="launchpad-button__spinner absolute right-4 transition-all"
             color={getLoaderColor()}
           />
         )}
-        <Icon icon={icon} className="text-20" />
+        <Icon icon={icon} className="launchpad-button__icon text-20" />
         {children}
       </button>
     );

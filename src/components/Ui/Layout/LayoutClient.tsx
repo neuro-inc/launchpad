@@ -12,9 +12,12 @@ type Props = {
 
 export const LayoutClient = ({ className, children }: Props) => {
   return (
-    <LayoutWrapper className="flex flex-1 flex-col">
+    <LayoutWrapper className="launchpad-layout flex flex-1 flex-col">
       <LayoutHeaderClient />
-      <main className={clsx('flex flex-1 flex-col', className)}>
+      <main
+        id="launchpad-main"
+        className={clsx('launchpad-main flex flex-1 flex-col', className)}
+      >
         {children}
       </main>
     </LayoutWrapper>

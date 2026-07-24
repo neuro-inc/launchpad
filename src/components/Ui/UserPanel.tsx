@@ -23,21 +23,32 @@ export const UserPanel: React.FC<Props> = ({ user, isAdmin = false }) => {
   const nameInitials = getNameInitials(name || email);
 
   return (
-    <Popover showArrow={false} align="end" side="bottom" className="p-5">
-      <div
+    <Popover
+      showArrow={false}
+      align="end"
+      side="bottom"
+      className="launchpad-user-panel__popover p-5"
+      triggerClassName="launchpad-user-panel launchpad-user-panel__trigger"
+    >
+      <span
         slot="trigger"
-        className="flex size-10 items-center justify-center rounded-full bg-rebecca capitalize"
+        className="launchpad-user-panel__avatar flex size-10 items-center justify-center rounded-full bg-rebecca capitalize"
       >
-        <span className="text-h7 text-white">{nameInitials}</span>
-      </div>
+        <span className="launchpad-user-panel__initials text-h7 text-white">
+          {nameInitials}
+        </span>
+      </span>
 
-      <div className="min-w-64">
-        <p>{email}</p>
-        <p className="mt-0.5 text-body-small text-neural-04">{name}</p>
+      <div className="launchpad-user-panel__content min-w-64">
+        <p className="launchpad-user-panel__email">{email}</p>
+        <p className="launchpad-user-panel__name mt-0.5 text-body-small text-neural-04">
+          {name}
+        </p>
         {isAdmin && (
           <Link
             href={PATH.ADMIN}
-            className="mt-4 block rounded-lg bg-primary px-4 py-2 text-center text-white transition-colors hover:bg-primary-dark"
+            className="launchpad-user-panel__admin-link mt-4 block rounded-lg bg-primary px-4 py-2 text-center text-white transition-colors hover:bg-primary-dark"
+            data-action="open-admin"
           >
             Admin Panel
           </Link>

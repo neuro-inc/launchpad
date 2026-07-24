@@ -28,6 +28,7 @@ export const FieldTextarea = React.forwardRef<HTMLTextAreaElement, Props>(
     {
       disabled,
       required,
+      name,
       autoComplete = 'off',
       className,
       resizable,
@@ -53,21 +54,28 @@ export const FieldTextarea = React.forwardRef<HTMLTextAreaElement, Props>(
     const slots = getSlots<'note' | 'error' | 'icon'>(children);
 
     return (
-      <FieldContainer className={containerClassName}>
+      <FieldContainer
+        className={clsx('launchpad-field--textarea', containerClassName)}
+        data-field={name}
+        data-invalid={Boolean(error) || undefined}
+      >
         <textarea
           {...props}
           ref={ref}
           id={id}
+          name={name}
           className={cn(
             fieldVariants({
               variant,
               error: !!error,
               label: !!label,
             }),
-            'min-h-[64px] resize-none pt-4',
+            'launchpad-field__control launchpad-textarea min-h-[64px] resize-none pt-4',
             { 'resize-y': resizable },
             className,
           )}
+          data-invalid={Boolean(error) || undefined}
+          data-variant={variant}
           autoComplete={autoComplete}
           disabled={disabled}
           placeholder={placeholder}
@@ -78,7 +86,11 @@ export const FieldTextarea = React.forwardRef<HTMLTextAreaElement, Props>(
           required={required}
           className={labelClassName}
         >
-          <span className={clsx({ 'flex items-center gap-2': !!tooltip })}>
+          <span
+            className={clsx('launchpad-field__label-content', {
+              'flex items-center gap-2': !!tooltip,
+            })}
+          >
             {label}
             {tooltip && (
               <Tooltip side="top">
@@ -87,7 +99,9 @@ export const FieldTextarea = React.forwardRef<HTMLTextAreaElement, Props>(
                   icon={faCircleInfo}
                   className="text-neural-04 hover:text-neural-06"
                 />
-                <span className="text-caption">{tooltip}</span>
+                <span className="launchpad-field__tooltip text-caption">
+                  {tooltip}
+                </span>
               </Tooltip>
             )}
           </span>

@@ -1,14 +1,16 @@
 import { cn } from '@utils';
 
-type Props = {
-  className?: string;
-  children?: React.ReactNode;
-};
+type Props = React.HTMLAttributes<HTMLDivElement>;
 
-export const LayoutContainer: React.FC<Props> = ({ className, children }) => (
+export const LayoutContainer: React.FC<Props> = ({
+  className,
+  children,
+  ...props
+}) => (
   <div
+    {...props}
     className={cn(
-      'mx-auto w-full max-w-[1512px] px-20 hd:px-16 sm-md:px-4',
+      'launchpad-container mx-auto w-full max-w-[1512px] px-20 hd:px-16 sm-md:px-4',
       className,
     )}
   >
