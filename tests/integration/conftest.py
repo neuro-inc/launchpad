@@ -224,6 +224,7 @@ def app_client(
         with (
             patch("launchpad.lifespan.AppsApiClient") as mock_api_client_class,
             patch("launchpad.lifespan.ApoloClientFactory") as mock_apolo_factory_class,
+            patch("launchpad.lifespan.init_internal_apps", new=AsyncMock()),
         ):
             mock_api_client_class.return_value = mock_apps_api_client
             mock_apolo_factory_class.return_value.get = AsyncMock(
