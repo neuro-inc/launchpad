@@ -1,3 +1,4 @@
+from typing import cast
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -6,7 +7,7 @@ from fastapi.testclient import TestClient
 def _visible_templates(app_client: TestClient) -> list[dict[str, object]]:
     response = app_client.get("/api/v1/apps/templates?is_internal=false")
     assert response.status_code == 200
-    return response.json()["items"]
+    return cast(list[dict[str, object]], response.json()["items"])
 
 
 def _import_template(app_client: TestClient, name: str) -> dict[str, object]:
@@ -15,7 +16,7 @@ def _import_template(app_client: TestClient, name: str) -> dict[str, object]:
         json={"template_name": name, "template_version": "1.0.0"},
     )
     assert response.status_code == 200
-    return response.json()
+    return cast(dict[str, object], response.json())
 
 
 def test_template_positions_are_created_and_exposed(app_client: TestClient) -> None:
