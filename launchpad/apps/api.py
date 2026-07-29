@@ -3,6 +3,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter
+from fastapi.exceptions import RequestValidationError
 from fastapi_pagination import Page, paginate
 from starlette.requests import Request
 from starlette.status import HTTP_200_OK, HTTP_204_NO_CONTENT
@@ -13,6 +14,7 @@ from launchpad.apps.exceptions import (
     AppServiceError,
     AppTemplateNotFound,
     AppUnhealthyError,
+    TemplateOrderValidationError,
 )
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.resources import (
@@ -22,6 +24,7 @@ from launchpad.apps.resources import (
     LaunchpadAppRead,
     LaunchpadInstalledAppRead,
     LaunchpadTemplateRead,
+    OrderTemplatesRequest,
 )
 from launchpad.apps.service import DepAppService
 from launchpad.auth.dependencies import AdminAuth, Auth
@@ -309,6 +312,31 @@ async def view_get_templates(
             LaunchpadTemplateRead.model_validate(template) for template in templates
         ]
         return paginate(template_reads)
+
+
+@apps_router.put("/templates/order", status_code=HTTP_204_NO_CONTENT)
+async def view_put_template_order(
+    order_request: OrderTemplatesRequest,
+    app_service: DepAppService,
+    user: AdminAuth,
+) -> None:
+    """Replace the global order of all visible app templates."""
+    try:
+        await app_service.reorder_templates(order_request.template_ids)
+    except TemplateOrderValidationError as exc:
+        template_ids = order_request.model_dump(mode="json")["template_ids"]
+        raise RequestValidationError(
+            [
+                {
+                    "type": "value_error",
+                    "loc": ("body", "template_ids"),
+                    "msg": f"Value error, {exc}",
+                    "input": template_ids,
+                    "ctx": {"error": str(exc)},
+                }
+            ],
+            body=order_request.model_dump(mode="json"),
+        ) from exc
 
 
 @apps_router.get("/instances", response_model=Page[InstalledApp])

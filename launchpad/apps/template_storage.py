@@ -3,10 +3,11 @@ import typing
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import and_, delete, select
+from sqlalchemy import and_, case, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from launchpad.apps.exceptions import TemplateOrderValidationError
 from launchpad.apps.registry.internal.embeddings import EmbeddingsApp
 from launchpad.apps.registry.internal.llm_inference import LlmInferenceApp
 from launchpad.apps.registry.internal.postgres import PostgresApp
@@ -15,6 +16,72 @@ from launchpad.apps.template_models import AppTemplate
 
 
 logger = logging.getLogger(__name__)
+
+
+async def lock_template_order(db: AsyncSession) -> None:
+    """Serialize every mutation that can affect the global template order."""
+    await db.execute(text("LOCK TABLE app_templates IN SHARE ROW EXCLUSIVE MODE"))
+
+
+async def _next_visible_position(db: AsyncSession) -> int:
+    cursor = await db.execute(
+        select(func.coalesce(func.max(AppTemplate.position), -1) + 1).where(
+            AppTemplate.is_internal.is_(False)
+        )
+    )
+    return typing.cast(int, cursor.scalar_one())
+
+
+async def normalize_template_positions(db: AsyncSession) -> None:
+    cursor = await db.execute(
+        select(AppTemplate.id)
+        .where(AppTemplate.is_internal.is_(False))
+        .order_by(
+            AppTemplate.position.asc().nulls_last(),
+            AppTemplate.created_at.asc(),
+            AppTemplate.id.asc(),
+        )
+    )
+    template_ids = list(cursor.scalars().all())
+    if not template_ids:
+        return
+
+    positions = {
+        template_id: position for position, template_id in enumerate(template_ids)
+    }
+    await db.execute(
+        update(AppTemplate)
+        .where(AppTemplate.id.in_(template_ids))
+        .values(position=case(positions, value=AppTemplate.id))
+    )
+
+
+async def reorder_templates(db: AsyncSession, template_ids: list[UUID]) -> None:
+    await lock_template_order(db)
+
+    cursor = await db.execute(
+        select(AppTemplate.id)
+        .where(AppTemplate.is_internal.is_(False))
+        .order_by(AppTemplate.id.asc())
+    )
+    visible_template_ids = set(cursor.scalars().all())
+    requested_template_ids = set(template_ids)
+    if requested_template_ids != visible_template_ids:
+        raise TemplateOrderValidationError(
+            "template_ids must contain every visible template exactly once; refresh and retry"
+        )
+
+    if not template_ids:
+        return
+
+    positions = {
+        template_id: position for position, template_id in enumerate(template_ids)
+    }
+    await db.execute(
+        update(AppTemplate)
+        .where(AppTemplate.id.in_(template_ids))
+        .values(position=case(positions, value=AppTemplate.id))
+    )
 
 
 async def seed_templates(db: AsyncSession) -> None:
@@ -121,8 +188,27 @@ async def insert_template(
     if input is None:
         input = {}
 
+    await lock_template_order(db)
+
+    # Check whether this exact upsert target already exists.
+    cursor = await db.execute(
+        select(AppTemplate).where(
+            AppTemplate.name == name,
+            AppTemplate.template_name == template_name,
+            AppTemplate.template_version == template_version,
+        )
+    )
+    existing_template = cursor.scalar_one_or_none()
+    was_visible = existing_template is not None and not existing_template.is_internal
+
+    if is_internal:
+        position = None
+    elif existing_template is not None and not existing_template.is_internal:
+        position = existing_template.position
+    else:
+        position = await _next_visible_position(db)
+
     # Check if template exists and has instances
-    existing_template = await select_template(db, name=name)
     if existing_template:
         # Check if there are any instances using this template
         from launchpad.apps.storage import list_apps
@@ -166,6 +252,7 @@ async def insert_template(
                 external_urls=external_urls,
                 tags=tags,
                 is_internal=is_internal,
+                position=position,
                 is_shared=is_shared,
                 handler_class=handler_class,
                 input=input,
@@ -184,6 +271,7 @@ async def insert_template(
                 external_urls=external_urls,
                 tags=tags,
                 is_internal=is_internal,
+                position=position,
                 is_shared=is_shared,
                 handler_class=handler_class,
                 input=input,
@@ -193,6 +281,8 @@ async def insert_template(
     )
     cursor = await db.execute(query)
     template = cursor.scalar()
+    if was_visible and is_internal:
+        await normalize_template_positions(db)
     return typing.cast(AppTemplate, template)
 
 
@@ -200,7 +290,9 @@ async def delete_template(
     db: AsyncSession,
     template_id: UUID,
 ) -> None:
+    await lock_template_order(db)
     await db.execute(delete(AppTemplate).where(AppTemplate.id == template_id))
+    await normalize_template_positions(db)
 
 
 async def list_templates(
@@ -216,6 +308,11 @@ async def list_templates(
     query = select(AppTemplate)
     if where:
         query = query.where(and_(*where))
+    query = query.order_by(
+        AppTemplate.position.asc().nulls_last(),
+        AppTemplate.created_at.asc(),
+        AppTemplate.id.asc(),
+    )
 
     logger.info(f"Executing query: {query}")
     cursor = await db.execute(query)

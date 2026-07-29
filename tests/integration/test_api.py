@@ -130,7 +130,7 @@ class TestAdminAuthorization:
                 "template_version": "1.0.0",
             },
         )
-        assert import_template_response.status_code == 401
+        assert import_template_response.status_code == 403
 
         import_app_response = app_client.post(
             "/api/v1/apps/import",
@@ -139,17 +139,17 @@ class TestAdminAuthorization:
                 "name": "admin-only-app",
             },
         )
-        assert import_app_response.status_code == 401
+        assert import_app_response.status_code == 403
 
         delete_instance_response = app_client.delete(
             f"/api/v1/apps/instances/{uuid4()}"
         )
-        assert delete_instance_response.status_code == 401
+        assert delete_instance_response.status_code == 403
 
         delete_template_response = app_client.delete(
             f"/api/v1/apps/templates/{uuid4()}"
         )
-        assert delete_template_response.status_code == 401
+        assert delete_template_response.status_code == 403
 
         mock_apps_api_client.get_template.assert_not_called()
         mock_apps_api_client.get_by_id.assert_not_called()
