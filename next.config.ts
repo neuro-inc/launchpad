@@ -1,7 +1,35 @@
 import type { NextConfig } from 'next';
 import { withSentryConfig } from '@sentry/nextjs';
+import { execFileSync } from 'node:child_process';
+
+import packageJson from './package.json';
+
+const getCommitSha = (): string => {
+  const commitSha = process.env.APP_COMMIT_SHA ?? process.env.GITHUB_SHA ?? '';
+
+  if (commitSha) return commitSha.slice(0, 7);
+
+  try {
+    return execFileSync('git', ['rev-parse', '--short=7', 'HEAD'], {
+      encoding: 'utf8',
+    }).trim();
+  } catch {
+    return 'unknown';
+  }
+};
+
+const buildInfo = {
+  version: process.env.APP_VERSION || packageJson.version,
+  commitSha: getCommitSha(),
+  deployedAt: process.env.APP_DEPLOYED_AT || new Date().toISOString(),
+};
 
 const nextConfig = {
+  env: {
+    APP_VERSION: buildInfo.version,
+    APP_COMMIT_SHA: buildInfo.commitSha,
+    APP_DEPLOYED_AT: buildInfo.deployedAt,
+  },
   images: {
     remotePatterns: [
       {

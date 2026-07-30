@@ -4,21 +4,22 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 
+import { IS_LOCAL } from '@constants/app.constants';
+import { deriveServerApiUrl } from '@utils/helpers/serverApiUrl';
+
 import { Button } from '@components';
 
 const getApiUrl = () => {
-  const hostname = location.hostname;
-  const match = hostname.match(/^(.+?)\.launchpad\.(.+)$/);
-  if (match) {
-    return `${location.protocol}//${match[1]}-api.${match[2]}`;
-  }
+  try {
+    const siteUrl =
+      IS_LOCAL && process.env.NEXT_PUBLIC_SITE_URL
+        ? process.env.NEXT_PUBLIC_SITE_URL
+        : location.origin;
 
-  const [firstLabel, ...restLabels] = hostname.split('.');
-  if (!firstLabel || restLabels.length === 0 || firstLabel === 'launchpad') {
+    return deriveServerApiUrl(siteUrl);
+  } catch {
     return null;
   }
-
-  return `${location.protocol}//${firstLabel}-api.${restLabels.join('.')}`;
 };
 
 export const LoginButton: React.FC = () => {

@@ -1,19 +1,27 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  faArrowsRotate,
+  faCubesStacked,
+  faLayerGroup,
+  faPlus,
+} from '@fortawesome/pro-regular-svg-icons';
 
 import {
   ImportAppRequest,
   ImportTemplateRequest,
   InstalledApp,
   Template,
+  UpdateTemplateOrderRequest,
   WithPagination,
 } from '@typings';
 import { toast } from '@features';
 import { formatToCamelCase, formatToSnakeCase } from '@utils/formatters';
-import { request, safeError } from '@utils/helpers';
+import { request, safeError, sortByPosition } from '@utils/helpers';
 
 import {
+  AppsOrderModal,
   ConfirmationModal,
   ImportAppForm,
   ImportTemplateForm,
@@ -21,13 +29,7 @@ import {
   TemplatesTable,
   TemplateViewEditModal,
 } from '@components/Admin';
-import {
-  Button,
-  ChaseSpinner,
-  Field,
-  Modal,
-  ModalRef,
-} from '@components/Shared';
+import { Button, Field, Icon, Modal, ModalRef } from '@components/Shared';
 
 type AdminPageProps = {
   surfaceColors?: {
@@ -82,7 +84,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
         instancesResponse.items,
       ) as InstalledApp[];
 
-      setTemplates(nextTemplates);
+      setTemplates(sortByPosition(nextTemplates));
       setInstances(nextInstances);
     } catch (error) {
       setTemplates([]);
@@ -102,6 +104,36 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
   const handleRefresh = async () => {
     await loadAdminData();
     toast.success('Data refreshed successfully');
+  };
+
+  const handleSaveTemplateOrder = async (templateIds: string[]) => {
+    const previousTemplates = templates;
+    const templatesById = new Map(
+      templates.map((template) => [template.id, template]),
+    );
+    const orderedVisibleTemplates = templateIds
+      .map((id) => templatesById.get(id))
+      .filter((template): template is Template => Boolean(template));
+    const internalTemplates = templates.filter(
+      (template) => template.isInternal,
+    );
+
+    setTemplates([...orderedVisibleTemplates, ...internalTemplates]);
+
+    try {
+      const payload: UpdateTemplateOrderRequest = { templateIds };
+
+      await request('/api/v1/apps/templates/order', {
+        method: 'PUT',
+        body: JSON.stringify(formatToSnakeCase(payload)),
+      });
+
+      toast.success('Launchpad app order saved');
+    } catch (error: any) {
+      setTemplates(previousTemplates);
+      toast.error(error.message || 'Failed to save app order');
+      throw error;
+    }
   };
 
   const handleTemplateImport = async (data: ImportTemplateRequest) => {
@@ -269,107 +301,127 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
     >
       {/* Header */}
       <div
-        className="launchpad-admin-header mb-8 flex items-center justify-between"
+        className="launchpad-admin-header mb-8 flex items-start justify-between gap-6 sm:flex-col"
         data-section="admin-header"
       >
-        <h1
-          id="launchpad-admin-title"
-          className="launchpad-admin-title text-h2 font-bold"
-        >
-          Admin Panel
-        </h1>
+        <div className="launchpad-admin-heading">
+          <h1
+            id="launchpad-admin-title"
+            className="launchpad-admin-title text-h3 font-bold sm:text-h4"
+          >
+            Admin Panel
+          </h1>
+          <p className="launchpad-admin-description mt-2 max-w-2xl text-body text-neural-04">
+            Manage application templates and imported instances from one place.
+          </p>
+        </div>
         <Button
-          className="launchpad-admin-refresh-button"
+          className="launchpad-admin-refresh-button h-10 shrink-0 px-4 sm:w-full"
           data-action="refresh-admin-data"
           onClick={handleRefresh}
-          variant="primary"
+          variant="secondary"
+          disabled={isLoading}
         >
-          Refresh Data
+          <Icon
+            icon={faArrowsRotate}
+            className={isLoading ? 'animate-spin' : undefined}
+          />
+          Refresh
         </Button>
       </div>
+
+      {!isLoading && loadError && (
+        <div
+          className="launchpad-admin-error-state launchpad-admin-data-error mb-6 flex items-center justify-between gap-5 rounded-xl border border-error/20 bg-error-subtle px-5 py-4 sm:flex-col sm:items-start"
+          data-section="admin-data-error"
+          data-state="error"
+        >
+          <div>
+            <p className="launchpad-admin-error-title text-h7 text-error-dark">
+              Admin data did not load
+            </p>
+            <p className="launchpad-admin-error-message mt-1 text-body-medium text-neural-05">
+              {loadError}
+            </p>
+          </div>
+          <Button
+            className="launchpad-admin-retry-button h-9 shrink-0 px-4 sm:w-full"
+            data-action="retry-admin-data"
+            onClick={loadAdminData}
+            variant="error-outline"
+          >
+            Try again
+          </Button>
+        </div>
+      )}
 
       {/* Templates Section */}
       <section
         id="launchpad-admin-templates-section"
-        className="launchpad-admin-section launchpad-admin-templates-section mb-8"
+        className="launchpad-admin-section launchpad-admin-templates-section mb-10 overflow-hidden rounded-2xl border border-neural-02 bg-white/80 shadow-[0_8px_30px_rgba(19,26,57,0.06)]"
         data-section="templates"
       >
-        <div className="launchpad-admin-section-header mb-4 flex items-center justify-between">
-          <h2 className="launchpad-admin-section-title text-h4 font-bold">
-            App Templates
-          </h2>
-          <Modal
-            ref={importTemplateModalRef}
-            content={
-              <Modal.Content
-                className="launchpad-admin-modal launchpad-admin-import-template-modal max-h-[90vh] w-[90vw] max-w-4xl"
-                title="Import Template"
-                subtitle="Add a new template to the system"
-              >
-                <div
-                  className="launchpad-admin-modal-body py-6"
-                  data-section="import-template"
+        <div className="launchpad-admin-section-header flex items-center justify-between gap-5 border-b border-neural-02 px-6 py-5 sm:flex-col sm:items-stretch sm:px-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-subtle text-primary-dark">
+              <Icon icon={faLayerGroup} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="launchpad-admin-section-title text-h5 font-600 sm:text-h6">
+                  App Templates
+                </h2>
+                <span className="rounded-full bg-neural-01 px-2.5 py-1 text-caption font-600 text-neural-05">
+                  {isLoading ? '—' : templates.length}
+                </span>
+              </div>
+              <p className="mt-0.5 text-body-medium text-neural-04">
+                Reusable definitions available for application deployment.
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 sm:flex-col">
+            <AppsOrderModal
+              templates={templates}
+              onSave={handleSaveTemplateOrder}
+            />
+            <Modal
+              ref={importTemplateModalRef}
+              content={
+                <Modal.Content
+                  className="launchpad-admin-modal launchpad-admin-import-template-modal max-h-[90vh] w-[90vw] max-w-4xl"
+                  title="Import Template"
+                  subtitle="Add a new template to the system"
                 >
-                  <ImportTemplateForm
-                    onSubmit={handleTemplateImport}
-                    onError={handleError}
-                    instances={instances}
-                  />
-                </div>
-              </Modal.Content>
-            }
-          >
-            <Button
-              className="launchpad-admin-import-template-button"
-              data-action="open-import-template"
-              variant="primary"
+                  <div
+                    className="launchpad-admin-modal-body py-6"
+                    data-section="import-template"
+                  >
+                    <ImportTemplateForm
+                      onSubmit={handleTemplateImport}
+                      onError={handleError}
+                      instances={instances}
+                    />
+                  </div>
+                </Modal.Content>
+              }
             >
-              Import Template
-            </Button>
-          </Modal>
+              <Button
+                className="launchpad-admin-import-template-button h-10 shrink-0 px-4 sm:w-full"
+                data-action="open-import-template"
+                variant="primary"
+                icon={faPlus}
+              >
+                Import Template
+              </Button>
+            </Modal>
+          </div>
         </div>
 
-        {isLoading && (
-          <div
-            className="launchpad-admin-loading-state launchpad-admin-templates-loading flex items-center justify-center gap-3 rounded-lg bg-white p-6 text-neural-04"
-            data-section="templates-loading-state"
-            data-state="loading"
-          >
-            <ChaseSpinner
-              color="primary"
-              className="launchpad-admin-loading-spinner size-5"
-            />
-            <span className="launchpad-admin-loading-message">
-              Loading templates...
-            </span>
-          </div>
-        )}
-
-        {!isLoading && loadError && (
-          <div
-            className="launchpad-admin-error-state launchpad-admin-data-error flex flex-col items-center gap-4 rounded-lg bg-white p-6 text-center"
-            data-section="admin-data-error"
-            data-state="error"
-          >
-            <p className="launchpad-admin-error-title text-h5 text-black">
-              Admin data did not load
-            </p>
-            <p className="launchpad-admin-error-message max-w-md text-neural-04">
-              {loadError}
-            </p>
-            <Button
-              className="launchpad-admin-retry-button h-10 px-8"
-              data-action="retry-admin-data"
-              onClick={loadAdminData}
-            >
-              Retry
-            </Button>
-          </div>
-        )}
-
-        {!isLoading && !loadError && (
+        {!loadError && (
           <TemplatesTable
             templates={templates}
+            isLoading={isLoading}
             onView={handleViewTemplate}
             onEdit={handleEditTemplate}
             onDelete={handleDeleteTemplateClick}
@@ -396,13 +448,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
       {/* App Instances Section */}
       <section
         id="launchpad-admin-instances-section"
-        className="launchpad-admin-section launchpad-admin-instances-section mb-8"
+        className="launchpad-admin-section launchpad-admin-instances-section mb-8 overflow-hidden rounded-2xl border border-neural-02 bg-white/80 shadow-[0_8px_30px_rgba(19,26,57,0.06)]"
         data-section="instances"
       >
-        <div className="launchpad-admin-section-header mb-4 flex items-center justify-between">
-          <h2 className="launchpad-admin-section-title text-h4 font-bold">
-            App Instances
-          </h2>
+        <div className="launchpad-admin-section-header flex items-center justify-between gap-5 border-b border-neural-02 px-6 py-5 sm:flex-col sm:items-stretch sm:px-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-secondary-subtle text-secondary-dark">
+              <Icon icon={faCubesStacked} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="launchpad-admin-section-title text-h5 font-600 sm:text-h6">
+                  App Instances
+                </h2>
+                <span className="rounded-full bg-neural-01 px-2.5 py-1 text-caption font-600 text-neural-05">
+                  {isLoading ? '—' : instances.length}
+                </span>
+              </div>
+              <p className="mt-0.5 text-body-medium text-neural-04">
+                Applications currently registered with this Launchpad.
+              </p>
+            </div>
+          </div>
           <Modal
             ref={importAppModalRef}
             content={
@@ -424,34 +491,20 @@ export const AdminPage: React.FC<AdminPageProps> = ({ surfaceColors }) => {
             }
           >
             <Button
-              className="launchpad-admin-import-app-button"
+              className="launchpad-admin-import-app-button h-10 shrink-0 px-4 sm:w-full"
               data-action="open-import-app"
               variant="primary"
+              icon={faPlus}
             >
               Import App Instance
             </Button>
           </Modal>
         </div>
 
-        {isLoading && (
-          <div
-            className="launchpad-admin-loading-state launchpad-admin-instances-loading flex items-center justify-center gap-3 rounded-lg bg-white p-6 text-neural-04"
-            data-section="instances-loading-state"
-            data-state="loading"
-          >
-            <ChaseSpinner
-              color="primary"
-              className="launchpad-admin-loading-spinner size-5"
-            />
-            <span className="launchpad-admin-loading-message">
-              Loading instances...
-            </span>
-          </div>
-        )}
-
-        {!isLoading && !loadError && (
+        {!loadError && (
           <InstancesTable
             instances={instances}
+            isLoading={isLoading}
             onDelete={handleDeleteInstanceClick}
             headerBgColor={surfaceColors?.headerBgColor}
             rowBgColor={surfaceColors?.rowBgColor}

@@ -1,6 +1,6 @@
 {
   "name": "apolo-launchpad",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "prepare": "husky",
@@ -18,6 +18,9 @@
     ]
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@fortawesome/fontawesome-pro": "^7.2.0",
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
     "@fortawesome/free-brands-svg-icons": "^7.2.0",
@@ -40,11 +43,11 @@
     "dayjs": "^1.11.13",
     "immer": "^10.1.1",
     "js-yaml": "^4.3.0",
-    "next": "^16.2.6",
-    "next-auth": "^4.24.12",
+    "next": "^16.2.12",
+    "next-auth": "^4.24.15",
     "nuqs": "^2.4.3",
     "react": "^19.2.7",
-    "postcss": "^8.5.10",
+    "postcss": "^8.5.18",
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.77.0",
     "react-toastify": "^11.0.5",

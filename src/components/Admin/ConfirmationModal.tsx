@@ -55,6 +55,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     <Modal.Content
       className="launchpad-admin-modal launchpad-admin-confirmation-modal max-w-lg"
       title={title}
+      description={message}
     >
       <div
         className="launchpad-admin-confirmation-body space-y-4"

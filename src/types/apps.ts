@@ -9,6 +9,11 @@ type BaseAppProperties = {
   documentationUrls: Array<{ [key: string]: string }>;
   externalUrls: Array<{ [key: string]: string }>;
   tags: string[];
+  position?: number | null;
+};
+
+export type UpdateTemplateOrderRequest = {
+  templateIds: string[];
 };
 
 export type App = BaseAppProperties & {

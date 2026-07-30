@@ -48,31 +48,29 @@ export const ModalHeader = ({
   }, [sticky]);
 
   return (
-    <Dialog.Title asChild>
-      <h2
-        className={cn(
-          'launchpad-modal__header launchpad-modal__title p-8 text-h4',
-          className,
-          {
-            'sticky -top-px z-30 border-b transition-colors border-transparent bg-inherit before:absolute before:bg-gradient-to-b before:from-white before:h-20 before:inset-x-0 before:top-full before:translate-y-px before:pointer-events-none before:opacity-0 before:transition-opacity':
-              sticky,
-            'border-neural-02 before:opacity-100': isPinned,
-          },
-        )}
-        ref={ref}
-        data-pinned={isPinned || undefined}
-        data-sticky={sticky || undefined}
-      >
-        {children}
+    <div
+      className={cn('launchpad-modal__header p-8', className, {
+        'sticky -top-px z-30 border-b transition-colors border-transparent bg-inherit before:absolute before:bg-gradient-to-b before:from-white before:h-20 before:inset-x-0 before:top-full before:translate-y-px before:pointer-events-none before:opacity-0 before:transition-opacity':
+          sticky,
+        'border-neural-02 before:opacity-100': isPinned,
+      })}
+      ref={ref}
+      data-pinned={isPinned || undefined}
+      data-sticky={sticky || undefined}
+    >
+      <Dialog.Title asChild>
+        <h2 className="launchpad-modal__title text-h4">{children}</h2>
+      </Dialog.Title>
 
-        <Slot slot={slots.subtitle}>
-          <Render if={subtitle}>
+      <Slot slot={slots.subtitle}>
+        <Render if={subtitle}>
+          <Dialog.Description asChild>
             <span className="launchpad-modal__subtitle mt-1 block text-sm font-normal text-neural-04">
               {subtitle}
             </span>
-          </Render>
-        </Slot>
-      </h2>
-    </Dialog.Title>
+          </Dialog.Description>
+        </Render>
+      </Slot>
+    </div>
   );
 };

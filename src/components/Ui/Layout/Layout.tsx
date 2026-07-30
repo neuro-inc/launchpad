@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import clsx from 'clsx';
 
+import { IS_LOCAL } from '@constants';
 import { getAuthOptions } from '@features';
 import {
   canDeriveLaunchpadApiHostname,
@@ -22,14 +23,19 @@ type Props = {
 export const Layout = async ({ className, children }: Props) => {
   const siteUrl = await getSiteUrl();
   const siteHostname = new URL(siteUrl).hostname;
-  const supportsLaunchpadAuth = canDeriveLaunchpadApiHostname(siteHostname);
+  const localApiUrl = IS_LOCAL
+    ? await getServerApiUrl().catch(() => null)
+    : null;
+  const supportsLaunchpadAuth = IS_LOCAL
+    ? Boolean(localApiUrl)
+    : canDeriveLaunchpadApiHostname(siteHostname);
 
   const authBootstrap = supportsLaunchpadAuth
     ? await (async () => {
         const authOptions = await getAuthOptions();
         const [session, apiUrl] = await Promise.all([
           getServerSession(authOptions),
-          getServerApiUrl(),
+          localApiUrl ?? getServerApiUrl(),
         ]);
 
         return { session, apiUrl };
