@@ -10,6 +10,7 @@ import { ToastContainer } from '@components/Ui/Toast';
 
 import '@features/dayjs.feature';
 
+import { AppVersionLog } from './AppVersionLog';
 import '@fortawesome/fontawesome-svg-core/styles.css';
 import './globals.css';
 
@@ -129,6 +130,7 @@ export default async function RootLayout({ children }: Props) {
         })}
         suppressHydrationWarning
       >
+        <AppVersionLog />
         <NuqsAdapter>{children}</NuqsAdapter>
         <ToastContainer />
         {config.cssUrl && (

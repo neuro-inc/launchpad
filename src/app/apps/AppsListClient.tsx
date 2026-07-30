@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { App, WithPagination } from '@typings';
 import { formatToCamelCase } from '@utils/formatters';
-import { request } from '@utils/helpers';
+import { request, sortByPosition } from '@utils/helpers';
 
 import { AppItem } from '@components/Apps/AppItem';
 import { Button } from '@components/Shared';
@@ -54,7 +54,7 @@ export const AppsListClient: React.FC<Props> = ({ tileStyle }) => {
     try {
       const { items } = await request<WithPagination<App>>('/api/v1/apps');
       const nextApps = formatToCamelCase(items) as App[];
-      setApps(nextApps);
+      setApps(sortByPosition(nextApps));
     } catch (err) {
       setApps([]);
       setError(err instanceof Error ? err.message : String(err));

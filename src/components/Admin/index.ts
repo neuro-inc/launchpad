@@ -1,3 +1,4 @@
+export * from './AppsOrderModal';
 export * from './CollapsibleSection';
 export * from './ConfirmationModal';
 export * from './FileUpload';

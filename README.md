@@ -27,7 +27,7 @@ Before running the frontend locally, you need to deploy a Launchpad instance:
 1. Go to **Apolo Console**
 2. Install the **Launchpad** app
 3. After installation, go to the app's **Outputs** tab
-4. Copy the **App URL** - you'll use this as `NEXT_PUBLIC_SERVER_API_URL`
+4. Copy the **App URL** - you'll use this as `NEXT_PUBLIC_SITE_URL`
 
 ### 2. Configure Keycloak for Local Development
 
@@ -60,11 +60,8 @@ Create a `.env.local` file in the root directory with the following variables:
 NEXTAUTH_SECRET=your-secret-here
 NEXTAUTH_URL=http://localhost:3000
 
-# Backend API URL (from Launchpad app outputs)
-NEXT_PUBLIC_SERVER_API_URL=https://your-launchpad-instance.jobs.neu.ro
-
-# Site URL (use http://localhost:3000 for local development)
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+# Site URL (use your real Launchpad app URL for local development)
+NEXT_PUBLIC_SITE_URL=https://your-launchpad-instance.launchpad.apps.dev.apolo.us
 
 # Sentry (optional)
 SENTRY_DSN=your-sentry-dsn
@@ -75,9 +72,10 @@ NEXT_PUBLIC_ENVIRONMENT=local
 ```
 
 **Important Notes:**
-- `NEXT_PUBLIC_SERVER_API_URL` is the App URL from your Launchpad instance outputs
+- `NEXT_PUBLIC_SITE_URL` should be the App URL from your Launchpad instance outputs
+- The frontend derives the backend API hostname automatically from `NEXT_PUBLIC_SITE_URL`
 - `NEXT_PUBLIC_SITE_URL` is used for OAuth redirects - use the public URL where this app is deployed
-- For local development, `NEXT_PUBLIC_SITE_URL` should be `http://localhost:3000`
+- For local development with backend access, do not use `http://localhost:3000` as `NEXT_PUBLIC_SITE_URL`
 
 ### 5. Run Development Server
 
