@@ -16,7 +16,7 @@ from starlette.status import HTTP_401_UNAUTHORIZED
 
 from launchpad.auth.models import User
 from launchpad.config import KeycloakConfig
-from launchpad.errors import Unauthorized
+from launchpad.errors import Forbidden, Unauthorized
 
 
 logger = logging.getLogger(__name__)
@@ -231,7 +231,7 @@ async def admin_role_required(user: Auth) -> User:
         logger.warning(
             f"User {user.email} attempted to access admin endpoint without admin role"
         )
-        raise Unauthorized("Admin role required")
+        raise Forbidden("Admin role required")
     return user
 
 

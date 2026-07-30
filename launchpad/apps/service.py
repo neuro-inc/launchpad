@@ -45,6 +45,7 @@ from launchpad.apps.template_storage import (
     delete_template,
     insert_template,
     list_templates,
+    reorder_templates as reorder_template_positions,
     select_template,
 )
 from launchpad.errors import BadRequest
@@ -1099,6 +1100,11 @@ class AppService:
 
         await self.delete_template_by_id(template.id, uninstall=uninstall)
 
+    async def reorder_templates(self, template_ids: list[UUID]) -> None:
+        async with self._db() as db:
+            async with db.begin():
+                await reorder_template_positions(db, template_ids)
+
     async def is_healthy(
         self,
         installed_app: InstalledApp,
@@ -1159,8 +1165,10 @@ class AppService:
         app_reads = [
             LaunchpadAppRead.model_validate(
                 {
+                    "id": template.id,
                     "verbose_name": template.verbose_name,
                     "name": template.name,
+                    "position": template.position,
                     "description_short": template.description_short,
                     "description_long": template.description_long,
                     "logo": template.logo,

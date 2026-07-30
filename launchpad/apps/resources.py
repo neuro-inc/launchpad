@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ImportTemplateRequest(BaseModel):
@@ -79,8 +79,10 @@ class GenericAppInstallRequest(BaseModel):
 
 
 class LaunchpadAppRead(BaseModel):
+    id: UUID
     name: str = Field(alias="title", validation_alias="verbose_name")
     launchpad_app_name: str = Field(validation_alias="name")
+    position: int | None
     description_short: str
     description_long: str
     logo: str
@@ -106,8 +108,20 @@ class LaunchpadTemplateRead(BaseModel):
     external_urls: list[dict[str, str]]
     tags: list[str]
     is_internal: bool
+    position: int | None
     is_shared: bool
     input: dict[str, Any]
+
+
+class OrderTemplatesRequest(BaseModel):
+    template_ids: list[UUID]
+
+    @field_validator("template_ids")
+    @classmethod
+    def validate_unique_template_ids(cls, template_ids: list[UUID]) -> list[UUID]:
+        if len(template_ids) != len(set(template_ids)):
+            raise ValueError("template_ids must be unique")
+        return template_ids
 
 
 class LaunchpadInstalledAppRead(BaseModel):

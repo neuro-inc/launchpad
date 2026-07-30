@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,6 +21,17 @@ class AppTemplate(Base):
             "template_name",
             "template_version",
             name="unique__app_templates__name_template_name_version",
+        ),
+        UniqueConstraint(
+            "position",
+            name="unique__app_templates__position",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint(
+            "(is_internal AND position IS NULL) OR "
+            "(NOT is_internal AND position IS NOT NULL AND position >= 0)",
+            name="check__app_templates__position_visibility",
         ),
     )
 
@@ -56,6 +67,9 @@ class AppTemplate(Base):
 
     is_internal: Mapped[bool]
     """Whether this template is internal (not visible to end users)"""
+
+    position: Mapped[int | None]
+    """Zero-based global position for visible templates; NULL for internal ones"""
 
     is_shared: Mapped[bool]
     """Whether apps from this template can be shared by multiple users"""
