@@ -7,7 +7,10 @@ from sqlalchemy import and_, case, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from launchpad.apps.exceptions import TemplateOrderValidationError
+from launchpad.apps.exceptions import (
+    AppTemplateNameConflict,
+    TemplateOrderValidationError,
+)
 from launchpad.apps.registry.internal.embeddings import EmbeddingsApp
 from launchpad.apps.registry.internal.llm_inference import LlmInferenceApp
 from launchpad.apps.registry.internal.postgres import PostgresApp
@@ -158,6 +161,14 @@ async def select_template(
     return cursor.scalar_one_or_none()
 
 
+async def select_templates_by_name(
+    db: AsyncSession,
+    name: str,
+) -> typing.Sequence[AppTemplate]:
+    cursor = await db.execute(select(AppTemplate).where(AppTemplate.name == name))
+    return cursor.scalars().all()
+
+
 async def insert_template(
     db: AsyncSession,
     name: str,
@@ -174,6 +185,7 @@ async def insert_template(
     is_shared: bool,
     handler_class: str | None = None,
     input: dict[str, Any] | None = None,
+    reject_name_conflicts: bool = False,
 ) -> AppTemplate:
     """
     Insert or update a template.
@@ -189,6 +201,21 @@ async def insert_template(
         input = {}
 
     await lock_template_order(db)
+
+    if reject_name_conflicts:
+        same_name_cursor = await db.execute(
+            select(AppTemplate).where(AppTemplate.name == name)
+        )
+        conflicting_templates = [
+            template
+            for template in same_name_cursor.scalars().all()
+            if template.template_name != template_name
+            or template.template_version != template_version
+        ]
+        if conflicting_templates:
+            raise AppTemplateNameConflict(
+                f"Template name '{name}' is already used by a different template or version"
+            )
 
     # Check whether this exact upsert target already exists.
     cursor = await db.execute(

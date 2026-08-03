@@ -21,6 +21,21 @@ class AppConfigurationResult:
     previous_launchpad_instance_ids: list[UUID] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class AppConfigurationPlan:
+    app_id: UUID
+    template_name: str = ""
+    template_version: str = ""
+    updated_input: dict[str, Any] | None = None
+    patched_paths: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    previous_launchpad_instance_ids: list[UUID] = field(default_factory=list)
+
+    @property
+    def changed(self) -> bool:
+        return self.updated_input is not None
+
+
 def _format_path(path: Path) -> str:
     return ".".join(path) if path else "<root>"
 
@@ -221,20 +236,21 @@ class AppConfigurator:
         self._auth_middleware_name = auth_middleware_name
         self._launchpad_instance_id = launchpad_instance_id
 
-    async def configure_launchpad_auth(
+    async def prepare_launchpad_auth(
         self,
         app_id: UUID,
-    ) -> AppConfigurationResult:
+    ) -> AppConfigurationPlan:
         warnings: list[str] = []
 
         try:
             app = await self._apps_api_client.get_by_id(app_id)
         except Exception as e:
             logger.warning("Failed to fetch app %s from Apps API: %s", app_id, e)
-            return AppConfigurationResult(
+            return AppConfigurationPlan(
+                app_id=app_id,
                 warnings=[
                     f"Auth middleware was not configured: failed to fetch app metadata for {app_id}"
-                ]
+                ],
             )
 
         template_name = app["template_name"]
@@ -244,10 +260,13 @@ class AppConfigurator:
             current_input = await self._apps_api_client.get_inputs(app_id)
         except Exception as e:
             logger.warning("Failed to fetch app %s input from Apps API: %s", app_id, e)
-            return AppConfigurationResult(
+            return AppConfigurationPlan(
+                app_id=app_id,
+                template_name=template_name,
+                template_version=template_version,
                 warnings=[
                     f"Auth middleware was not configured for {template_name}:{template_version}: failed to fetch current app input"
-                ]
+                ],
             )
 
         try:
@@ -261,26 +280,35 @@ class AppConfigurator:
                 template_version,
                 e,
             )
-            return AppConfigurationResult(
+            return AppConfigurationPlan(
+                app_id=app_id,
+                template_name=template_name,
+                template_version=template_version,
                 warnings=[
                     f"Auth middleware was not configured for {template_name}:{template_version}: failed to fetch template schema"
-                ]
+                ],
             )
 
         schema = template.get("input")
         if not isinstance(schema, dict):
-            return AppConfigurationResult(
+            return AppConfigurationPlan(
+                app_id=app_id,
+                template_name=template_name,
+                template_version=template_version,
                 warnings=[
                     f"Auth middleware was not configured for {template_name}:{template_version}: template schema is unavailable"
-                ]
+                ],
             )
 
         paths = discover_ingress_http_paths(schema)
         if not paths:
-            return AppConfigurationResult(
+            return AppConfigurationPlan(
+                app_id=app_id,
+                template_name=template_name,
+                template_version=template_version,
                 warnings=[
                     f"Auth middleware was not configured for {template_name}:{template_version}: no IngressHttp input found in template schema"
-                ]
+                ],
             )
 
         previous_launchpad_instance_ids = [
@@ -303,11 +331,14 @@ class AppConfigurator:
         warnings.extend(patch_warnings)
 
         if not patched_paths:
-            return AppConfigurationResult(
+            return AppConfigurationPlan(
+                app_id=app_id,
+                template_name=template_name,
+                template_version=template_version,
                 warnings=[
                     f"Auth middleware was not configured for {template_name}:{template_version}: no patchable IngressHttp input found",
                     *warnings,
-                ]
+                ],
             )
 
         if updated_input == current_input:
@@ -316,46 +347,71 @@ class AppConfigurator:
                 app_id,
                 patched_paths,
             )
-            return AppConfigurationResult(
+            return AppConfigurationPlan(
+                app_id=app_id,
+                template_name=template_name,
+                template_version=template_version,
                 warnings=warnings,
                 previous_launchpad_instance_ids=previous_launchpad_instance_ids,
             )
 
+        return AppConfigurationPlan(
+            app_id=app_id,
+            template_name=template_name,
+            template_version=template_version,
+            updated_input=updated_input,
+            patched_paths=patched_paths,
+            warnings=warnings,
+            previous_launchpad_instance_ids=previous_launchpad_instance_ids,
+        )
+
+    async def apply_launchpad_auth(
+        self,
+        plan: AppConfigurationPlan,
+    ) -> AppConfigurationResult:
+        if plan.updated_input is None:
+            return AppConfigurationResult(
+                warnings=plan.warnings,
+                previous_launchpad_instance_ids=plan.previous_launchpad_instance_ids,
+            )
+
         if self._launchpad_instance_id is None:
+            warnings = [*plan.warnings]
             warnings.append(
                 "Launchpad instance id is not configured; using local import comment fallback"
             )
             instance = "unknown"
         else:
+            warnings = plan.warnings
             instance = str(self._launchpad_instance_id)
 
         comment = f"Import into Launchpad {instance}: change auth middleware"
         try:
             await self._apps_api_client.configure_app(
-                app_id,
-                inputs=updated_input,
+                plan.app_id,
+                inputs=plan.updated_input,
                 comment=comment,
             )
         except Exception as e:
             logger.warning(
                 "Failed to configure Launchpad auth middleware for app %s: %s",
-                app_id,
+                plan.app_id,
                 e,
             )
             return AppConfigurationResult(
                 warnings=[
-                    f"Auth middleware was not configured for {template_name}:{template_version}: app reconfiguration failed",
+                    f"Auth middleware was not configured for {plan.template_name}:{plan.template_version}: app reconfiguration failed",
                     *warnings,
                 ]
             )
 
         logger.info(
             "Configured Launchpad auth middleware for app %s at input paths: %s",
-            app_id,
-            patched_paths,
+            plan.app_id,
+            plan.patched_paths,
         )
         return AppConfigurationResult(
             changed=True,
             warnings=warnings,
-            previous_launchpad_instance_ids=previous_launchpad_instance_ids,
+            previous_launchpad_instance_ids=plan.previous_launchpad_instance_ids,
         )

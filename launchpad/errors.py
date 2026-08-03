@@ -6,6 +6,7 @@ from starlette.status import (
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_404_NOT_FOUND,
+    HTTP_409_CONFLICT,
 )
 
 
@@ -43,3 +44,8 @@ class Forbidden(LaunchpadApiError):
 class NotFound(LaunchpadApiError):
     def __init__(self, message: str = "Not Found", **kwargs: Any):
         super().__init__(status_code=HTTP_404_NOT_FOUND, message=message, **kwargs)
+
+
+class Conflict(LaunchpadApiError):
+    def __init__(self, message: str = "Conflict", **kwargs: Any):
+        super().__init__(status_code=HTTP_409_CONFLICT, message=message, **kwargs)

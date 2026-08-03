@@ -15,6 +15,7 @@ from launchpad.apps.exceptions import (
     AppMissingUrlError,
     AppNotInstalledError,
     AppServiceError,
+    AppTemplateNameConflict,
     AppTemplateNotFound,
     AppUnhealthyError,
 )
@@ -31,6 +32,7 @@ from launchpad.apps.resources import (
     ImportAppRequest,
     ImportTemplateRequest,
     LaunchpadAppRead,
+    LaunchpadTemplateBrandingRead,
 )
 from launchpad.apps.storage import (
     delete_app,
@@ -47,6 +49,7 @@ from launchpad.apps.template_storage import (
     list_templates,
     reorder_templates as reorder_template_positions,
     select_template,
+    select_templates_by_name,
 )
 from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import AppsApiError, NotFound
@@ -648,15 +651,23 @@ class AppService:
                 "will use null url and empty external_url_list"
             )
 
-        configuration_result = await self._app_configurator.configure_launchpad_auth(
+        configuration_plan = await self._app_configurator.prepare_launchpad_auth(
             import_request.app_id
         )
-        warnings.extend(configuration_result.warnings)
+
+        source_template, source_warnings = await self._fetch_source_template_metadata(
+            app_id=import_request.app_id,
+            previous_launchpad_instance_ids=(
+                configuration_plan.previous_launchpad_instance_ids
+            ),
+            template_name=template_name,
+            template_version=template_version,
+        )
+        warnings.extend(source_warnings)
 
         # Create/update template using helper method
-        # NOTE: We ignore import_request.name for app imports because the template
-        # should always be identified by the template_name from Apps API, not a custom name.
-        # The 'name' parameter is only meaningful for template imports (ImportTemplateRequest).
+        # The request may override the Launchpad-facing template name; the Apps API
+        # template_name and template_version remain the immutable source identity.
         template = await self._fetch_and_create_template(
             template_name=template_name,
             template_version=template_version,
@@ -672,7 +683,14 @@ class AppService:
             is_shared=True,  # Imported installed apps are always shared
             fallback_verbose_name=display_name,  # Use display_name as fallback
             input=app_inputs,  # Use actual inputs from the running app
+            source_template=source_template,
+            reject_name_conflicts=True,
         )
+
+        configuration_result = await self._app_configurator.apply_launchpad_auth(
+            configuration_plan
+        )
+        warnings.extend(configuration_result.warnings)
 
         # Link the app installation
         async with self._db() as db:
@@ -699,6 +717,56 @@ class AppService:
         )
         installed_app.warnings = warnings  # type: ignore[attr-defined]
         return installed_app
+
+    async def _fetch_source_template_metadata(
+        self,
+        *,
+        app_id: UUID,
+        previous_launchpad_instance_ids: list[UUID],
+        template_name: str,
+        template_version: str,
+    ) -> tuple[LaunchpadTemplateBrandingRead | None, list[str]]:
+        if not previous_launchpad_instance_ids:
+            return None, []
+        if len(previous_launchpad_instance_ids) != 1:
+            return None, [
+                "Branding was not imported because more than one source Launchpad "
+                "was discovered; refresh the app metadata manually."
+            ]
+
+        source_launchpad_id = previous_launchpad_instance_ids[0]
+        try:
+            outputs = await self._apps_api_client.get_outputs(source_launchpad_id)
+            source_admin = await LaunchpadAdminApi.from_outputs(
+                http=self._http,
+                apolo_client=self._apolo_client,
+                cluster_name=self._apps_api_client.cluster,
+                org_name=self._apps_api_client.org_name,
+                project_name=self._apps_api_client.project_name,
+                outputs=outputs,
+            )
+            source_template = LaunchpadTemplateBrandingRead.model_validate(
+                await source_admin.get_app_template(app_id)
+            )
+            if (
+                source_template.template_name != template_name
+                or source_template.template_version != template_version
+            ):
+                raise LaunchpadApiError(
+                    "source template identity does not match the running app"
+                )
+            return source_template, []
+        except (AppsApiError, LaunchpadApiError, ValueError) as e:
+            logger.warning(
+                "Failed to import branding for app %s from Launchpad %s: %s",
+                app_id,
+                source_launchpad_id,
+                e,
+            )
+            return None, [
+                f"Branding was not imported from source Launchpad "
+                f"{source_launchpad_id}: {e}"
+            ]
 
     async def _delete_app_from_previous_launchpad(
         self,
@@ -767,6 +835,8 @@ class AppService:
         is_shared: bool = True,
         fallback_verbose_name: str | None = None,
         input: dict[str, Any] | None = None,
+        source_template: LaunchpadTemplateBrandingRead | None = None,
+        reject_name_conflicts: bool = False,
     ) -> AppTemplate:
         """
         Fetch template metadata from Apps API and create/update AppTemplate.
@@ -828,17 +898,52 @@ class AppService:
             template_doc_urls = []
             template_ext_urls = []
 
-        # Apply priority logic: user override > fallback > template metadata > defaults
-        resolved_name = name or template_name
-        resolved_verbose_name = (
-            verbose_name or fallback_verbose_name or template_title or resolved_name
+        def first_not_none(*values: Any) -> Any:
+            return next((value for value in values if value is not None), None)
+
+        source_name = source_template.name if source_template is not None else None
+        source_verbose_name = (
+            source_template.verbose_name if source_template is not None else None
         )
-        resolved_description_short = description_short or template_desc_short
-        resolved_description_long = description_long or template_desc_long
-        resolved_logo = logo or template_logo
-        resolved_documentation_urls = documentation_urls or template_doc_urls
-        resolved_external_urls = external_urls or template_ext_urls
-        resolved_tags = tags or template_tags
+        source_description_short = (
+            source_template.description_short if source_template is not None else None
+        )
+        source_description_long = (
+            source_template.description_long if source_template is not None else None
+        )
+        source_logo = source_template.logo if source_template is not None else None
+        source_documentation_urls = (
+            source_template.documentation_urls if source_template is not None else None
+        )
+        source_external_urls = (
+            source_template.external_urls if source_template is not None else None
+        )
+        source_tags = source_template.tags if source_template is not None else None
+
+        # Explicit request > source Launchpad > Apps API template > instance/default.
+        # None means absent; empty strings and lists are intentional values.
+        resolved_name = first_not_none(name, source_name, template_name)
+        resolved_verbose_name = first_not_none(
+            verbose_name,
+            source_verbose_name,
+            template_title or None,
+            fallback_verbose_name,
+            resolved_name,
+        )
+        resolved_description_short = first_not_none(
+            description_short, source_description_short, template_desc_short
+        )
+        resolved_description_long = first_not_none(
+            description_long, source_description_long, template_desc_long
+        )
+        resolved_logo = first_not_none(logo, source_logo, template_logo)
+        resolved_documentation_urls = first_not_none(
+            documentation_urls, source_documentation_urls, template_doc_urls
+        )
+        resolved_external_urls = first_not_none(
+            external_urls, source_external_urls, template_ext_urls
+        )
+        resolved_tags = first_not_none(tags, source_tags, template_tags)
 
         # Create or update the template
 
@@ -860,6 +965,7 @@ class AppService:
                     is_shared=is_shared,
                     handler_class=None,
                     input=input,
+                    reject_name_conflicts=reject_name_conflicts,
                 )
 
         return template
@@ -1099,6 +1205,28 @@ class AppService:
             raise NotFound(f"Template for app instance with id {app_id} not found")
 
         await self.delete_template_by_id(template.id, uninstall=uninstall)
+
+    async def get_template_by_app_id(
+        self, app_id: UUID
+    ) -> LaunchpadTemplateBrandingRead:
+        async with self._db() as db:
+            installed_app = await select_app(db, id=app_id)
+
+        if installed_app is None:
+            raise NotFound(f"App instance with id {app_id} not found")
+
+        async with self._db() as db:
+            templates = await select_templates_by_name(
+                db, name=installed_app.template_name
+            )
+
+        if not templates:
+            raise NotFound(f"Template for app instance with id {app_id} not found")
+        if len(templates) != 1:
+            raise AppTemplateNameConflict(
+                f"Multiple templates use name '{installed_app.template_name}'"
+            )
+        return LaunchpadTemplateBrandingRead.model_validate(templates[0])
 
     async def reorder_templates(self, template_ids: list[UUID]) -> None:
         async with self._db() as db:

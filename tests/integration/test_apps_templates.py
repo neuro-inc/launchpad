@@ -1,7 +1,9 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+
+from launchpad.ext.launchpad_api import LaunchpadAdminApi
 
 
 class TestTemplateImport:
@@ -281,6 +283,12 @@ class TestAppImport:
         assert data["is_shared"] is True  # Always true for imported apps
         assert data["user_id"] is None
 
+        template_response = app_client.get(
+            f"/api/v1/apps/templates/by-instance/{app_id}"
+        )
+        assert template_response.status_code == 200
+        assert template_response.json()["name"] == "test-template"
+
     def test_import_app_with_overrides(self, app_client: TestClient) -> None:
         """Test importing app with custom metadata"""
         app_id = uuid4()
@@ -298,12 +306,139 @@ class TestAppImport:
         assert response.status_code == 200
         data = response.json()
 
-        # The 'name' parameter is ignored for app imports to prevent bugs
-        # The template is always identified by template_name from Apps API
+        # The Launchpad-facing name can be overridden without changing Apps API identity.
         assert (
             data["launchpad_app_name"] == "my-imported-app"
         )  # From Apps API, not "my-imported-app"
         assert data["is_shared"] is True  # Always true for imported apps
+
+    def test_import_app_copies_source_template_branding(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        app_id = uuid4()
+        previous_launchpad_id = uuid4()
+        mock_apps_api_client.get_app_endpoints.return_value = (
+            "https://app.example.com",
+            [],
+        )
+        mock_apps_api_client.get_inputs.side_effect = None
+        mock_apps_api_client.get_inputs.return_value = {
+            "ingress": {
+                "auth": {
+                    "middleware": {
+                        "name": f"platform-launchpad-{previous_launchpad_id}-auth-middleware"
+                    }
+                }
+            }
+        }
+        mock_apps_api_client.get_template.side_effect = None
+        mock_apps_api_client.get_template.return_value = {
+            "title": "Apps API title",
+            "short_description": "Apps API description",
+            "input": {
+                "properties": {"ingress": {"type": "object", "x-type": "IngressHttp"}}
+            },
+        }
+        mock_apps_api_client.cluster = "cluster"
+        mock_apps_api_client.org_name = "org"
+        mock_apps_api_client.project_name = "project"
+        source_admin = AsyncMock(spec=LaunchpadAdminApi)
+        source_admin.get_app_template.return_value = {
+            "name": "source-branded-app",
+            "template_name": "test-template",
+            "template_version": "1.0.0",
+            "verbose_name": "Source title",
+            "description_short": "",
+            "description_long": "Source long description",
+            "logo": "https://source.example.com/logo.svg",
+            "documentation_urls": [],
+            "external_urls": [],
+            "tags": [],
+            "position": 7,
+        }
+        source_admin.delete_app_template_by_app_id.return_value = True
+
+        with patch(
+            "launchpad.apps.service.LaunchpadAdminApi.from_outputs",
+            new=AsyncMock(return_value=source_admin),
+        ):
+            response = app_client.post(
+                "/api/v1/apps/import", json={"app_id": str(app_id)}
+            )
+
+        assert response.status_code == 200, response.text
+        templates = app_client.get("/api/v1/apps/templates").json()["items"]
+        imported = next(
+            item for item in templates if item["name"] == "source-branded-app"
+        )
+        assert imported["verbose_name"] == "Source title"
+        assert imported["description_short"] == ""
+        assert imported["description_long"] == "Source long description"
+        assert imported["logo"] == "https://source.example.com/logo.svg"
+        assert imported["documentation_urls"] == []
+        assert imported["tags"] == []
+        assert imported["position"] != 7
+        source_admin.delete_app_template_by_app_id.assert_awaited_once_with(
+            app_id, uninstall=False
+        )
+
+    def test_import_app_rejects_name_collision_without_linking_instance(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        existing = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "different-template",
+                "template_version": "9.0.0",
+                "name": "occupied-name",
+            },
+        )
+        assert existing.status_code == 200
+
+        response = app_client.post(
+            "/api/v1/apps/import",
+            json={"app_id": str(uuid4()), "name": "occupied-name"},
+        )
+
+        assert response.status_code == 409
+        assert "already used" in response.json()["detail"]["message"]
+        assert app_client.get("/api/v1/apps/instances").json()["items"] == []
+        mock_apps_api_client.configure_app.assert_not_awaited()
+
+    def test_import_app_updates_exact_match_without_repositioning(
+        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+    ) -> None:
+        mock_apps_api_client.get_app_endpoints.return_value = (
+            "https://app.example.com",
+            [],
+        )
+        existing_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "test-template",
+                "template_version": "1.0.0",
+                "name": "exact-match",
+                "verbose_name": "Old branding",
+            },
+        )
+        assert existing_response.status_code == 200
+        existing = existing_response.json()
+
+        import_response = app_client.post(
+            "/api/v1/apps/import",
+            json={
+                "app_id": str(uuid4()),
+                "name": "exact-match",
+                "verbose_name": "Updated branding",
+            },
+        )
+        assert import_response.status_code == 200, import_response.text
+
+        templates = app_client.get("/api/v1/apps/templates").json()["items"]
+        updated = next(item for item in templates if item["name"] == "exact-match")
+        assert updated["id"] == existing["id"]
+        assert updated["position"] == existing["position"]
+        assert updated["verbose_name"] == "Updated branding"
 
 
 class TestGenericAppInstall:

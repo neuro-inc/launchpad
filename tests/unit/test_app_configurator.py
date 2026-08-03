@@ -192,7 +192,9 @@ async def test_app_configurator_calls_configure_when_input_changes() -> None:
         launchpad_instance_id=uuid4(),
     )
 
-    result = await configurator.configure_launchpad_auth(app_id)
+    plan = await configurator.prepare_launchpad_auth(app_id)
+    apps_api_client.configure_app.assert_not_awaited()
+    result = await configurator.apply_launchpad_auth(plan)
 
     assert result.changed is True
     assert result.warnings == []
@@ -258,7 +260,8 @@ async def test_app_configurator_skips_configure_when_input_is_unchanged() -> Non
         launchpad_instance_id=uuid4(),
     )
 
-    result = await configurator.configure_launchpad_auth(app_id)
+    plan = await configurator.prepare_launchpad_auth(app_id)
+    result = await configurator.apply_launchpad_auth(plan)
 
     assert result.changed is False
     assert result.warnings == []

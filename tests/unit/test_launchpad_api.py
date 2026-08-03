@@ -129,6 +129,79 @@ async def test_launchpad_admin_api_reuses_access_token() -> None:
     http.post.assert_awaited_once()
 
 
+async def test_launchpad_admin_api_gets_template_by_instance_directly() -> None:
+    http = AsyncMock()
+    app_id = uuid.uuid4()
+    login_response = MagicMock()
+    login_response.text = AsyncMock(return_value='{"access_token": "token"}')
+    login_response.raise_for_status.return_value = None
+    login_response.json = AsyncMock(return_value={"access_token": "token"})
+    get_response = MagicMock()
+    get_response.status = 200
+    get_response.text = AsyncMock(return_value="{}")
+    get_response.raise_for_status.return_value = None
+    get_response.json = AsyncMock(return_value={"name": "branded-app"})
+    http.post.return_value = login_response
+    http.get.return_value = get_response
+
+    admin_api = LaunchpadAdminApi(
+        http=http,
+        base_url="https://launchpad-api.example.com",
+        username="admin",
+        password="password",
+    )
+
+    assert await admin_api.get_app_template(app_id) == {"name": "branded-app"}
+    http.get.assert_awaited_once_with(
+        f"https://launchpad-api.example.com/api/v1/apps/templates/by-instance/{app_id}",
+        headers={"Authorization": "Bearer token"},
+        ssl=False,
+    )
+
+
+async def test_launchpad_admin_api_falls_back_to_legacy_list_endpoints() -> None:
+    http = AsyncMock()
+    app_id = uuid.uuid4()
+    login_response = MagicMock()
+    login_response.text = AsyncMock(return_value='{"access_token": "token"}')
+    login_response.raise_for_status.return_value = None
+    login_response.json = AsyncMock(return_value={"access_token": "token"})
+
+    not_found = MagicMock(status=404)
+    instances = MagicMock(status=200)
+    instances.text = AsyncMock(return_value="{}")
+    instances.raise_for_status.return_value = None
+    instances.json = AsyncMock(
+        return_value={
+            "items": [{"app_id": str(app_id), "template_name": "branded-app"}],
+            "pages": 1,
+        }
+    )
+    templates = MagicMock(status=200)
+    templates.text = AsyncMock(return_value="{}")
+    templates.raise_for_status.return_value = None
+    templates.json = AsyncMock(
+        return_value={
+            "items": [{"name": "branded-app", "verbose_name": "Branded"}],
+            "pages": 1,
+        }
+    )
+    http.post.return_value = login_response
+    http.get.side_effect = [not_found, instances, templates]
+
+    admin_api = LaunchpadAdminApi(
+        http=http,
+        base_url="https://launchpad-api.example.com",
+        username="admin",
+        password="password",
+    )
+
+    result = await admin_api.get_app_template(app_id)
+
+    assert result["verbose_name"] == "Branded"
+    assert http.get.await_count == 3
+
+
 async def test_launchpad_admin_api_delete_app_template_by_app_id_returns_false_on_404() -> (
     None
 ):
