@@ -379,7 +379,9 @@ async def view_get_unimported_instances(
     - size: Page size (default: 50, max: 100)
 
     Returns:
-    - items: List of unimported healthy app instances
+    - items: List of unimported healthy app instances. Each item may also contain
+      flat source branding fields, source_branding_launchpad_id, and
+      branding_warnings; existing Apps API fields remain unchanged.
     - total: Total count of unimported healthy instances
     - page: Current page number
     - size: Page size

@@ -357,20 +357,57 @@ class TestAppImport:
             "position": 7,
         }
         source_admin.delete_app_template_by_app_id.return_value = True
+        mock_apps_api_client.list_instances.return_value = {
+            "items": [
+                {
+                    "id": str(app_id),
+                    "name": f"app-{app_id}",
+                    "template_name": "test-template",
+                    "template_version": "1.0.0",
+                    "display_name": "Installed display name",
+                    "state": "healthy",
+                    "endpoints": ["https://app.example.com"],
+                }
+            ],
+            "total": 1,
+            "page": 1,
+            "size": 50,
+            "pages": 1,
+        }
 
         with patch(
             "launchpad.apps.service.LaunchpadAdminApi.from_outputs",
             new=AsyncMock(return_value=source_admin),
         ):
+            candidates_response = app_client.get("/api/v1/apps/instances/unimported")
+            assert candidates_response.status_code == 200
+            candidate = candidates_response.json()["items"][0]
+            assert candidate["name"] == f"app-{app_id}"
+            assert candidate["verbose_name"] == "Source title"
+            assert candidate["description_short"] == ""
+            assert candidate["source_branding_launchpad_id"] == str(
+                previous_launchpad_id
+            )
+            assert candidate["branding_warnings"] == []
+
             response = app_client.post(
-                "/api/v1/apps/import", json={"app_id": str(app_id)}
+                "/api/v1/apps/import",
+                json={
+                    "app_id": str(app_id),
+                    "name": candidate["name"],
+                    "verbose_name": candidate["verbose_name"],
+                    "description_short": candidate["description_short"],
+                    "description_long": candidate["description_long"],
+                    "logo": candidate["logo"],
+                    "documentation_urls": candidate["documentation_urls"],
+                    "external_urls": candidate["external_urls"],
+                    "tags": candidate["tags"],
+                },
             )
 
         assert response.status_code == 200, response.text
         templates = app_client.get("/api/v1/apps/templates").json()["items"]
-        imported = next(
-            item for item in templates if item["name"] == "source-branded-app"
-        )
+        imported = next(item for item in templates if item["name"] == f"app-{app_id}")
         assert imported["verbose_name"] == "Source title"
         assert imported["description_short"] == ""
         assert imported["description_long"] == "Source long description"
@@ -381,6 +418,7 @@ class TestAppImport:
         source_admin.delete_app_template_by_app_id.assert_awaited_once_with(
             app_id, uninstall=False
         )
+        source_admin.get_app_template.assert_awaited_once_with(app_id)
 
     def test_import_app_rejects_name_collision_without_linking_instance(
         self, app_client: TestClient, mock_apps_api_client: AsyncMock
