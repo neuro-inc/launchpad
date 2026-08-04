@@ -70,7 +70,7 @@
       "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Apolo Files Image Path",
-      "x-type": "ApoloFilesImagePathBackground"
+      "x-type": "ApoloFilesImagePathFavIcon"
     },
     "ApoloFilesImagePathLogo": {
       "properties": {
@@ -106,7 +106,7 @@
       "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Apolo Files Image Path",
-      "x-type": "ApoloFilesImagePathBackground"
+      "x-type": "ApoloFilesImagePathLogo"
     },
     "ApoloFilesPath": {
       "properties": {
@@ -130,7 +130,7 @@
       "x-is-configurable": true,
       "x-meta-type": "inline",
       "x-title": "Apolo Files Path",
-      "x-type": "ApoloFilesFile"
+      "x-type": "ApoloFilesPath"
     },
     "ApoloSecret": {
       "properties": {
