@@ -15,6 +15,7 @@ from launchpad.apps.exceptions import (
     AppMissingUrlError,
     AppNotInstalledError,
     AppServiceError,
+    AppTemplateNameConflict,
     AppTemplateNotFound,
     AppUnhealthyError,
 )
@@ -31,6 +32,7 @@ from launchpad.apps.resources import (
     ImportAppRequest,
     ImportTemplateRequest,
     LaunchpadAppRead,
+    LaunchpadTemplateBrandingRead,
 )
 from launchpad.apps.storage import (
     delete_app,
@@ -47,6 +49,7 @@ from launchpad.apps.template_storage import (
     list_templates,
     reorder_templates as reorder_template_positions,
     select_template,
+    select_templates_by_name,
 )
 from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import AppsApiError, NotFound
@@ -57,6 +60,49 @@ logger = logging.getLogger(__name__)
 
 
 HEALTHY_STATUSES = {"queued", "progressing", "healthy"}
+
+
+class _Unset:
+    __slots__ = ()
+
+
+_UNSET = _Unset()
+_TEMPLATE_METADATA_FIELDS = {
+    "name",
+    "verbose_name",
+    "description_short",
+    "description_long",
+    "logo",
+    "documentation_urls",
+    "external_urls",
+    "tags",
+}
+
+
+def _metadata_overrides(
+    request: ImportAppRequest | ImportTemplateRequest,
+) -> dict[str, Any]:
+    return request.model_dump(include=_TEMPLATE_METADATA_FIELDS, exclude_unset=True)
+
+
+def _string_metadata(
+    value: str | None | _Unset,
+    apps_api_value: str,
+    *,
+    null_uses_default: bool = False,
+) -> str:
+    if isinstance(value, _Unset) or (value is None and null_uses_default):
+        return apps_api_value
+    return value or ""
+
+
+def _list_metadata[T](
+    value: list[T] | None | _Unset,
+    apps_api_value: list[T],
+) -> list[T]:
+    if isinstance(value, _Unset):
+        return apps_api_value
+    return value or []
 
 
 class AppService:
@@ -648,31 +694,28 @@ class AppService:
                 "will use null url and empty external_url_list"
             )
 
-        configuration_result = await self._app_configurator.configure_launchpad_auth(
+        configuration_plan = await self._app_configurator.prepare_launchpad_auth(
             import_request.app_id
         )
-        warnings.extend(configuration_result.warnings)
 
         # Create/update template using helper method
-        # NOTE: We ignore import_request.name for app imports because the template
-        # should always be identified by the template_name from Apps API, not a custom name.
-        # The 'name' parameter is only meaningful for template imports (ImportTemplateRequest).
+        # The confirmation form suggests the running Apps API name. Direct clients
+        # that omit it retain the historical template_name fallback.
         template = await self._fetch_and_create_template(
             template_name=template_name,
             template_version=template_version,
-            name=import_request.name,
-            verbose_name=import_request.verbose_name,
-            description_short=import_request.description_short,
-            description_long=import_request.description_long,
-            logo=import_request.logo,
-            documentation_urls=import_request.documentation_urls,
-            external_urls=import_request.external_urls,
-            tags=import_request.tags,
             is_internal=import_request.is_internal or url is None,
             is_shared=True,  # Imported installed apps are always shared
             fallback_verbose_name=display_name,  # Use display_name as fallback
             input=app_inputs,  # Use actual inputs from the running app
+            reject_name_conflicts=True,
+            **_metadata_overrides(import_request),
         )
+
+        configuration_result = await self._app_configurator.apply_launchpad_auth(
+            configuration_plan
+        )
+        warnings.extend(configuration_result.warnings)
 
         # Link the app installation
         async with self._db() as db:
@@ -699,6 +742,56 @@ class AppService:
         )
         installed_app.warnings = warnings  # type: ignore[attr-defined]
         return installed_app
+
+    async def _fetch_source_template_metadata(
+        self,
+        *,
+        app_id: UUID,
+        previous_launchpad_instance_ids: list[UUID],
+        template_name: str,
+        template_version: str,
+    ) -> tuple[LaunchpadTemplateBrandingRead | None, list[str]]:
+        if not previous_launchpad_instance_ids:
+            return None, []
+        if len(previous_launchpad_instance_ids) != 1:
+            return None, [
+                "Branding was not loaded because more than one source Launchpad "
+                "was discovered."
+            ]
+
+        source_launchpad_id = previous_launchpad_instance_ids[0]
+        try:
+            outputs = await self._apps_api_client.get_outputs(source_launchpad_id)
+            source_admin = await LaunchpadAdminApi.from_outputs(
+                http=self._http,
+                apolo_client=self._apolo_client,
+                cluster_name=self._apps_api_client.cluster,
+                org_name=self._apps_api_client.org_name,
+                project_name=self._apps_api_client.project_name,
+                outputs=outputs,
+            )
+            source_template = LaunchpadTemplateBrandingRead.model_validate(
+                await source_admin.get_app_template(app_id)
+            )
+            if (
+                source_template.template_name != template_name
+                or source_template.template_version != template_version
+            ):
+                raise LaunchpadApiError(
+                    "source template identity does not match the running app"
+                )
+            return source_template, []
+        except (AppsApiError, LaunchpadApiError, ValueError) as e:
+            logger.warning(
+                "Failed to import branding for app %s from Launchpad %s: %s",
+                app_id,
+                source_launchpad_id,
+                e,
+            )
+            return None, [
+                f"Branding was not loaded from source Launchpad "
+                f"{source_launchpad_id}: {e}"
+            ]
 
     async def _delete_app_from_previous_launchpad(
         self,
@@ -755,18 +848,19 @@ class AppService:
         self,
         template_name: str,
         template_version: str,
-        name: str | None = None,
-        verbose_name: str | None = None,
-        description_short: str | None = None,
-        description_long: str | None = None,
-        logo: str | None = None,
-        documentation_urls: list[dict[str, str]] | None = None,
-        external_urls: list[dict[str, str]] | None = None,
-        tags: list[str] | None = None,
+        name: str | None | _Unset = _UNSET,
+        verbose_name: str | None | _Unset = _UNSET,
+        description_short: str | None | _Unset = _UNSET,
+        description_long: str | None | _Unset = _UNSET,
+        logo: str | None | _Unset = _UNSET,
+        documentation_urls: list[dict[str, str]] | None | _Unset = _UNSET,
+        external_urls: list[dict[str, str]] | None | _Unset = _UNSET,
+        tags: list[str] | None | _Unset = _UNSET,
         is_internal: bool = False,
         is_shared: bool = True,
         fallback_verbose_name: str | None = None,
         input: dict[str, Any] | None = None,
+        reject_name_conflicts: bool = False,
     ) -> AppTemplate:
         """
         Fetch template metadata from Apps API and create/update AppTemplate.
@@ -828,17 +922,26 @@ class AppService:
             template_doc_urls = []
             template_ext_urls = []
 
-        # Apply priority logic: user override > fallback > template metadata > defaults
-        resolved_name = name or template_name
-        resolved_verbose_name = (
-            verbose_name or fallback_verbose_name or template_title or resolved_name
+        # Omitted request fields retain the sentinel and inherit Apps API metadata.
+        # Explicit null/empty optional branding values clear that metadata.
+        resolved_name = _string_metadata(name, template_name, null_uses_default=True)
+        resolved_verbose_name = _string_metadata(
+            verbose_name,
+            template_title or fallback_verbose_name or resolved_name,
+            null_uses_default=True,
         )
-        resolved_description_short = description_short or template_desc_short
-        resolved_description_long = description_long or template_desc_long
-        resolved_logo = logo or template_logo
-        resolved_documentation_urls = documentation_urls or template_doc_urls
-        resolved_external_urls = external_urls or template_ext_urls
-        resolved_tags = tags or template_tags
+        resolved_description_short = _string_metadata(
+            description_short, template_desc_short
+        )
+        resolved_description_long = _string_metadata(
+            description_long, template_desc_long
+        )
+        resolved_logo = _string_metadata(logo, template_logo)
+        resolved_documentation_urls = _list_metadata(
+            documentation_urls, template_doc_urls
+        )
+        resolved_external_urls = _list_metadata(external_urls, template_ext_urls)
+        resolved_tags = _list_metadata(tags, template_tags)
 
         # Create or update the template
 
@@ -860,6 +963,7 @@ class AppService:
                     is_shared=is_shared,
                     handler_class=None,
                     input=input,
+                    reject_name_conflicts=reject_name_conflicts,
                 )
 
         return template
@@ -987,17 +1091,10 @@ class AppService:
         return await self._fetch_and_create_template(
             template_name=import_request.template_name,
             template_version=import_request.template_version,
-            name=import_request.name,
-            verbose_name=import_request.verbose_name,
-            description_short=import_request.description_short,
-            description_long=import_request.description_long,
-            logo=import_request.logo,
-            documentation_urls=import_request.documentation_urls,
-            external_urls=import_request.external_urls,
-            tags=import_request.tags,
             is_internal=import_request.is_internal,
             is_shared=import_request.is_shared,
             input=import_request.input,
+            **_metadata_overrides(import_request),
         )
 
     async def delete(self, app_id: UUID, uninstall: bool = False) -> None:
@@ -1099,6 +1196,28 @@ class AppService:
             raise NotFound(f"Template for app instance with id {app_id} not found")
 
         await self.delete_template_by_id(template.id, uninstall=uninstall)
+
+    async def get_template_by_app_id(
+        self, app_id: UUID
+    ) -> LaunchpadTemplateBrandingRead:
+        async with self._db() as db:
+            installed_app = await select_app(db, id=app_id)
+
+        if installed_app is None:
+            raise NotFound(f"App instance with id {app_id} not found")
+
+        async with self._db() as db:
+            templates = await select_templates_by_name(
+                db, name=installed_app.template_name
+            )
+
+        if not templates:
+            raise NotFound(f"Template for app instance with id {app_id} not found")
+        if len(templates) != 1:
+            raise AppTemplateNameConflict(
+                f"Multiple templates use name '{installed_app.template_name}'"
+            )
+        return LaunchpadTemplateBrandingRead.model_validate(templates[0])
 
     async def reorder_templates(self, template_ids: list[UUID]) -> None:
         async with self._db() as db:
@@ -1263,14 +1382,87 @@ class AppService:
 
         logger.info(f"Found {len(unimported_instances)} unimported healthy instances")
 
+        discovery_semaphore = asyncio.Semaphore(10)
+        enriched_instances = await asyncio.gather(
+            *(
+                self._add_source_branding_to_unimported_instance(
+                    instance, discovery_semaphore
+                )
+                for instance in unimported_instances
+            )
+        )
+
         # Return paginated result matching the Apps API response structure
         return {
-            "items": unimported_instances,
+            "items": enriched_instances,
             "total": len(unimported_instances),
             "page": page,
             "size": size,
             "pages": (len(unimported_instances) + size - 1) // size,
         }
+
+    async def _add_source_branding_to_unimported_instance(
+        self,
+        instance: dict[str, Any],
+        semaphore: asyncio.Semaphore,
+    ) -> dict[str, Any]:
+        enriched = {
+            **instance,
+            "source_branding_launchpad_id": None,
+            "branding_warnings": [],
+        }
+        raw_app_id = instance.get("id")
+        try:
+            app_id = UUID(str(raw_app_id))
+        except ValueError:
+            enriched["branding_warnings"] = [
+                f"Branding was not loaded because app id '{raw_app_id}' is invalid."
+            ]
+            return enriched
+
+        template_name = instance.get("template_name")
+        template_version = instance.get("template_version")
+        if not isinstance(template_name, str) or not isinstance(template_version, str):
+            enriched["branding_warnings"] = [
+                "Branding was not loaded because the app template identity is missing."
+            ]
+            return enriched
+
+        async with semaphore:
+            configuration_plan = await self._app_configurator.prepare_launchpad_auth(
+                app_id
+            )
+            (
+                source_template,
+                branding_warnings,
+            ) = await self._fetch_source_template_metadata(
+                app_id=app_id,
+                previous_launchpad_instance_ids=(
+                    configuration_plan.previous_launchpad_instance_ids
+                ),
+                template_name=template_name,
+                template_version=template_version,
+            )
+
+        enriched["branding_warnings"] = branding_warnings
+        if source_template is None:
+            return enriched
+
+        enriched.update(
+            {
+                "verbose_name": source_template.verbose_name,
+                "description_short": source_template.description_short,
+                "description_long": source_template.description_long,
+                "logo": source_template.logo,
+                "documentation_urls": source_template.documentation_urls,
+                "external_urls": source_template.external_urls,
+                "tags": source_template.tags,
+                "source_branding_launchpad_id": str(
+                    configuration_plan.previous_launchpad_instance_ids[0]
+                ),
+            }
+        )
+        return enriched
 
 
 async def dep_app_service(request: Request) -> AppService:

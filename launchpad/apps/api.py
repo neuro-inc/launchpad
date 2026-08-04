@@ -12,6 +12,7 @@ from launchpad.app import Launchpad
 from launchpad.apps.exceptions import (
     AppNotInstalledError,
     AppServiceError,
+    AppTemplateNameConflict,
     AppTemplateNotFound,
     AppUnhealthyError,
     TemplateOrderValidationError,
@@ -23,12 +24,13 @@ from launchpad.apps.resources import (
     ImportTemplateRequest,
     LaunchpadAppRead,
     LaunchpadInstalledAppRead,
+    LaunchpadTemplateBrandingRead,
     LaunchpadTemplateRead,
     OrderTemplatesRequest,
 )
 from launchpad.apps.service import DepAppService
 from launchpad.auth.dependencies import AdminAuth, Auth
-from launchpad.errors import BadRequest, NotFound
+from launchpad.errors import BadRequest, Conflict, NotFound
 from launchpad.ext.apps_api import NotFound as AppsApiNotFound
 
 
@@ -161,6 +163,8 @@ async def view_post_import_app(
     """
     try:
         return await app_service.import_app(import_request)
+    except AppTemplateNameConflict as e:
+        raise Conflict(str(e))
     except AppServiceError as e:
         raise BadRequest(str(e))
 
@@ -375,7 +379,9 @@ async def view_get_unimported_instances(
     - size: Page size (default: 50, max: 100)
 
     Returns:
-    - items: List of unimported healthy app instances
+    - items: List of unimported healthy app instances. Each item may also contain
+      flat source branding fields, source_branding_launchpad_id, and
+      branding_warnings; existing Apps API fields remain unchanged.
     - total: Total count of unimported healthy instances
     - page: Current page number
     - size: Page size
@@ -444,6 +450,23 @@ async def view_delete_template_by_instance(
     instances without relying on user-editable template names in the request.
     """
     await app_service.delete_template_by_app_id(app_id, uninstall)
+
+
+@apps_router.get(
+    "/templates/by-instance/{app_id}",
+    response_model=LaunchpadTemplateBrandingRead,
+)
+async def view_get_template_by_instance(
+    app_id: UUID,
+    app_service: DepAppService,
+    user: AdminAuth,
+) -> LaunchpadTemplateBrandingRead:
+    try:
+        return await app_service.get_template_by_app_id(app_id)
+    except AppsApiNotFound as e:
+        raise NotFound(str(e))
+    except AppTemplateNameConflict as e:
+        raise Conflict(str(e))
 
 
 @apps_router.delete("/instances/{app_id}", status_code=HTTP_204_NO_CONTENT)

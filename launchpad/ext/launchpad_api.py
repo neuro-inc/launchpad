@@ -179,6 +179,87 @@ class LaunchpadAdminApi:
             raise LaunchpadApiError("Launchpad admin DELETE request failed") from e
         return True
 
+    async def _authorized_get_json(
+        self, path: str, **kwargs: Any
+    ) -> dict[str, Any] | None:
+        access_token = await self._get_access_token()
+        response = await self._http.get(
+            f"{self._base_url}{path}",
+            headers={"Authorization": f"Bearer {access_token}"},
+            ssl=False,
+            **kwargs,
+        )
+        if response.status == 404:
+            return None
+
+        raw_response = await response.text(errors="ignore")
+        try:
+            response.raise_for_status()
+        except ClientResponseError as e:
+            logger.warning(
+                "Launchpad admin GET %s failed with status %s: %s",
+                path,
+                e.status,
+                raw_response,
+            )
+            raise LaunchpadApiError("Launchpad admin GET request failed") from e
+
+        payload = await response.json()
+        if not isinstance(payload, dict):
+            raise LaunchpadApiError("Launchpad admin GET response is malformed")
+        return payload
+
+    async def _list_all(self, path: str) -> list[dict[str, Any]]:
+        page = 1
+        items: list[dict[str, Any]] = []
+        while True:
+            payload = await self._authorized_get_json(
+                path, params={"page": page, "size": 100}
+            )
+            if payload is None:
+                raise LaunchpadApiError(f"Launchpad endpoint {path} is unavailable")
+            page_items = payload.get("items")
+            if not isinstance(page_items, list) or not all(
+                isinstance(item, dict) for item in page_items
+            ):
+                raise LaunchpadApiError("Launchpad paginated response is malformed")
+            items.extend(page_items)
+            pages = payload.get("pages")
+            if not isinstance(pages, int) or page >= pages:
+                break
+            page += 1
+        return items
+
+    async def get_app_template(self, app_id: UUID) -> dict[str, Any]:
+        direct = await self._authorized_get_json(
+            f"/api/v1/apps/templates/by-instance/{app_id}"
+        )
+        if direct is not None:
+            return direct
+
+        instances = await self._list_all("/api/v1/apps/instances")
+        matching_instances = [
+            item for item in instances if str(item.get("app_id")) == str(app_id)
+        ]
+        if len(matching_instances) != 1:
+            raise LaunchpadApiError(
+                f"Expected one source app for {app_id}, found {len(matching_instances)}"
+            )
+        template_alias = matching_instances[0].get("template_name")
+        if not isinstance(template_alias, str):
+            raise LaunchpadApiError("Source app does not identify its template")
+
+        templates = await self._list_all("/api/v1/apps/templates")
+        matching_templates = [
+            item for item in templates if item.get("name") == template_alias
+        ]
+        if len(matching_templates) != 1:
+            raise LaunchpadApiError(
+                f"Expected one source template named '{template_alias}', "
+                f"found {len(matching_templates)}"
+            )
+        return matching_templates[0]
+
     async def delete_app_template_by_app_id(
         self,
         app_id: UUID,

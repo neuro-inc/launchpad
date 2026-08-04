@@ -8,6 +8,7 @@ import pytest
 
 from launchpad.ext.app_configurator import (
     AUTH_INGRESS_MIDDLEWARE_TYPE,
+    AppConfigurationPlan,
     AppConfigurator,
     discover_ingress_http_paths,
     patch_ingress_http_auth,
@@ -192,7 +193,9 @@ async def test_app_configurator_calls_configure_when_input_changes() -> None:
         launchpad_instance_id=uuid4(),
     )
 
-    result = await configurator.configure_launchpad_auth(app_id)
+    plan = await configurator.prepare_launchpad_auth(app_id)
+    apps_api_client.configure_app.assert_not_awaited()
+    result = await configurator.apply_launchpad_auth(plan)
 
     assert result.changed is True
     assert result.warnings == []
@@ -258,8 +261,83 @@ async def test_app_configurator_skips_configure_when_input_is_unchanged() -> Non
         launchpad_instance_id=uuid4(),
     )
 
-    result = await configurator.configure_launchpad_auth(app_id)
+    plan = await configurator.prepare_launchpad_auth(app_id)
+    result = await configurator.apply_launchpad_auth(plan)
 
     assert result.changed is False
     assert result.warnings == []
     apps_api_client.configure_app.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("failure_stage", "warning_fragment"),
+    [
+        ("app", "failed to fetch app metadata"),
+        ("input", "failed to fetch current app input"),
+        ("template", "failed to fetch template schema"),
+        ("schema", "template schema is unavailable"),
+        ("paths", "no IngressHttp input found"),
+        ("patch", "no patchable IngressHttp input found"),
+    ],
+)
+async def test_prepare_launchpad_auth_failure_paths(
+    failure_stage: str,
+    warning_fragment: str,
+) -> None:
+    apps_api_client = SimpleNamespace(
+        get_by_id=AsyncMock(
+            return_value={"template_name": "template", "template_version": "v1"}
+        ),
+        get_inputs=AsyncMock(return_value={}),
+        get_template=AsyncMock(return_value={"input": {}}),
+        configure_app=AsyncMock(),
+    )
+    if failure_stage == "app":
+        apps_api_client.get_by_id.side_effect = RuntimeError("failure")
+    elif failure_stage == "input":
+        apps_api_client.get_inputs.side_effect = RuntimeError("failure")
+    elif failure_stage == "template":
+        apps_api_client.get_template.side_effect = RuntimeError("failure")
+    elif failure_stage == "schema":
+        apps_api_client.get_template.return_value = {}
+    elif failure_stage == "patch":
+        apps_api_client.get_template.return_value = {
+            "input": {
+                "properties": {"ingress": {"type": "object", "x-type": "IngressHttp"}}
+            }
+        }
+
+    configurator = AppConfigurator(
+        apps_api_client=cast(Any, apps_api_client),
+        auth_middleware_name="middleware",
+        launchpad_instance_id=uuid4(),
+    )
+
+    plan = await configurator.prepare_launchpad_auth(uuid4())
+
+    assert warning_fragment in plan.warnings[0]
+    apps_api_client.configure_app.assert_not_awaited()
+
+
+async def test_apply_launchpad_auth_uses_unknown_instance_fallback() -> None:
+    apps_api_client = SimpleNamespace(configure_app=AsyncMock())
+    configurator = AppConfigurator(
+        apps_api_client=cast(Any, apps_api_client),
+        auth_middleware_name="middleware",
+        launchpad_instance_id=None,
+    )
+    plan = AppConfigurationPlan(
+        app_id=uuid4(),
+        template_name="template",
+        template_version="v1",
+        updated_input={"ingress": {}},
+    )
+
+    result = await configurator.apply_launchpad_auth(plan)
+
+    assert result.changed is True
+    assert "instance id is not configured" in result.warnings[0]
+    assert (
+        "Launchpad unknown"
+        in apps_api_client.configure_app.await_args.kwargs["comment"]
+    )

@@ -1,4 +1,6 @@
+import asyncio
 import uuid
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID
 
@@ -6,11 +8,12 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from launchpad.app import Launchpad
+from launchpad.apps.exceptions import AppTemplateNameConflict
 from launchpad.apps.models import InstalledApp
 from launchpad.apps.registry.base import App
 from launchpad.apps.service import AppService
 from launchpad.config import Config
-from launchpad.ext.apps_api import AppsApiClient
+from launchpad.ext.apps_api import AppsApiClient, NotFound as AppsApiNotFound
 from launchpad.ext.launchpad_api import LaunchpadAdminApi
 
 
@@ -209,3 +212,140 @@ async def test_delete_app_from_previous_launchpad_falls_back_to_instance_delete(
         f"This app template was not deleted from previous Launchpad {previous_launchpad_id}; "
         f"please delete this app template manually there (without uninstall)."
     ]
+
+
+async def test_fetch_source_template_metadata_rejects_ambiguous_source(
+    app_service: AppService,
+    app_id: UUID,
+) -> None:
+    result, warnings = await app_service._fetch_source_template_metadata(
+        app_id=app_id,
+        previous_launchpad_instance_ids=[uuid.uuid4(), uuid.uuid4()],
+        template_name="template",
+        template_version="v1",
+    )
+
+    assert result is None
+    assert "more than one source Launchpad" in warnings[0]
+
+
+async def test_fetch_source_template_metadata_warns_on_identity_mismatch(
+    app_service: AppService,
+    mock_apps_api_client: AsyncMock,
+    app_id: UUID,
+) -> None:
+    source_launchpad_id = uuid.uuid4()
+    mock_apps_api_client.cluster = "cluster"
+    mock_apps_api_client.org_name = "org"
+    mock_apps_api_client.project_name = "project"
+    source_admin = AsyncMock(spec=LaunchpadAdminApi)
+    source_admin.get_app_template.return_value = {
+        "name": "source-name",
+        "template_name": "other-template",
+        "template_version": "v1",
+        "verbose_name": "Title",
+        "description_short": "",
+        "description_long": "",
+        "logo": "",
+        "documentation_urls": [],
+        "external_urls": [],
+        "tags": [],
+    }
+
+    with patch(
+        "launchpad.apps.service.LaunchpadAdminApi.from_outputs",
+        new=AsyncMock(return_value=source_admin),
+    ):
+        result, warnings = await app_service._fetch_source_template_metadata(
+            app_id=app_id,
+            previous_launchpad_instance_ids=[source_launchpad_id],
+            template_name="template",
+            template_version="v1",
+        )
+
+    assert result is None
+    assert "identity does not match" in warnings[0]
+
+
+@pytest.mark.parametrize(
+    ("instance", "warning_fragment"),
+    [
+        ({"id": "invalid"}, "app id 'invalid' is invalid"),
+        (
+            {"id": str(uuid.uuid4()), "template_name": "template"},
+            "template identity is missing",
+        ),
+    ],
+)
+async def test_add_source_branding_validates_candidate(
+    app_service: AppService,
+    instance: dict[str, object],
+    warning_fragment: str,
+) -> None:
+    result = await app_service._add_source_branding_to_unimported_instance(
+        instance,
+        asyncio.Semaphore(1),
+    )
+
+    assert result["source_branding_launchpad_id"] is None
+    assert warning_fragment in result["branding_warnings"][0]
+    cast(
+        AsyncMock, app_service._app_configurator.prepare_launchpad_auth
+    ).assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("installed_app", "templates", "error"),
+    [
+        (None, [], AppsApiNotFound),
+        (
+            InstalledApp(
+                app_id=uuid.uuid4(),
+                app_name="app",
+                launchpad_app_name="name",
+                is_internal=False,
+                is_shared=True,
+                user_id=None,
+                url="https://app.example.com",
+                template_name="name",
+                external_url_list=[],
+            ),
+            [],
+            AppsApiNotFound,
+        ),
+        (
+            InstalledApp(
+                app_id=uuid.uuid4(),
+                app_name="app",
+                launchpad_app_name="name",
+                is_internal=False,
+                is_shared=True,
+                user_id=None,
+                url="https://app.example.com",
+                template_name="name",
+                external_url_list=[],
+            ),
+            [MagicMock(), MagicMock()],
+            AppTemplateNameConflict,
+        ),
+    ],
+)
+async def test_get_template_by_app_id_errors(
+    app_service: AppService,
+    installed_app: InstalledApp | None,
+    templates: list[MagicMock],
+    error: type[Exception],
+    app_id: UUID,
+) -> None:
+    with (
+        patch(
+            "launchpad.apps.service.select_app",
+            new=AsyncMock(return_value=installed_app),
+        ),
+        patch(
+            "launchpad.apps.service.select_templates_by_name",
+            new=AsyncMock(return_value=templates),
+        ),
+        pytest.raises(error),
+    ):
+        await app_service.get_template_by_app_id(app_id)

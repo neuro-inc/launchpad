@@ -91,12 +91,11 @@ class LaunchpadAppRead(BaseModel):
     tags: list[str]
 
 
-class LaunchpadTemplateRead(BaseModel):
-    """Response model for template data"""
+class LaunchpadTemplateBrandingRead(BaseModel):
+    """Template identity and branding safe to transfer between Launchpads."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
     name: str
     template_name: str
     template_version: str
@@ -107,6 +106,12 @@ class LaunchpadTemplateRead(BaseModel):
     documentation_urls: list[dict[str, str]]
     external_urls: list[dict[str, str]]
     tags: list[str]
+
+
+class LaunchpadTemplateRead(LaunchpadTemplateBrandingRead):
+    """Full response model for template data."""
+
+    id: UUID
     is_internal: bool
     position: int | None
     is_shared: bool
