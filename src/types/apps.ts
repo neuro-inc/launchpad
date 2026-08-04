@@ -64,6 +64,15 @@ export type UnimportedInstance = {
   state: string;
   createdAt: string;
   endpoints: string[];
+  verboseName?: string;
+  descriptionShort?: string;
+  descriptionLong?: string;
+  logo?: string;
+  documentationUrls?: Array<{ [key: string]: string }>;
+  externalUrls?: Array<{ [key: string]: string }>;
+  tags?: string[];
+  sourceBrandingLaunchpadId?: string | null;
+  brandingWarnings?: string[];
 };
 
 /**

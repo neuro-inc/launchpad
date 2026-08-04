@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import { ImportAppRequest } from '@typings';
+import { ImportAppRequest, UnimportedInstance } from '@typings';
 import { parseTags } from '@utils/helpers';
 
 import { Button, Field } from '@components/Shared';
@@ -21,7 +21,8 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
   onSubmit,
   onError,
 }) => {
-  const [selectedInstance, setSelectedInstance] = useState<any | null>(null);
+  const [selectedInstance, setSelectedInstance] =
+    useState<UnimportedInstance | null>(null);
   const [loading, setLoading] = useState(false);
 
   const {
@@ -29,7 +30,6 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
     handleSubmit: handleFormSubmit,
     formState: { errors },
     reset,
-    setValue,
   } = useForm<ImportAppFormData>({
     resolver: zodResolver(importAppSchema),
     defaultValues: {
@@ -44,24 +44,26 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
     },
   });
 
-  const handleSelectFromList = (instance: any) => {
-    // Store the selected instance for display
+  const handleSelectFromList = (instance: UnimportedInstance) => {
     setSelectedInstance(instance);
-
-    // Pre-fill the form with the selected instance data
-    setValue('appId', instance.id || '');
-    setValue('name', instance.name || '');
-    setValue('verboseName', instance.displayName || '');
-    setValue('descriptionShort', '');
-    setValue('descriptionLong', '');
-    setValue('logo', '');
-    setValue('tags', '');
-    // If the instance has no endpoints, it should be marked as internal
-    setValue(
-      'isInternal',
-      !instance.endpoints || instance.endpoints.length === 0,
-    );
   };
+
+  useEffect(() => {
+    if (!selectedInstance) return;
+
+    reset({
+      appId: selectedInstance.id || '',
+      name: selectedInstance.name || '',
+      verboseName:
+        selectedInstance.verboseName ?? selectedInstance.displayName ?? '',
+      descriptionShort: selectedInstance.descriptionShort ?? '',
+      descriptionLong: selectedInstance.descriptionLong ?? '',
+      logo: selectedInstance.logo ?? '',
+      tags: selectedInstance.tags?.join(', ') ?? '',
+      isInternal:
+        !selectedInstance.endpoints || selectedInstance.endpoints.length === 0,
+    });
+  }, [reset, selectedInstance]);
 
   const handleBackToList = () => {
     setSelectedInstance(null);
@@ -72,14 +74,21 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
     setLoading(true);
     try {
       // Convert form data to API request format
+      const preserveEmptyBranding = Boolean(
+        selectedInstance?.sourceBrandingLaunchpadId,
+      );
+      const optionalBrandingString = (value: string) =>
+        preserveEmptyBranding ? value : value || null;
       const requestData: ImportAppRequest = {
         appId: data.appId,
         name: data.name || null,
-        verboseName: data.verboseName || null,
-        descriptionShort: data.descriptionShort || null,
-        descriptionLong: data.descriptionLong || null,
-        logo: data.logo || null,
-        tags: parseTags(data.tags),
+        verboseName: optionalBrandingString(data.verboseName),
+        descriptionShort: optionalBrandingString(data.descriptionShort),
+        descriptionLong: optionalBrandingString(data.descriptionLong),
+        logo: optionalBrandingString(data.logo),
+        documentationUrls: selectedInstance?.documentationUrls ?? null,
+        externalUrls: selectedInstance?.externalUrls ?? null,
+        tags: preserveEmptyBranding || data.tags ? parseTags(data.tags) : null,
         isInternal: data.isInternal,
       };
 
@@ -133,6 +142,29 @@ export const ImportAppForm: React.FC<ImportAppFormProps> = ({
           </Button>
         </div>
       </div>
+
+      {selectedInstance.sourceBrandingLaunchpadId && (
+        <div
+          className="launchpad-admin-branding-source-note rounded-lg bg-neutral-100 p-3 text-caption text-neutral-700"
+          data-section="source-branding-note"
+        >
+          Branding loaded from Launchpad{' '}
+          <span className="font-mono">
+            {selectedInstance.sourceBrandingLaunchpadId}
+          </span>
+          . You can review and edit it before importing.
+        </div>
+      )}
+
+      {selectedInstance.brandingWarnings?.map((warning) => (
+        <div
+          key={warning}
+          className="launchpad-admin-branding-warning rounded-lg bg-warning-subtle p-3 text-caption text-neutral-700"
+          data-section="source-branding-warning"
+        >
+          {warning}
+        </div>
+      ))}
 
       {/* Form Fields */}
       <div
