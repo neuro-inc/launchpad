@@ -463,6 +463,8 @@ async def view_get_template_by_instance(
 ) -> LaunchpadTemplateBrandingRead:
     try:
         return await app_service.get_template_by_app_id(app_id)
+    except AppsApiNotFound as e:
+        raise NotFound(str(e))
     except AppTemplateNameConflict as e:
         raise Conflict(str(e))
 

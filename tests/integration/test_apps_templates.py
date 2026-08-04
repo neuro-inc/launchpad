@@ -289,6 +289,46 @@ class TestAppImport:
         assert template_response.status_code == 200
         assert template_response.json()["name"] == "test-template"
 
+    def test_get_template_by_instance_returns_404_for_unknown_app(
+        self, app_client: TestClient
+    ) -> None:
+        response = app_client.get(f"/api/v1/apps/templates/by-instance/{uuid4()}")
+
+        assert response.status_code == 404
+
+    def test_get_template_by_instance_returns_409_for_ambiguous_name(
+        self, app_client: TestClient
+    ) -> None:
+        install_response = app_client.post(
+            "/api/v1/apps/install",
+            json={
+                "template_name": "ambiguous-template",
+                "template_version": "v1",
+                "inputs": {},
+                "name": "ambiguous-name",
+            },
+        )
+        assert install_response.status_code == 200
+        second_template = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "ambiguous-template",
+                "template_version": "v2",
+                "name": "ambiguous-name",
+            },
+        )
+        assert second_template.status_code == 200
+        instances = app_client.get("/api/v1/apps/instances").json()["items"]
+        app_id = next(
+            item["app_id"]
+            for item in instances
+            if item["launchpad_app_name"] == "ambiguous-name"
+        )
+
+        response = app_client.get(f"/api/v1/apps/templates/by-instance/{app_id}")
+
+        assert response.status_code == 409
+
     def test_import_app_with_overrides(self, app_client: TestClient) -> None:
         """Test importing app with custom metadata"""
         app_id = uuid4()

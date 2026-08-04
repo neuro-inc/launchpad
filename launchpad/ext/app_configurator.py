@@ -31,10 +31,6 @@ class AppConfigurationPlan:
     warnings: list[str] = field(default_factory=list)
     previous_launchpad_instance_ids: list[UUID] = field(default_factory=list)
 
-    @property
-    def changed(self) -> bool:
-        return self.updated_input is not None
-
 
 def _format_path(path: Path) -> str:
     return ".".join(path) if path else "<root>"

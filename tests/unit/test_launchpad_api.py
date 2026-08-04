@@ -2,6 +2,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from aiohttp import ClientResponseError
 
 from launchpad.ext.launchpad_api import (
     LaunchpadAdminApi,
@@ -200,6 +201,120 @@ async def test_launchpad_admin_api_falls_back_to_legacy_list_endpoints() -> None
 
     assert result["verbose_name"] == "Branded"
     assert http.get.await_count == 3
+
+
+async def test_launchpad_admin_api_get_rejects_http_error() -> None:
+    http = AsyncMock()
+    response = MagicMock(status=500)
+    response.text = AsyncMock(return_value="failure")
+    response.raise_for_status.side_effect = ClientResponseError(
+        request_info=MagicMock(), history=(), status=500
+    )
+    http.get.return_value = response
+    admin_api = LaunchpadAdminApi(
+        http=http,
+        base_url="https://launchpad-api.example.com",
+        username="admin",
+        password="password",
+    )
+    admin_api._access_token = "token"
+
+    with pytest.raises(LaunchpadApiError, match="admin GET request failed"):
+        await admin_api._authorized_get_json("/test")
+
+
+async def test_launchpad_admin_api_get_rejects_non_object_response() -> None:
+    http = AsyncMock()
+    response = MagicMock(status=200)
+    response.text = AsyncMock(return_value="[]")
+    response.raise_for_status.return_value = None
+    response.json = AsyncMock(return_value=[])
+    http.get.return_value = response
+    admin_api = LaunchpadAdminApi(
+        http=http,
+        base_url="https://launchpad-api.example.com",
+        username="admin",
+        password="password",
+    )
+    admin_api._access_token = "token"
+
+    with pytest.raises(LaunchpadApiError, match="response is malformed"):
+        await admin_api._authorized_get_json("/test")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [None, {"items": "invalid", "pages": 1}],
+)
+async def test_launchpad_admin_api_list_rejects_malformed_pages(
+    payload: dict[str, object] | None,
+) -> None:
+    admin_api = LaunchpadAdminApi(
+        http=AsyncMock(),
+        base_url="https://launchpad-api.example.com",
+        username="admin",
+        password="password",
+    )
+    admin_api._authorized_get_json = AsyncMock(return_value=payload)  # type: ignore[method-assign]
+
+    with pytest.raises(LaunchpadApiError):
+        await admin_api._list_all("/test")
+
+
+async def test_launchpad_admin_api_list_reads_all_pages() -> None:
+    admin_api = LaunchpadAdminApi(
+        http=AsyncMock(),
+        base_url="https://launchpad-api.example.com",
+        username="admin",
+        password="password",
+    )
+    admin_api._authorized_get_json = AsyncMock(  # type: ignore[method-assign]
+        side_effect=[
+            {"items": [{"id": 1}], "pages": 2},
+            {"items": [{"id": 2}], "pages": 2},
+        ]
+    )
+
+    assert await admin_api._list_all("/test") == [{"id": 1}, {"id": 2}]
+
+
+@pytest.mark.parametrize(
+    ("instances", "templates", "message"),
+    [
+        ([], [], "Expected one source app"),
+        ([{"app_id": "APP_ID"}], [], "does not identify its template"),
+        (
+            [{"app_id": "APP_ID", "template_name": "name"}],
+            [],
+            "Expected one source template",
+        ),
+    ],
+)
+async def test_launchpad_admin_api_legacy_lookup_validation(
+    instances: list[dict[str, object]],
+    templates: list[dict[str, object]],
+    message: str,
+) -> None:
+    app_id = uuid.uuid4()
+    normalized_instances = [
+        {**instance, "app_id": str(app_id)}
+        if instance.get("app_id") == "APP_ID"
+        else instance
+        for instance in instances
+    ]
+    admin_api = LaunchpadAdminApi(
+        http=AsyncMock(),
+        base_url="https://launchpad-api.example.com",
+        username="admin",
+        password="password",
+    )
+    admin_api._authorized_get_json = AsyncMock(return_value=None)  # type: ignore[method-assign]
+    admin_api._list_all = AsyncMock(  # type: ignore[method-assign]
+        side_effect=[normalized_instances, templates]
+    )
+
+    with pytest.raises(LaunchpadApiError, match=message):
+        await admin_api.get_app_template(app_id)
 
 
 async def test_launchpad_admin_api_delete_app_template_by_app_id_returns_false_on_404() -> (
