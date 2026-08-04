@@ -62,6 +62,49 @@ logger = logging.getLogger(__name__)
 HEALTHY_STATUSES = {"queued", "progressing", "healthy"}
 
 
+class _Unset:
+    __slots__ = ()
+
+
+_UNSET = _Unset()
+_TEMPLATE_METADATA_FIELDS = {
+    "name",
+    "verbose_name",
+    "description_short",
+    "description_long",
+    "logo",
+    "documentation_urls",
+    "external_urls",
+    "tags",
+}
+
+
+def _metadata_overrides(
+    request: ImportAppRequest | ImportTemplateRequest,
+) -> dict[str, Any]:
+    return request.model_dump(include=_TEMPLATE_METADATA_FIELDS, exclude_unset=True)
+
+
+def _string_metadata(
+    value: str | None | _Unset,
+    apps_api_value: str,
+    *,
+    null_uses_default: bool = False,
+) -> str:
+    if isinstance(value, _Unset) or (value is None and null_uses_default):
+        return apps_api_value
+    return value or ""
+
+
+def _list_metadata[T](
+    value: list[T] | None | _Unset,
+    apps_api_value: list[T],
+) -> list[T]:
+    if isinstance(value, _Unset):
+        return apps_api_value
+    return value or []
+
+
 class AppService:
     def __init__(self, app: "Launchpad"):
         self._db = app.db
@@ -661,19 +704,12 @@ class AppService:
         template = await self._fetch_and_create_template(
             template_name=template_name,
             template_version=template_version,
-            name=import_request.name,
-            verbose_name=import_request.verbose_name,
-            description_short=import_request.description_short,
-            description_long=import_request.description_long,
-            logo=import_request.logo,
-            documentation_urls=import_request.documentation_urls,
-            external_urls=import_request.external_urls,
-            tags=import_request.tags,
             is_internal=import_request.is_internal or url is None,
             is_shared=True,  # Imported installed apps are always shared
             fallback_verbose_name=display_name,  # Use display_name as fallback
             input=app_inputs,  # Use actual inputs from the running app
             reject_name_conflicts=True,
+            **_metadata_overrides(import_request),
         )
 
         configuration_result = await self._app_configurator.apply_launchpad_auth(
@@ -812,14 +848,14 @@ class AppService:
         self,
         template_name: str,
         template_version: str,
-        name: str | None = None,
-        verbose_name: str | None = None,
-        description_short: str | None = None,
-        description_long: str | None = None,
-        logo: str | None = None,
-        documentation_urls: list[dict[str, str]] | None = None,
-        external_urls: list[dict[str, str]] | None = None,
-        tags: list[str] | None = None,
+        name: str | None | _Unset = _UNSET,
+        verbose_name: str | None | _Unset = _UNSET,
+        description_short: str | None | _Unset = _UNSET,
+        description_long: str | None | _Unset = _UNSET,
+        logo: str | None | _Unset = _UNSET,
+        documentation_urls: list[dict[str, str]] | None | _Unset = _UNSET,
+        external_urls: list[dict[str, str]] | None | _Unset = _UNSET,
+        tags: list[str] | None | _Unset = _UNSET,
         is_internal: bool = False,
         is_shared: bool = True,
         fallback_verbose_name: str | None = None,
@@ -886,28 +922,26 @@ class AppService:
             template_doc_urls = []
             template_ext_urls = []
 
-        def first_not_none(*values: Any) -> Any:
-            return next((value for value in values if value is not None), None)
-
-        # Explicit request > Apps API template > instance/default.
-        # None means absent; empty strings and lists are intentional values.
-        resolved_name = first_not_none(name, template_name)
-        resolved_verbose_name = first_not_none(
+        # Omitted request fields retain the sentinel and inherit Apps API metadata.
+        # Explicit null/empty optional branding values clear that metadata.
+        resolved_name = _string_metadata(name, template_name, null_uses_default=True)
+        resolved_verbose_name = _string_metadata(
             verbose_name,
-            template_title or None,
-            fallback_verbose_name,
-            resolved_name,
+            template_title or fallback_verbose_name or resolved_name,
+            null_uses_default=True,
         )
-        resolved_description_short = first_not_none(
+        resolved_description_short = _string_metadata(
             description_short, template_desc_short
         )
-        resolved_description_long = first_not_none(description_long, template_desc_long)
-        resolved_logo = first_not_none(logo, template_logo)
-        resolved_documentation_urls = first_not_none(
+        resolved_description_long = _string_metadata(
+            description_long, template_desc_long
+        )
+        resolved_logo = _string_metadata(logo, template_logo)
+        resolved_documentation_urls = _list_metadata(
             documentation_urls, template_doc_urls
         )
-        resolved_external_urls = first_not_none(external_urls, template_ext_urls)
-        resolved_tags = first_not_none(tags, template_tags)
+        resolved_external_urls = _list_metadata(external_urls, template_ext_urls)
+        resolved_tags = _list_metadata(tags, template_tags)
 
         # Create or update the template
 
@@ -1057,17 +1091,10 @@ class AppService:
         return await self._fetch_and_create_template(
             template_name=import_request.template_name,
             template_version=import_request.template_version,
-            name=import_request.name,
-            verbose_name=import_request.verbose_name,
-            description_short=import_request.description_short,
-            description_long=import_request.description_long,
-            logo=import_request.logo,
-            documentation_urls=import_request.documentation_urls,
-            external_urls=import_request.external_urls,
-            tags=import_request.tags,
             is_internal=import_request.is_internal,
             is_shared=import_request.is_shared,
             input=import_request.input,
+            **_metadata_overrides(import_request),
         )
 
     async def delete(self, app_id: UUID, uninstall: bool = False) -> None:

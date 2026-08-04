@@ -94,6 +94,72 @@ class TestTemplateImport:
         assert data2["verbose_name"] == "Second Import"
         assert data2["template_version"] == "1.0.0"  # Same version
 
+    def test_import_template_explicit_null_clears_existing_branding(
+        self, app_client: TestClient
+    ) -> None:
+        initial_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "clear-branding-test",
+                "template_version": "1.0.0",
+            },
+        )
+        assert initial_response.status_code == 200
+        assert initial_response.json()["description_short"] == (
+            "Short description from Apps API"
+        )
+
+        update_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "clear-branding-test",
+                "template_version": "1.0.0",
+                "description_short": None,
+                "description_long": None,
+                "logo": None,
+            },
+        )
+
+        assert update_response.status_code == 200
+        updated = update_response.json()
+        assert updated["description_short"] == ""
+        assert updated["description_long"] == ""
+        assert updated["logo"] == ""
+
+        nonempty_update_response = app_client.post(
+            "/api/v1/apps/templates/import",
+            json={
+                "template_name": "clear-branding-test",
+                "template_version": "1.0.0",
+                "description_short": "Restored description",
+            },
+        )
+        assert nonempty_update_response.status_code == 200
+        assert (
+            nonempty_update_response.json()["description_short"]
+            == "Restored description"
+        )
+
+    def test_import_template_omitted_branding_keeps_apps_api_fallback_on_update(
+        self, app_client: TestClient
+    ) -> None:
+        request = {
+            "template_name": "fallback-branding-test",
+            "template_version": "1.0.0",
+        }
+        assert (
+            app_client.post("/api/v1/apps/templates/import", json=request).status_code
+            == 200
+        )
+
+        update_response = app_client.post("/api/v1/apps/templates/import", json=request)
+
+        assert update_response.status_code == 200
+        updated = update_response.json()
+        assert updated["description_short"] == "Short description from Apps API"
+        assert updated["description_long"] == "Long description from Apps API"
+        assert updated["logo"] == "https://example.com/logo.png"
+
     def test_import_template_different_versions_creates_separate_templates(
         self, app_client: TestClient
     ) -> None:
