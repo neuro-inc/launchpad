@@ -93,7 +93,7 @@ pytest-cov = "^7.1.0"
 pytest-asyncio = "1.4.0"
 types-cachetools = "^7.0.0.20260713"
 testcontainers = {extras = ["postgres"], version = "^4.14.2"}
-psycopg2-binary = "^2.9.11"
+psycopg2-binary = "^2.9.13"
 httpx2 = "^2.12.0"
 
 [build-system]
