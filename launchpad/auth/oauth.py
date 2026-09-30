@@ -14,6 +14,7 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 
 from launchpad.config import KeycloakConfig
+from launchpad.hostnames import canonical_hostname
 
 
 if TYPE_CHECKING:
@@ -55,6 +56,15 @@ class Oauth:
             launchpad_app_id = uuid.uuid4()
         self._cookie_token = f"launchpad-{launchpad_app_id.hex}-token"
         self._cookie_code_verifier = f"launchpad-{launchpad_app_id.hex}-code-verifier"
+
+    @property
+    def auth_base_url(self) -> str:
+        return self._callback_url.rsplit("/", 1)[0]
+
+    def covers_hostname(self, hostname: str) -> bool:
+        host = canonical_hostname(hostname)
+        domain = canonical_hostname(self._cookie_domain.lstrip("."))
+        return host == domain or host.endswith(f".{domain}")
 
     def redirect(
         self,

@@ -1,6 +1,7 @@
 import logging
 import os
-from typing import Annotated, Any, Optional
+from typing import TYPE_CHECKING, Annotated, Any, Mapping, Optional
+from uuid import UUID
 
 import aiohttp
 import backoff
@@ -8,18 +9,67 @@ import jwt
 from aiohttp import ClientSession
 from asyncache import cached
 from cachetools import LRUCache
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from launchpad.auth.models import User
 from launchpad.config import KeycloakConfig
 from launchpad.errors import Forbidden, Unauthorized
+from launchpad.ext.apps_api import AppsApiError
+
+
+if TYPE_CHECKING:
+    from launchpad.apps.models import InstalledApp
+    from launchpad.apps.service import AppService
+    from launchpad.auth.oauth import Oauth
+    from launchpad.auth.static_hostname import StaticHostnameAuthService
 
 
 logger = logging.getLogger(__name__)
+
+
+def authorize_app_email(installed_app: "InstalledApp", token: Mapping[str, Any]) -> str:
+    email = token.get("email")
+    if not isinstance(email, str) or not email:
+        raise Forbidden("Token is missing required 'email' claim")
+    if not installed_app.is_shared and email != installed_app.user_id:
+        raise Forbidden()
+    return email
+
+
+async def resolve_app_for_authorization(
+    app_service: "AppService", hostname: str
+) -> "InstalledApp | None":
+    try:
+        return await app_service.resolve_app_for_authorization(hostname)
+    except AppsApiError:
+        logger.warning("Unable to resolve App hostname: %s", hostname)
+        raise HTTPException(503, "Unable to resolve App hostname") from None
+
+
+async def decode_app_token(
+    request: Request,
+    app_id: UUID,
+    oauth: "Oauth",
+    static_hostname_auth: "StaticHostnameAuthService",
+    *,
+    hostname: str,
+    is_cross_domain: bool,
+) -> dict[str, Any]:
+    if not is_cross_domain:
+        return await decode_token_from_request(request, oauth)
+    session = request.cookies.get(static_hostname_auth.session_cookie, "")
+    access_token = await static_hostname_auth.get_token(session, hostname, app_id)
+    access_token = access_token or get_raw_token_from_request(
+        request, allow_cookie=False
+    )
+    if access_token is None:
+        raise Unauthorized()
+    return await token_from_string(
+        request.app.http, request.app.config.keycloak, access_token
+    )
 
 
 async def auth_required(

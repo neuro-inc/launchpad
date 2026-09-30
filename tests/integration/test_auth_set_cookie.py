@@ -13,6 +13,7 @@ from yarl import URL
 
 from launchpad.app_factory import create_app
 from launchpad.auth.oauth import Oauth
+from launchpad.auth.static_hostname import StaticHostnameAuthService
 from launchpad.config import (
     ApoloConfig,
     AppsConfig,
@@ -91,6 +92,7 @@ def app(
         app.config = mock_config
         app.http = mock_http
         app.oauth = oauth
+        app.static_hostname_auth = AsyncMock(spec=StaticHostnameAuthService)
         yield app
 
 

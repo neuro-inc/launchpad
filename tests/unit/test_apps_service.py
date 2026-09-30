@@ -349,3 +349,129 @@ async def test_get_template_by_app_id_errors(
         pytest.raises(error),
     ):
         await app_service.get_template_by_app_id(app_id)
+
+
+@pytest.mark.parametrize(
+    "hostname,expected_url",
+    [
+        ("generated.example", "https://generated.example"),
+        ("GENERATED.EXAMPLE.:443", "https://generated.example"),
+        ("GENERATED.EXAMPLE.:8443", "https://generated.example:8443"),
+    ],
+)
+async def test_resolve_generated_hostname_uses_local_urls(
+    app_service: AppService,
+    mock_apps_api_client: AsyncMock,
+    hostname: str,
+    expected_url: str,
+) -> None:
+    installed = MagicMock(spec=InstalledApp)
+    mock_apps_api_client.is_static_hostname.return_value = False
+    with patch(
+        "launchpad.apps.service.select_app_by_any_url",
+        new=AsyncMock(return_value=installed),
+    ) as by_url:
+        assert await app_service.resolve_app_for_authorization(hostname) is installed
+    mock_apps_api_client.get_id_by_static_hostname.assert_not_awaited()
+
+    assert by_url.await_args is not None
+    assert by_url.await_args.args[1] == expected_url
+
+
+@pytest.mark.parametrize("current_app_id", [uuid.uuid4(), None])
+async def test_resolve_alias_checks_current_binding(
+    app_service: AppService,
+    mock_apps_api_client: AsyncMock,
+    current_app_id: UUID | None,
+) -> None:
+    installed = MagicMock(spec=InstalledApp)
+    mock_apps_api_client.get_id_by_static_hostname.return_value = current_app_id
+    with (
+        patch(
+            "launchpad.apps.service.select_app_by_any_url",
+            new=AsyncMock(return_value=None),
+        ) as by_url,
+        patch(
+            "launchpad.apps.service.select_app", new=AsyncMock(return_value=installed)
+        ) as by_id,
+    ):
+        result = await app_service.resolve_app_for_authorization(
+            "silverfin-dev.apps.apolo.us"
+        )
+    by_url.assert_awaited_once()
+    if current_app_id is None:
+        assert result is None
+        by_id.assert_not_awaited()
+    else:
+        assert result is installed
+        assert by_id.await_args is not None
+        assert by_id.await_args.kwargs["id"] == current_app_id
+    mock_apps_api_client.get_id_by_static_hostname.assert_awaited_once_with(
+        "silverfin-dev.apps.apolo.us"
+    )
+
+
+async def test_registered_external_hostname_remains_authorized(
+    app_service: AppService,
+    mock_apps_api_client: AsyncMock,
+) -> None:
+    installed = MagicMock(spec=InstalledApp)
+    mock_apps_api_client.is_static_hostname.return_value = False
+    with patch(
+        "launchpad.apps.service.select_app_by_any_url",
+        new=AsyncMock(return_value=installed),
+    ):
+        assert (
+            await app_service.resolve_app_for_authorization(
+                "registered.external.example"
+            )
+            is installed
+        )
+    mock_apps_api_client.get_id_by_static_hostname.assert_not_awaited()
+
+
+async def test_stored_static_alias_cannot_override_current_binding(
+    app_service: AppService,
+    mock_apps_api_client: AsyncMock,
+) -> None:
+    mock_apps_api_client.is_static_hostname.return_value = True
+    mock_apps_api_client.get_id_by_static_hostname.return_value = None
+    with patch(
+        "launchpad.apps.service.select_app_by_any_url",
+        new=AsyncMock(return_value=MagicMock(spec=InstalledApp)),
+    ):
+        assert (
+            await app_service.resolve_app_for_authorization(
+                "silverfin-dev.apps.apolo.us"
+            )
+            is None
+        )
+
+
+async def test_stored_static_hostname_resolves_to_current_app(
+    app_service: AppService, mock_apps_api_client: AsyncMock
+) -> None:
+    previous, current = MagicMock(spec=InstalledApp), MagicMock(spec=InstalledApp)
+    previous.app_id, current.app_id = uuid.uuid4(), uuid.uuid4()
+    mock_apps_api_client.is_static_hostname.return_value = True
+    mock_apps_api_client.get_id_by_static_hostname.return_value = current.app_id
+    with (
+        patch(
+            "launchpad.apps.service.select_app_by_any_url",
+            new=AsyncMock(return_value=previous),
+        ),
+        patch(
+            "launchpad.apps.service.select_app", new=AsyncMock(return_value=current)
+        ) as by_id,
+    ):
+        assert (
+            await app_service.resolve_app_for_authorization(
+                "silverfin-dev.apps.apolo.us"
+            )
+            is current
+        )
+    mock_apps_api_client.is_static_hostname.assert_awaited_once_with(
+        "silverfin-dev.apps.apolo.us"
+    )
+    assert by_id.await_args is not None
+    assert by_id.await_args.kwargs["id"] == current.app_id

@@ -2,6 +2,8 @@
 
 Launchpad is a FastAPI-based application service that manages application deployments and authentication through Keycloak integration. It serves as a platform for launching and managing various applications (vLLM, Postgres, embeddings, OpenWebUI) within the Apolo platform ecosystem.
 
+See the [documentation index](docs/README.md) for architecture and operations guides.
+
 ## Table of Contents
 
 - [API Usage](#api-usage)

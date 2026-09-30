@@ -39,6 +39,7 @@ from launchpad.apps.storage import (
     insert_app,
     list_apps,
     select_app,
+    select_app_by_any_url,
     update_app_endpoints,
     update_app_url,
 )
@@ -54,6 +55,7 @@ from launchpad.apps.template_storage import (
 from launchpad.errors import BadRequest
 from launchpad.ext.apps_api import AppsApiError, NotFound
 from launchpad.ext.launchpad_api import LaunchpadAdminApi, LaunchpadApiError
+from launchpad.hostnames import canonical_authority
 
 
 logger = logging.getLogger(__name__)
@@ -114,6 +116,23 @@ class AppService:
         self._app_configurator = app.app_configurator
         self._instance_id = app.config.instance_id
         self._output_buffer: asyncio.Queue[InstalledApp] = asyncio.Queue()
+
+    async def resolve_app_for_authorization(self, hostname: str) -> InstalledApp | None:
+        hostname = canonical_authority(hostname)
+        async with self._db() as db:
+            installed_app = await select_app_by_any_url(db, f"https://{hostname}")
+        if (
+            installed_app is not None
+            and not await self._apps_api_client.is_static_hostname(hostname)
+        ):
+            return installed_app
+
+        # Resolve each request against current bindings; never persist transferable aliases.
+        app_id = await self._apps_api_client.get_id_by_static_hostname(hostname)
+        if app_id is None:
+            return None
+        async with self._db() as db:
+            return await select_app(db, id=app_id)
 
     async def get_existing_app(
         self,

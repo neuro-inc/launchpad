@@ -4,6 +4,9 @@ from typing import Any
 from uuid import UUID
 
 from aiohttp import ClientResponseError, ClientSession
+from pydantic import BaseModel, ValidationError
+
+from launchpad.hostnames import canonical_hostname
 
 
 logger = logging.getLogger(__name__)
@@ -19,6 +22,24 @@ class NotFound(AppsApiError):
 
 class ServerError(AppsApiError):
     pass
+
+
+class _AppIdentity(BaseModel):
+    id: UUID
+
+
+class _AppIdentityPage(BaseModel):
+    items: list[_AppIdentity]
+
+
+class _StaticHostname(BaseModel):
+    hostname: str
+    phase: str
+    static_url: str | None
+
+
+class _HostnameConfiguration(BaseModel):
+    hostname_domain: str
 
 
 class AppsApiClient:
@@ -75,6 +96,50 @@ class AppsApiClient:
             method="GET",
             url=f"{self.v2_url}/instances/{app_id}",
         )
+
+    async def get_id_by_static_hostname(self, hostname: str) -> UUID | None:
+        hostname = canonical_hostname(hostname)
+        try:
+            payload = await self._request(
+                method="GET",
+                url=f"{self.v2_url}/instances",
+                params={"hostname": hostname},
+            )
+            page = _AppIdentityPage.model_validate(payload)
+            if len(page.items) != 1:
+                raise AppsApiError("Expected exactly one App for hostname")
+            app_id = page.items[0].id
+            binding_payload = await self._request(
+                method="GET", url=f"{self.v2_url}/instances/{app_id}/static-hostname"
+            )
+            binding = _StaticHostname.model_validate(binding_payload)
+        except NotFound:
+            return None
+        except ValidationError as e:
+            raise AppsApiError("Invalid static hostname lookup response") from e
+
+        if (
+            binding.hostname != hostname
+            or binding.phase != "active"
+            or binding.static_url != f"https://{hostname}"
+        ):
+            return None
+        return app_id
+
+    async def is_static_hostname(self, hostname: str) -> bool:
+        hostname = canonical_hostname(hostname)
+        try:
+            payload = await self._request(
+                method="GET", url=f"{self.v2_url}/hostnames/configuration"
+            )
+        except NotFound:
+            return False
+        try:
+            domain = _HostnameConfiguration.model_validate(payload).hostname_domain
+            domain = canonical_hostname(domain.lstrip("."))
+        except ValueError as e:
+            raise AppsApiError("Invalid hostname configuration response") from e
+        return hostname == domain or hostname.endswith(f".{domain}")
 
     async def get_template(
         self, template_name: str, template_version: str

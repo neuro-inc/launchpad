@@ -17,6 +17,7 @@ async def create_db(app: Launchpad) -> AsyncIterator[None]:
     app.db_engine = create_async_engine(
         app.config.postgres.dsn,
         future=True,
+        hide_parameters=True,
         pool_pre_ping=True,
         pool_size=app.config.postgres.pool_min_size,
         pool_recycle=3600,

@@ -1,6 +1,6 @@
 ARG PY_VERSION=3.13.1
 
-FROM python:${PY_VERSION}-slim-bookworm as builder
+FROM python:${PY_VERSION}-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -20,9 +20,9 @@ COPY launchpad /app/launchpad
 
 RUN poetry install --only main && rm -rf /tmp/poetry-cache
 
-FROM python:${PY_VERSION}-slim-bookworm as runtime
+FROM python:${PY_VERSION}-slim-bookworm AS runtime
 
-LABEL org.opencontainers.image.source = "https://github.com/neuro-inc/launchpad"
+LABEL org.opencontainers.image.source="https://github.com/neuro-inc/launchpad"
 
 ENV SERVICE_NAME="launchpad"
 

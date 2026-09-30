@@ -1,0 +1,9 @@
+# apolo-agent-harness:start
+# apolo-agent-harness sha256: c67cb2cf6ec0990dbaabed002fcabb0bdba1f5ff8859650a61399458a42fdb2d
+[agents.explorer]
+description = "Read-only Apolo repository and dependency investigator"
+config_file = "../../apolo-agent-harness/.codex/agents/explorer.toml"
+[agents.reviewer]
+description = "Independent read-only reviewer of Apolo code and contracts"
+config_file = "../../apolo-agent-harness/.codex/agents/reviewer.toml"
+# apolo-agent-harness:end
