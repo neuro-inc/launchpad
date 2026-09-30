@@ -1,6 +1,6 @@
 import logging
 from typing import Any, Mapping
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit, urlunsplit
 
 import aiohttp
 from fastapi import APIRouter, HTTPException, Request
@@ -8,11 +8,13 @@ from pydantic import BaseModel
 from starlette.responses import (
     JSONResponse,
     PlainTextResponse,
+    RedirectResponse,
     Response,
 )
 
-from launchpad.apps.storage import select_app_by_any_url
+from launchpad.apps.service import DepAppService
 from launchpad.auth import (
+    AUTH_REDIRECT_HEADERS,
     HEADER_X_AUTH_REQUEST_EMAIL,
     HEADER_X_AUTH_REQUEST_GROUPS,
     HEADER_X_AUTH_REQUEST_ROLES,
@@ -22,17 +24,24 @@ from launchpad.auth import (
 )
 from launchpad.auth.dependencies import (
     _extract_bearer_token,
+    authorize_app_email,
+    decode_app_token,
     decode_token_from_request,
     get_raw_token_from_request,
+    resolve_app_for_authorization,
     token_from_string,
 )
+from launchpad.auth.oauth import DepOauth, OauthError
+from launchpad.auth.static_hostname import DepStaticHostnameAuth
+from launchpad.auth.static_hostname_api import (
+    begin_static_hostname_login,
+    handle_static_hostname_handoff,
+)
+from launchpad.errors import Forbidden, Unauthorized
+from launchpad.hostnames import canonical_authority
 
 
 _token_from_request = get_raw_token_from_request
-from launchpad.auth.oauth import DepOauth, OauthError
-from launchpad.db.dependencies import Db
-from launchpad.errors import Forbidden, Unauthorized
-
 
 logger = logging.getLogger(__name__)
 
@@ -211,17 +220,43 @@ async def get_token(
 @auth_router.get("/authorize", status_code=200)
 async def view_post_authorize(
     request: Request,
-    db: Db,
+    app_service: DepAppService,
     oauth: DepOauth,
+    static_hostname_auth: DepStaticHostnameAuth,
 ) -> Response:
-    app_url = f"https://{request.headers[HEADER_X_FORWARDED_HOST]}"
-    installed_app = await select_app_by_any_url(db=db, url=app_url)
+    forwarded_hostname = request.headers[HEADER_X_FORWARDED_HOST]
+    try:
+        hostname = canonical_authority(forwarded_hostname)
+    except ValueError:
+        raise Forbidden("Invalid forwarded hostname") from None
+    app_url = f"https://{hostname}"
+    is_cross_domain = not oauth.covers_hostname(hostname)
+    installed_app = await resolve_app_for_authorization(app_service, hostname)
     if installed_app is None:
         logger.info(f"Unable to find installed app by url: {app_url}")
         raise Forbidden()
 
+    if hostname != forwarded_hostname:
+        forwarded_uri = urlsplit(request.headers.get(HEADER_X_FORWARDED_URI, ""))
+        return RedirectResponse(
+            urlunsplit(
+                ("https", hostname, forwarded_uri.path or "/", forwarded_uri.query, "")
+            ),
+            headers=AUTH_REDIRECT_HEADERS,
+        )
+
+    handoff_response = await handle_static_hostname_handoff(
+        request,
+        installed_app.app_id,
+        static_hostname_auth,
+        hostname=hostname,
+        is_cross_domain=is_cross_domain,
+    )
+    if handoff_response is not None:
+        return handoff_response
+
     request_path = request.headers.get(HEADER_X_FORWARDED_URI, "")
-    auth_bypass_path_prefixes = request.app.config.auth_bypass_path_prefixes
+    auth_bypass_path_prefixes = request.app.config.auth_bypass_path_prefixes or []
     if _is_auth_bypass_path(request_path, auth_bypass_path_prefixes):
         logger.debug(
             "Bypassing auth redirect for path '%s' by prefixes: %s",
@@ -235,24 +270,30 @@ async def view_post_authorize(
     #     logger.info("access to an internal app is forbidden")
     #     raise Forbidden()
 
-    # Attempt to decode token (prefers cookie when oauth provided)
     try:
-        decoded_token = await decode_token_from_request(request, oauth)
+        decoded_token = await decode_app_token(
+            request,
+            installed_app.app_id,
+            oauth,
+            static_hostname_auth,
+            hostname=hostname,
+            is_cross_domain=is_cross_domain,
+        )
     except Unauthorized:
         logger.info(
             "no access token present or unable to decode. redirecting to keycloak"
         )
-        return oauth.redirect(original_redirect_uri=app_url)
+        if not is_cross_domain:
+            return oauth.redirect(original_redirect_uri=app_url)
+        return await begin_static_hostname_login(
+            hostname, installed_app.app_id, oauth, static_hostname_auth
+        )
 
     logger.debug(f"Decoded token keys: {list(decoded_token.keys())}")
     logger.debug(f"Token realm_access: {decoded_token.get('realm_access')}")
     logger.debug(f"Token groups: {decoded_token.get('groups')}")
 
-    try:
-        email = str(decoded_token["email"])
-    except KeyError:
-        logger.error("Token missing required 'email' claim; denying access")
-        raise Forbidden("Token is missing required 'email' claim")
+    email = authorize_app_email(installed_app, decoded_token)
 
     # extract username from token
     username = str(decoded_token.get("preferred_username", email))
@@ -268,10 +309,6 @@ async def view_post_authorize(
     )
 
     # check permissions for individual apps
-    if not installed_app.is_shared and email != installed_app.user_id:
-        logger.info(f"permission denied for user {email}")
-        raise Forbidden()
-
     response_headers: dict[str, str] = {
         # pass headers to a downstream app via traefik auth middleware
         HEADER_X_AUTH_REQUEST_EMAIL: email,
@@ -304,7 +341,9 @@ async def callback(request: Request, oauth: DepOauth) -> Response:
     # --- GET: Standard OAuth callback ---
     if request.method == "GET":
         try:
-            return await oauth.callback(request)
+            response: Response = await oauth.callback(request)
+            response.headers.update(AUTH_REDIRECT_HEADERS)
+            return response
         except OauthError as e:
             raise Forbidden(str(e))
 
@@ -344,7 +383,17 @@ async def callback(request: Request, oauth: DepOauth) -> Response:
 
 
 @auth_router.post("/logout", status_code=200)
-async def logout(oauth: DepOauth) -> Response:
+async def logout(
+    request: Request, oauth: DepOauth, static_hostname_auth: DepStaticHostnameAuth
+) -> Response:
+    try:
+        decoded = await decode_token_from_request(request, oauth)
+    except Unauthorized:
+        pass
+    else:
+        email = decoded.get("email")
+        if isinstance(email, str) and email:
+            await static_hostname_auth.revoke_user(email)
     response = Response(status_code=200)
     oauth.logout(response)
     return response

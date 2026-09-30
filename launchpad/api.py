@@ -13,6 +13,7 @@ from launchpad.app import Launchpad
 from launchpad.apps.api import apps_router
 from launchpad.auth.api import auth_router
 from launchpad.auth.dependencies import auth_required
+from launchpad.auth.static_hostname_api import static_hostname_router
 
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ api_v1_router = APIRouter(dependencies=[Depends(auth_required)])
 
 api_v1_router.include_router(apps_router, prefix="/apps")
 root_router.include_router(auth_router, prefix="/auth")
+root_router.include_router(static_hostname_router, prefix="/auth")
 
 
 root_router.include_router(

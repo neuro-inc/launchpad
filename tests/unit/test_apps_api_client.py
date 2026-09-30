@@ -6,12 +6,80 @@ from uuid import UUID
 import pytest
 from aiohttp import ClientResponseError
 
-from launchpad.ext.apps_api import AppsApiClient, NotFound, ServerError
+from launchpad.ext.apps_api import AppsApiClient, AppsApiError, NotFound, ServerError
 
 
 @pytest.fixture
 def mock_http_session() -> AsyncMock:
     return AsyncMock()
+
+
+@pytest.mark.parametrize(
+    "hostname", ["silverfin-dev.apps.apolo.us", "SILVERFIN-DEV.APPS.APOLO.US.:443"]
+)
+async def test_get_id_by_static_hostname(
+    apps_api_client: AppsApiClient, app_id: UUID, hostname: str
+) -> None:
+    with patch.object(
+        apps_api_client,
+        "_request",
+        new=AsyncMock(
+            side_effect=[
+                {"items": [{"id": str(app_id)}]},
+                {
+                    "hostname": "silverfin-dev.apps.apolo.us",
+                    "phase": "active",
+                    "static_url": "https://silverfin-dev.apps.apolo.us",
+                },
+            ]
+        ),
+    ) as request:
+        assert await apps_api_client.get_id_by_static_hostname(hostname) == app_id
+    request.assert_any_await(
+        method="GET",
+        url="https://api.example.com/v2/instances",
+        params={"hostname": "silverfin-dev.apps.apolo.us"},
+    )
+
+    request.assert_any_await(
+        method="GET",
+        url=f"https://api.example.com/v2/instances/{app_id}/static-hostname",
+    )
+
+
+@pytest.mark.parametrize("missing_binding", [False, True])
+async def test_get_id_by_static_hostname_inactive(
+    apps_api_client: AppsApiClient, app_id: UUID, missing_binding: bool
+) -> None:
+    responses: list[Any] = [NotFound()]
+    if missing_binding:
+        responses.insert(0, {"items": [{"id": str(app_id)}]})
+    with patch.object(
+        apps_api_client, "_request", new=AsyncMock(side_effect=responses)
+    ):
+        assert (
+            await apps_api_client.get_id_by_static_hostname("detached.apps.apolo.us")
+            is None
+        )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"items": []},
+        {"items": [{"id": "bad"}]},
+        {"items": [{"id": str(uuid.uuid4())}, {"id": str(uuid.uuid4())}]},
+    ],
+)
+async def test_get_id_by_static_hostname_invalid_response(
+    apps_api_client: AppsApiClient, payload: dict[str, Any]
+) -> None:
+    with (
+        patch.object(apps_api_client, "_request", new=AsyncMock(return_value=payload)),
+        pytest.raises(AppsApiError),
+    ):
+        await apps_api_client.get_id_by_static_hostname("silverfin-dev.apps.apolo.us")
 
 
 @pytest.fixture
@@ -359,3 +427,124 @@ async def test_server_error_500(
 
     with pytest.raises(ServerError):
         await apps_api_client.get_by_id(app_id)
+
+
+@pytest.mark.parametrize(
+    "binding",
+    [
+        {
+            "hostname": "silverfin-dev.apps.apolo.us",
+            "phase": "reserved",
+            "static_url": None,
+        },
+        {
+            "hostname": "silverfin-dev.apps.apolo.us",
+            "phase": "active",
+            "static_url": None,
+        },
+        {
+            "hostname": "other.apps.apolo.us",
+            "phase": "active",
+            "static_url": "https://other.apps.apolo.us",
+        },
+    ],
+)
+async def test_static_hostname_requires_exact_active_binding(
+    apps_api_client: AppsApiClient, app_id: UUID, binding: dict[str, Any]
+) -> None:
+    with patch.object(
+        apps_api_client,
+        "_request",
+        new=AsyncMock(side_effect=[{"items": [{"id": str(app_id)}]}, binding]),
+    ):
+        assert (
+            await apps_api_client.get_id_by_static_hostname(
+                "silverfin-dev.apps.apolo.us"
+            )
+            is None
+        )
+
+
+async def test_static_hostname_rejects_name_lookup_on_attacker_domain(
+    apps_api_client: AppsApiClient, app_id: UUID
+) -> None:
+    binding = {
+        "hostname": "silverfin-dev.apps.apolo.us",
+        "phase": "active",
+        "static_url": "https://silverfin-dev.apps.apolo.us",
+    }
+    with patch.object(
+        apps_api_client,
+        "_request",
+        new=AsyncMock(side_effect=[{"items": [{"id": str(app_id)}]}, binding]),
+    ):
+        assert (
+            await apps_api_client.get_id_by_static_hostname(
+                "silverfin-dev.attacker.example"
+            )
+            is None
+        )
+
+
+@pytest.mark.parametrize(
+    "hostname,expected",
+    [
+        ("silverfin-dev.apps.apolo.us", True),
+        ("silverfin-dev.apps.apolo.us:443", True),
+        ("SILVERFIN-DEV.apps.apolo.us.", True),
+        ("silverfin-dev.attacker.example", False),
+        ("evilapps.apolo.us", False),
+    ],
+)
+async def test_static_hostname_namespace(
+    apps_api_client: AppsApiClient, hostname: str, expected: bool
+) -> None:
+    with patch.object(
+        apps_api_client,
+        "_request",
+        new=AsyncMock(return_value={"hostname_domain": "apps.apolo.us"}),
+    ):
+        assert await apps_api_client.is_static_hostname(hostname) is expected
+
+
+@pytest.mark.parametrize("binding_response", [{}, ServerError()])
+async def test_static_hostname_binding_failure_is_not_a_missing_binding(
+    apps_api_client: AppsApiClient,
+    app_id: UUID,
+    binding_response: dict[str, Any] | ServerError,
+) -> None:
+    with (
+        patch.object(
+            apps_api_client,
+            "_request",
+            new=AsyncMock(
+                side_effect=[{"items": [{"id": str(app_id)}]}, binding_response]
+            ),
+        ),
+        pytest.raises(AppsApiError),
+    ):
+        await apps_api_client.get_id_by_static_hostname("silverfin-dev.apps.apolo.us")
+
+
+async def test_unconfigured_static_hostname_namespace_is_false(
+    apps_api_client: AppsApiClient,
+) -> None:
+    with patch.object(
+        apps_api_client, "_request", new=AsyncMock(side_effect=NotFound())
+    ):
+        assert not await apps_api_client.is_static_hostname(
+            "registered.external.example"
+        )
+
+
+@pytest.mark.parametrize("response", [ServerError(), {}, {"hostname_domain": ""}])
+async def test_static_hostname_configuration_failure_is_not_disabled(
+    apps_api_client: AppsApiClient, response: ServerError | dict[str, Any]
+) -> None:
+    with (
+        patch.object(
+            apps_api_client, "_request", new=AsyncMock(side_effect=[response])
+        ),
+        pytest.raises(AppsApiError),
+    ):
+        await apps_api_client.is_static_hostname("registered.external.example")

@@ -1,8 +1,10 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 
+from launchpad.apps.service import AppService
 from launchpad.auth import (
     HEADER_X_AUTH_REQUEST_EMAIL,
     HEADER_X_AUTH_REQUEST_GROUPS,
@@ -26,7 +28,7 @@ def mock_request() -> MagicMock:
 
 
 def _installed_app() -> SimpleNamespace:
-    return SimpleNamespace(is_shared=True, user_id="owner@example.test")
+    return SimpleNamespace(app_id=uuid4(), is_shared=True, user_id="owner@example.test")
 
 
 @pytest.mark.parametrize(
@@ -67,21 +69,27 @@ async def test_view_post_authorize_forwards_groups_and_roles_separately(
     expected_groups: str,
     expected_roles: str,
 ) -> None:
-    db = MagicMock()
+    app_service = MagicMock(spec=AppService)
     oauth = MagicMock()
+    oauth.covers_hostname.return_value = True
 
     with (
-        patch(
-            "launchpad.auth.api.select_app_by_any_url", new=AsyncMock()
+        patch.object(
+            app_service, "resolve_app_for_authorization", new=AsyncMock()
         ) as mock_select_app,
         patch(
-            "launchpad.auth.api.decode_token_from_request", new=AsyncMock()
+            "launchpad.auth.dependencies.decode_token_from_request", new=AsyncMock()
         ) as mock_decode,
     ):
         mock_select_app.return_value = _installed_app()
         mock_decode.return_value = decoded_token
 
-        response = await view_post_authorize(request=mock_request, db=db, oauth=oauth)
+        response = await view_post_authorize(
+            request=mock_request,
+            app_service=app_service,
+            oauth=oauth,
+            static_hostname_auth=MagicMock(),
+        )
 
     assert response.status_code == 200
     assert response.headers[HEADER_X_AUTH_REQUEST_EMAIL] == "user@example.test"
@@ -109,16 +117,17 @@ def test_is_auth_bypass_path(path: str, prefixes: list[str], expected: bool) -> 
 async def test_view_post_authorize_bypasses_redirect_for_configured_paths(
     mock_request: MagicMock,
 ) -> None:
-    db = MagicMock()
+    app_service = MagicMock(spec=AppService)
     oauth = MagicMock()
+    oauth.covers_hostname.return_value = True
     mock_request.headers[HEADER_X_FORWARDED_URI] = "/api/webhooks/incoming"
 
     with (
-        patch(
-            "launchpad.auth.api.select_app_by_any_url", new=AsyncMock()
+        patch.object(
+            app_service, "resolve_app_for_authorization", new=AsyncMock()
         ) as mock_select_app,
         patch(
-            "launchpad.auth.api.decode_token_from_request", new=AsyncMock()
+            "launchpad.auth.dependencies.decode_token_from_request", new=AsyncMock()
         ) as mock_decode,
     ):
         mock_select_app.return_value = _installed_app()
@@ -126,7 +135,12 @@ async def test_view_post_authorize_bypasses_redirect_for_configured_paths(
             "decode_token_from_request should not be called for bypass paths"
         )
 
-        response = await view_post_authorize(request=mock_request, db=db, oauth=oauth)
+        response = await view_post_authorize(
+            request=mock_request,
+            app_service=app_service,
+            oauth=oauth,
+            static_hostname_auth=MagicMock(),
+        )
 
     assert response.status_code == 200
     oauth.redirect.assert_not_called()
@@ -135,23 +149,29 @@ async def test_view_post_authorize_bypasses_redirect_for_configured_paths(
 async def test_view_post_authorize_does_not_bypass_when_prefixes_disabled(
     mock_request: MagicMock,
 ) -> None:
-    db = MagicMock()
+    app_service = MagicMock(spec=AppService)
     oauth = MagicMock()
+    oauth.covers_hostname.return_value = True
     mock_request.headers[HEADER_X_FORWARDED_URI] = "/api/webhooks/incoming"
     mock_request.app.config.auth_bypass_path_prefixes = []
 
     with (
-        patch(
-            "launchpad.auth.api.select_app_by_any_url", new=AsyncMock()
+        patch.object(
+            app_service, "resolve_app_for_authorization", new=AsyncMock()
         ) as mock_select_app,
         patch(
-            "launchpad.auth.api.decode_token_from_request", new=AsyncMock()
+            "launchpad.auth.dependencies.decode_token_from_request", new=AsyncMock()
         ) as mock_decode,
     ):
         mock_select_app.return_value = _installed_app()
         mock_decode.return_value = {"email": "user@example.test"}
 
-        response = await view_post_authorize(request=mock_request, db=db, oauth=oauth)
+        response = await view_post_authorize(
+            request=mock_request,
+            app_service=app_service,
+            oauth=oauth,
+            static_hostname_auth=MagicMock(),
+        )
 
     assert response.status_code == 200
     assert response.headers[HEADER_X_AUTH_REQUEST_EMAIL] == "user@example.test"

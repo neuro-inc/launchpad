@@ -13,6 +13,7 @@ from launchpad.ext.apps_api import AppsApiClient
 
 if TYPE_CHECKING:
     from launchpad.apps.service import AppService
+    from launchpad.auth.static_hostname import StaticHostnameAuthService
 
 
 class Launchpad(FastAPI):
@@ -25,3 +26,4 @@ class Launchpad(FastAPI):
     app_configurator: AppConfigurator
     app_service: "AppService"
     oauth: "Oauth"
+    static_hostname_auth: "StaticHostnameAuthService"

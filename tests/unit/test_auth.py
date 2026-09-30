@@ -208,3 +208,20 @@ async def test_oauth_fetch_token_key_error(
     data = {"grant_type": "authorization_code"}
     with pytest.raises(OauthError):
         await oauth_instance._fetch_token(data)
+
+
+@pytest.mark.parametrize(
+    "hostname,expected",
+    [
+        ("app.mock-cookie.com", True),
+        ("app.mock-cookie.com:443", True),
+        ("APP.MOCK-COOKIE.COM.:443", True),
+        ("mock-cookie.com", True),
+        ("alias.apps.apolo.us", False),
+        ("evil-mock-cookie.com", False),
+    ],
+)
+def test_oauth_cookie_domain_coverage(
+    oauth_instance: Oauth, hostname: str, expected: bool
+) -> None:
+    assert oauth_instance.covers_hostname(hostname) is expected

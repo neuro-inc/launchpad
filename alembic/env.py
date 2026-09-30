@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from alembic import context
 from alembic.script import ScriptDirectory
+from launchpad.auth.models import AliasSession  # noqa: F401 -- register ORM metadata
 from launchpad.config import EnvironConfigFactory
 from launchpad.db.base import DSN, Base
 

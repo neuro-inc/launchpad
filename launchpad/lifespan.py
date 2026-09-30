@@ -2,6 +2,7 @@ import asyncio
 import logging
 import typing as t
 from contextlib import AsyncExitStack, asynccontextmanager
+from uuid import uuid4
 
 import aiohttp
 from apolo_sdk import Factory as ApoloClientFactory
@@ -11,6 +12,7 @@ from launchpad.apps.lifespan import init_internal_apps
 from launchpad.apps.service import AppService
 from launchpad.apps.template_storage import seed_templates
 from launchpad.auth.oauth import Oauth
+from launchpad.auth.static_hostname import StaticHostnameAuthService
 from launchpad.db.lifespan import create_db
 from launchpad.ext.app_configurator import AppConfigurator
 from launchpad.ext.apps_api import AppsApiClient
@@ -68,12 +70,14 @@ async def lifespan(app: Launchpad) -> t.AsyncIterator[None]:
         )
 
         app.app_service = AppService(app=app)
+        launchpad_id = app.config.instance_id or uuid4()
+        app.static_hostname_auth = StaticHostnameAuthService(app.db, launchpad_id)
         app.oauth = Oauth(
             http=app.http,
             keycloak_config=app.config.keycloak,
             cookie_domain=app.config.apolo.base_domain,
             launchpad_domain=app.config.apolo.self_domain,
-            launchpad_app_id=app.config.instance_id,
+            launchpad_app_id=launchpad_id,
         )
 
         # Seed app templates and initialize internal apps only if apps config is present

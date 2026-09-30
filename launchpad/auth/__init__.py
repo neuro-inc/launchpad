@@ -16,3 +16,6 @@ AUTH_RESPONSE_HEADERS = (
     HEADER_X_AUTH_REQUEST_GROUPS,
     HEADER_X_AUTH_REQUEST_ROLES,
 ) = AUTH_RESPONSE_HEADERS
+
+
+AUTH_REDIRECT_HEADERS = {"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"}
