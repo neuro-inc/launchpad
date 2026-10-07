@@ -185,8 +185,11 @@ jobs:
   release-pr-image:
     name: Release PR image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     needs: test
-    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Checkout commit
         uses: actions/checkout@v7
@@ -203,17 +206,20 @@ jobs:
           make build-image
 
       - name: Push PR image
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
         run: |
-          BRANCH_NAME=${{ github.head_ref }}
           # Convert to lowercase, replace anything not a-z0-9_.- with '-'
           export IMAGE_TAG=$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
           make push-image
 
       - name: Comment on PR
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
         uses: actions/github-script@v9
         with:
           script: |
-            const branchName = '${{ github.head_ref }}';
+            const branchName = process.env.BRANCH_NAME;
             const imageTag = branchName.toLowerCase().replace(/[^a-z0-9_.-]/g, '-');
             const commentBody = `🐳 Docker image for this PR has been built and pushed:\n\n\`ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${imageTag}\``;
 
@@ -243,9 +249,13 @@ jobs:
   release-hook-image:
     name: Release hook image
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+      packages: write
     needs: test
     if: (
-        (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
+        (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository) ||
         (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/master'))
       )
     steps:
@@ -257,9 +267,10 @@ jobs:
           token: ${{ github.token }}
           expire-in: 30mins
       - name: Set APP_IMAGE_TAG
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BRANCH_NAME=${{ github.head_ref }}
             export APP_IMAGE_TAG=$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
           elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
             export APP_IMAGE_TAG=master
@@ -279,8 +290,9 @@ jobs:
           make build-hook-image
       - name: Release branch image
         if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
         run: |
-          BRANCH_NAME=${{ github.head_ref }}
           # Convert to lowercase, replace anything not a-z0-9_.- with '-'
           export IMAGE_TAG=$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
           make push-hook-image
