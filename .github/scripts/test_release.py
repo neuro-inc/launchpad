@@ -1,4 +1,4 @@
-"""Test component provenance, release assembly, and manual publication."""
+"""Test component provenance, release assembly, and version publication."""
 
 import copy
 import hashlib
@@ -24,6 +24,7 @@ from release import (
     load_release,
     prepare,
     publish,
+    publish_development,
     record_component,
     registry_digest,
     select_component,
@@ -125,8 +126,8 @@ class ReleaseTests(unittest.TestCase):
     def test_component_selection_preserves_publication_tags(self) -> None:
         cases = (
             ("backend", "pull_request", "branch", "feature", "feature-it-281-new"),
-            ("backend", "push", "branch", "master", "master"),
-            ("backend", "push", "tag", "v1.2.3", "v1.2.3"),
+            ("backend", "push", "branch", "master", head()),
+            ("hook", "push", "branch", "master", head()),
             ("frontend", "pull_request", "branch", "feature", head()),
         )
         for component, event, ref_type, ref_name, expected_tag in cases:
@@ -140,7 +141,12 @@ class ReleaseTests(unittest.TestCase):
                         "PR_BRANCH": "Feature/IT-281 New",
                     },
                 ):
-                    selection = select_component(component, self.base, (), False)
+                    dependencies = (
+                        hook_dependencies(self.images) if component == "hook" else ()
+                    )
+                    selection = select_component(
+                        component, self.base, dependencies, False
+                    )
                 self.assertEqual(selection["build"], "false")
                 self.assertEqual(
                     selection["tag"], REPOSITORIES[component] + ":" + expected_tag
@@ -335,7 +341,10 @@ class ReleaseTests(unittest.TestCase):
         for mock in (
             patch.dict(os.environ, {"GITHUB_EVENT_NAME": "workflow_dispatch"}),
             patch(
-                "release.gh", side_effect=lambda *args: json.dumps(self.run_metadata)
+                "release.gh",
+                side_effect=lambda *args: self.release["source_revision"]
+                if args[0] == "api"
+                else json.dumps(self.run_metadata),
             ),
             patch("release.download_release", side_effect=download),
             patch(
@@ -447,7 +456,116 @@ class ReleaseTests(unittest.TestCase):
         publish(self.root / "publication", "42", "v1.2.4")
         self.assertEqual(len(self.registry_writes), 3)
 
-    def test_publication_requires_a_manual_master_dispatch_and_valid_inputs(
+    def test_tag_push_selects_the_successful_ci_run_for_its_commit(self) -> None:
+        self.mock_publication()
+        with (
+            patch.dict(
+                os.environ,
+                {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/tags/v1.2.3"},
+            ),
+            patch(
+                "release.gh", side_effect=["42", json.dumps(self.run_metadata)]
+            ) as api,
+        ):
+            publish(self.root / "publication", "", "v1.2.3")
+        arguments = api.call_args_list[0].args
+        for option, value in (
+            ("--commit", self.release["source_revision"]),
+            ("--branch", "master"),
+            ("--workflow", "ci.yaml"),
+            ("--status", "success"),
+        ):
+            self.assertEqual(arguments[arguments.index(option) + 1], value)
+        self.assertEqual(len(self.registry_writes), 3)
+
+    def test_automatic_publication_requires_available_ci_for_the_exact_commit(
+        self,
+    ) -> None:
+        self.mock_publication()
+        with patch.dict(
+            os.environ,
+            {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/tags/v1.2.3"},
+        ):
+            with (
+                patch("release.gh", return_value=""),
+                self.assertRaisesRegex(ValueError, "successful master CI"),
+            ):
+                publish(self.root / "publication", "", "v1.2.3")
+            self.run_metadata["headSha"] = "f" * 40
+            with (
+                patch("release.gh", side_effect=["42", json.dumps(self.run_metadata)]),
+                self.assertRaisesRegex(ValueError, "exact tagged commit"),
+            ):
+                publish(self.root / "publication", "", "v1.2.3")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_tag_push_cannot_publish_a_different_tag(self) -> None:
+        self.mock_publication()
+        with (
+            patch.dict(
+                os.environ,
+                {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/tags/v1.2.4"},
+            ),
+            self.assertRaises(ValueError),
+        ):
+            publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_development_publication_updates_existing_aliases_without_building(
+        self,
+    ) -> None:
+        self.mock_publication()
+        for repository in REPOSITORIES.values():
+            self.registry[repository + ":master"] = "sha256:" + "f" * 64
+        publish_development(self.base)
+        self.assertEqual(len(self.registry_writes), 3)
+        for component, image in self.images.items():
+            self.assertEqual(
+                self.registry[REPOSITORIES[component] + ":master"],
+                image["image_ref"].split("@", 1)[1],
+            )
+        publish_development(self.base)
+        self.assertEqual(len(self.registry_writes), 3)
+
+    def test_development_publication_rejects_other_refs_and_unverified_sources(
+        self,
+    ) -> None:
+        self.mock_publication()
+        for event, ref in (
+            ("pull_request", "refs/heads/master"),
+            ("push", "refs/heads/feature"),
+            ("push", "refs/tags/v1.2.3"),
+        ):
+            with (
+                patch.dict(os.environ, {"GITHUB_EVENT_NAME": event, "GITHUB_REF": ref}),
+                self.assertRaises(ValueError),
+            ):
+                publish_development(self.base)
+        del self.registry[self.images["hook"]["image_ref"]]
+        with self.assertRaisesRegex(ValueError, "tested digest"):
+            publish_development(self.base)
+        self.assertEqual(self.registry_writes, [])
+
+    def test_development_publication_rejects_a_superseded_master_run(self) -> None:
+        self.mock_publication()
+        with (
+            patch("release.gh", return_value="f" * 40),
+            self.assertRaisesRegex(ValueError, "no longer matches master"),
+        ):
+            publish_development(self.base)
+        self.assertEqual(self.registry_writes, [])
+
+    def test_development_publication_requires_its_original_current_combination(
+        self,
+    ) -> None:
+        self.mock_publication()
+        (self.root / "notes.txt").write_text("documentation only\n")
+        self.commit()
+        with self.assertRaisesRegex(ValueError, "current commit"):
+            publish_development(self.base)
+        self.assertEqual(self.registry_writes, [])
+
+    def test_publication_requires_an_authorized_event_and_valid_inputs(
         self,
     ) -> None:
         self.mock_publication()

@@ -307,19 +307,44 @@ def registry_digest(reference: str, allow_missing: bool = False) -> str | None:
 
 
 def publish(directory: Path, run_id: str, release_tag: str) -> None:
-    if (
-        os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
-        or os.environ.get("GITHUB_REF") != "refs/heads/master"
-    ):
-        raise ValueError(
-            "Dispatch the Release workflow from master after development acceptance."
-        )
-    text(run_id, r"[1-9][0-9]*")
+    event = os.environ.get("GITHUB_EVENT_NAME")
+    ref = os.environ.get("GITHUB_REF")
+    manual = event == "workflow_dispatch" and ref == "refs/heads/master"
+    tagged = event == "push" and ref == f"refs/tags/{release_tag}"
+    if not (manual or tagged):
+        raise ValueError("Publish from a version tag or dispatch Release from master.")
     text(release_tag, r"v[a-zA-Z0-9_.-]{0,127}")
     revision = text(
         command("git", "rev-parse", "--verify", f"refs/tags/{release_tag}^{{commit}}"),
         REVISION,
     )
+    automatic = tagged
+    if automatic:
+        run_id = gh(
+            "run",
+            "list",
+            "--repo",
+            os.environ["GITHUB_REPOSITORY"],
+            "--workflow",
+            "ci.yaml",
+            "--branch",
+            "master",
+            "--commit",
+            revision,
+            "--status",
+            "success",
+            "--limit",
+            "20",
+            "--json",
+            "databaseId,event",
+            "--jq",
+            '[.[] | select(.event == "push" or .event == "workflow_dispatch")] | first | .databaseId // empty',
+        )
+        if not run_id:
+            raise ValueError(
+                "Wait for successful master CI for the tagged commit, then rerun Release."
+            )
+    text(run_id, r"[1-9][0-9]*")
     run = fields(
         json.loads(
             gh(
@@ -341,26 +366,59 @@ def publish(directory: Path, run_id: str, release_tag: str) -> None:
     ) or run["event"] not in ("push", "workflow_dispatch"):
         raise ValueError("The release requires a successful master CI run.")
     source = text(run["headSha"], REVISION)
+    if automatic and source != revision:
+        raise ValueError(
+            "Automatic publication requires CI for the exact tagged commit."
+        )
     if not download_release(directory, run_id):
         raise ValueError("The selected App release artifact is unavailable.")
     release = verify_release(directory, revision)
     if release["source_revision"] != source:
         raise ValueError("The release does not match its successful master CI run.")
+    publish_aliases(release, release_tag)
+
+
+def publish_development(directory: Path) -> None:
+    if (
+        os.environ.get("GITHUB_EVENT_NAME") not in ("push", "workflow_dispatch")
+        or os.environ.get("GITHUB_REF") != "refs/heads/master"
+    ):
+        raise ValueError("Development publication requires a master CI run.")
+    source = head()
+    release = verify_release(directory, source)
+    if release["source_revision"] != source:
+        raise ValueError("The development release must identify the current commit.")
+    current = text(
+        gh(
+            "api",
+            f"repos/{os.environ['GITHUB_REPOSITORY']}/git/ref/heads/master",
+            "--jq",
+            ".object.sha",
+        ),
+        REVISION,
+    )
+    if source != current:
+        raise ValueError("The development release no longer matches master.")
+    publish_aliases(release, "master", replace=True)
+
+
+def publish_aliases(release: Release, tag: str, *, replace: bool = False) -> None:
     aliases: list[tuple[str, str, str, bool]] = []
-    for component, image in release["images"].items():
+    for component in REPOSITORIES:
+        image = release["images"][component]
         reference = image["image_ref"]
         expected = reference.split("@", 1)[1]
         if registry_digest(reference) != expected:
             raise ValueError("The registry image does not match the tested digest.")
-        alias = REPOSITORIES[component] + ":" + release_tag
+        alias = REPOSITORIES[component] + ":" + tag
         existing = registry_digest(alias, allow_missing=True)
-        if existing is not None and existing != expected:
+        if existing is not None and existing != expected and not replace:
             raise ValueError(
                 f"The published version already selects a different image: {alias}."
             )
-        aliases.append((alias, reference, expected, existing is None))
-    for alias, reference, expected, missing in aliases:
-        if missing:
+        aliases.append((alias, reference, expected, existing != expected))
+    for alias, reference, expected, update in aliases:
+        if update:
             command(
                 "docker",
                 "buildx",
@@ -409,13 +467,9 @@ def select_component(
     component: str, directory: Path, dependencies: tuple[str, ...], force: bool
 ) -> dict[str, str]:
     image = select_image(component, directory, dependencies, force)
-    tag = os.environ["GITHUB_REF_NAME"]
-    if component == "frontend":
-        tag = head()
-    elif os.environ["GITHUB_EVENT_NAME"] == "pull_request":
+    tag = head()
+    if component != "frontend" and os.environ["GITHUB_EVENT_NAME"] == "pull_request":
         tag = re.sub(r"[^a-z0-9_.-]", "-", os.environ["PR_BRANCH"].lower())
-    elif os.environ["GITHUB_REF_TYPE"] != "tag":
-        tag = "master"
     return {
         "build": str(image is None).lower(),
         "image_ref": image["image_ref"] if image else "",
@@ -456,7 +510,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "operation",
-        choices=("prepare", "select", "record", "assemble", "publish"),
+        choices=(
+            "prepare",
+            "select",
+            "record",
+            "assemble",
+            "publish",
+            "publish-development",
+        ),
     )
     parser.add_argument("directory", type=Path)
     parser.add_argument("--component", choices=tuple(REPOSITORIES))
@@ -472,6 +533,8 @@ def main() -> None:
         if args.images is None:
             parser.error("Release assembly requires image records.")
         assemble(args.directory, args.images)
+    elif args.operation == "publish-development":
+        publish_development(args.directory)
     elif args.operation == "publish":
         publish(args.directory, args.run_id, args.release_tag)
     else:

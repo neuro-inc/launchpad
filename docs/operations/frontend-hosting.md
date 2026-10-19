@@ -28,6 +28,16 @@ The artifact contains all three immutable image references, their build commits,
 The chart record includes its source fingerprint and archive checksum.
 This artifact identifies the tested App combination.
 Publishing an individual image does not establish a complete App release.
+Component builds use commit tags before final assembly.
+After all checks pass, master CI publishes the verified combination through the three `master` image aliases.
+The hook alias changes last and embeds the selected backend and frontend digests.
+Failed validation or assembly cannot advance these aliases.
+A superseded master run cannot replace the current development aliases.
+The development catalog discovers the `master` template through its existing Git loader.
+Catalog refresh can occur before image publication finishes.
+Wait for successful master CI before installing or updating that template.
+This workflow does not request App upgrades.
+Apps tracking a Git branch can still synchronize chart changes through Argo CD.
 
 Subsequent runs can reuse images from the latest successful `master` release when its artifact remains available.
 Development reuse requires the baseline source commit to be an ancestor of the selected revision.
@@ -65,32 +75,43 @@ Do not rerun the selected CI build after development acceptance.
 Repeat acceptance if that build produces a replacement artifact.
 CI verifies artifact integrity and source compatibility without querying an installed App or Argo CD.
 
-The `Release` workflow runs from `master` with two required inputs:
+The `Release` workflow starts when a maintainer pushes a `v*` tag.
+It selects the latest successful master `CI` run for that exact tagged commit.
+A successful run must exist before publication starts.
+If the tag arrives before CI finishes, wait for CI and rerun the failed Release workflow.
+The workflow does not rebuild images or select a nearby commit.
+
+The workflow accepts successful `CI` runs triggered by a master push or a manual master dispatch.
+It rejects PR runs, failed runs, expired artifacts, and ambiguous artifacts.
+The release manifest must identify the selected CI run's source commit.
+Every component and the chart must match the tagged build inputs.
+
+Complete development acceptance before pushing the version tag:
+
+```sh
+git tag "$RELEASE_TAG" "$TESTED_COMMIT"
+git push origin "$RELEASE_TAG"
+```
+
+Do not move an existing tag.
+Pushing the tag confirms development acceptance of its CI combination.
+No workflow queries an installed App or Argo CD to establish that acceptance.
+
+The manual `Release` dispatch remains available from `master` for recovery and explicit selection:
 
 | Input | Purpose |
 | --- | --- |
 | `build_run_id` | It selects the successful `master` CI run tested in development. |
 | `release_tag` | It selects an existing reviewed `v*` Git tag to publish. |
 
-The workflow accepts successful `CI` runs triggered by a master push or a manual master dispatch.
-It rejects PR runs, failed runs, expired artifacts, and ambiguous artifacts.
-The release manifest must identify the selected CI run's source commit.
-Every component and the chart must match the tagged build inputs.
-A different Git commit can qualify when every build input remains unchanged.
-Changed component or chart inputs require another CI build and development acceptance.
-
-Set `BUILD_RUN_ID` to the tested CI run ID.
-Create the reviewed version tag before dispatching publication.
-Set `RELEASE_TAG` to that existing tag.
-Do not move an existing tag.
-Dispatch publication after development acceptance:
-
 ```sh
 gh workflow run release.yml --repo neuro-inc/launchpad --ref master \
   -f build_run_id="$BUILD_RUN_ID" -f release_tag="$RELEASE_TAG"
 ```
 
-Pushing a tag does not publish images.
+An explicit run can use a different commit when every component and chart input remains unchanged.
+Changed build inputs require another successful CI build and development acceptance.
+
 The workflow verifies all source images and existing version aliases before publishing any alias.
 An existing alias must already select the tested digest.
 Publication preserves each image digest and retains the original release manifest and chart archive without rebuilding or repackaging.
@@ -98,7 +119,7 @@ A retry with the same inputs can complete interrupted publication.
 Wait for the complete Release workflow before installing the tagged App version.
 Keep its `launchpad-release` artifact with the operational release record.
 
-The maintainer's manual dispatch records release approval after development acceptance.
+The maintainer's tag push or manual dispatch records release approval after development acceptance.
 The GitHub `production` environment records the release job.
 Configure additional environment approval rules when the repository supports them and the team requires them.
 The built-in `GITHUB_TOKEN` reads repository artifacts and publishes registry aliases.

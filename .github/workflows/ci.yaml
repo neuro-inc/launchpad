@@ -256,6 +256,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      packages: write
     steps:
       - name: Require every check and image selection to succeed
         env:
@@ -276,6 +277,19 @@ jobs:
         run: >-
           python3 .github/scripts/release.py assemble "$RUNNER_TEMP/launchpad-release"
           --images "$RUNNER_TEMP/component-images"
+      - uses: docker/setup-buildx-action@v4
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+      - uses: docker/login-action@v4.3.0
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Publish the verified development combination
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/release.py publish-development "$RUNNER_TEMP/launchpad-release"
       - uses: actions/upload-artifact@v4
         with:
           name: launchpad-release
