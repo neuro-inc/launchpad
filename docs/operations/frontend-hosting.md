@@ -43,7 +43,8 @@ Subsequent runs can reuse images from the latest successful `master` release whe
 Development reuse requires the baseline source commit to be an ancestor of the selected revision.
 The verifier reconstructs each recorded fingerprint from its original Git commit.
 It compares that fingerprint with the selected component's current inputs before permitting reuse.
-The fingerprint covers tracked Docker inputs, publication recipes, and release verification code.
+The fingerprint covers tracked Docker inputs, CI build recipes, and release verification code.
+Promotion workflow changes and release test changes do not invalidate image reuse.
 The hook fingerprint also includes the selected backend and frontend digests.
 
 A backend-only change can therefore reuse the frontend image.

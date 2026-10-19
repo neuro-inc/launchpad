@@ -18,6 +18,7 @@ from release import (
     assemble,
     command,
     download_release,
+    find_successful_master_ci,
     fingerprint,
     head,
     hook_dependencies,
@@ -187,6 +188,66 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(image["source_revision"], head())
         self.assertEqual(image["inputs_sha256"], fingerprint("backend", head()))
         self.assertEqual(json.loads(Path("backend.json").read_text()), image)
+
+    def test_fresh_component_record_does_not_inspect_the_unused_reuse_base(
+        self,
+    ) -> None:
+        (self.base / "release.json").write_text("invalid unused baseline")
+        image = record_component("backend", self.base, (), False, "sha256:" + "a" * 64)
+        self.assertEqual(image["source_revision"], head())
+        self.assertEqual(image["inputs_sha256"], fingerprint("backend", head()))
+        with self.assertRaises(json.JSONDecodeError):
+            record_component("backend", self.base, (), False, "")
+
+    def test_promotion_and_release_test_changes_preserve_image_reuse(self) -> None:
+        for name in (
+            ".github/workflows/release.yml",
+            ".github/scripts/test_release.py",
+        ):
+            with self.subTest(path=name):
+                path = self.root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                self.change(name)
+                for component in REPOSITORIES:
+                    dependencies = (
+                        hook_dependencies(self.images) if component == "hook" else ()
+                    )
+                    self.assertEqual(
+                        select_image(component, self.base, dependencies, False),
+                        self.images[component],
+                    )
+
+    def test_build_recipe_and_provenance_changes_require_new_images(self) -> None:
+        for name in (
+            ".github/workflows/ci.yaml",
+            ".github/workflows/component-image.yml",
+            ".github/scripts/release.py",
+        ):
+            with self.subTest(path=name):
+                path = self.root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                original = path.read_text() if path.exists() else None
+                self.change(name)
+                for component in REPOSITORIES:
+                    dependencies = (
+                        hook_dependencies(self.images) if component == "hook" else ()
+                    )
+                    self.assertIsNone(
+                        select_image(component, self.base, dependencies, False)
+                    )
+                if original is None:
+                    path.unlink()
+                else:
+                    path.write_text(original)
+                self.commit()
+
+    def test_fresh_component_record_rejects_tag_builds(self) -> None:
+        with (
+            patch.dict(os.environ, {"GITHUB_REF_TYPE": "tag"}),
+            self.assertRaisesRegex(ValueError, "complete tested App release"),
+        ):
+            record_component("backend", self.base, (), False, "sha256:" + "a" * 64)
+        self.assertFalse(Path("backend.json").exists())
 
     def test_component_record_requires_a_build_digest_or_verified_reuse(self) -> None:
         for digest in ("", "latest", "sha256:invalid"):
@@ -464,7 +525,17 @@ class ReleaseTests(unittest.TestCase):
                 {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/tags/v1.2.3"},
             ),
             patch(
-                "release.gh", side_effect=["42", json.dumps(self.run_metadata)]
+                "release.gh",
+                side_effect=[
+                    json.dumps(
+                        {
+                            "databaseId": 42,
+                            "headSha": self.release["source_revision"],
+                            "event": "push",
+                        }
+                    ),
+                    json.dumps(self.run_metadata),
+                ],
             ) as api,
         ):
             publish(self.root / "publication", "", "v1.2.3")
@@ -493,7 +564,19 @@ class ReleaseTests(unittest.TestCase):
                 publish(self.root / "publication", "", "v1.2.3")
             self.run_metadata["headSha"] = "f" * 40
             with (
-                patch("release.gh", side_effect=["42", json.dumps(self.run_metadata)]),
+                patch(
+                    "release.gh",
+                    side_effect=[
+                        json.dumps(
+                            {
+                                "databaseId": 42,
+                                "headSha": self.release["source_revision"],
+                                "event": "push",
+                            }
+                        ),
+                        json.dumps(self.run_metadata),
+                    ],
+                ),
                 self.assertRaisesRegex(ValueError, "exact tagged commit"),
             ):
                 publish(self.root / "publication", "", "v1.2.3")
@@ -661,6 +744,49 @@ class ReleaseTests(unittest.TestCase):
             ),
         ):
             self.assertEqual(registry_digest(reference), expected)
+
+    def test_ci_discovery_supports_latest_and_exact_commit_selection(self) -> None:
+        candidate = {"databaseId": 42, "headSha": head(), "event": "push"}
+        for revision in (None, head()):
+            with (
+                self.subTest(revision=revision),
+                patch("release.gh", return_value=json.dumps(candidate)) as api,
+            ):
+                self.assertEqual(find_successful_master_ci(revision), ("42", head()))
+                arguments = api.call_args.args
+                if revision is None:
+                    self.assertNotIn("--commit", arguments)
+                else:
+                    self.assertEqual(
+                        arguments[arguments.index("--commit") + 1], revision
+                    )
+        with patch("release.gh", return_value=""):
+            self.assertIsNone(find_successful_master_ci())
+
+    def test_ci_discovery_rejects_invalid_candidates_and_wrong_commits(self) -> None:
+        candidate: dict[str, object] = {
+            "databaseId": 42,
+            "headSha": head(),
+            "event": "push",
+        }
+        for field, value in (
+            ("databaseId", "invalid"),
+            ("headSha", "master"),
+            ("event", "pull_request"),
+        ):
+            with (
+                self.subTest(field=field),
+                patch(
+                    "release.gh", return_value=json.dumps({**candidate, field: value})
+                ),
+                self.assertRaises(ValueError),
+            ):
+                find_successful_master_ci()
+        with (
+            patch("release.gh", return_value=json.dumps(candidate)),
+            self.assertRaisesRegex(ValueError, "requested commit"),
+        ):
+            find_successful_master_ci("f" * 40)
 
     def test_ci_tag_dispatch_uses_the_release_workflow_instead(self) -> None:
         with (

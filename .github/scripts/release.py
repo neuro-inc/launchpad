@@ -44,8 +44,7 @@ BUILD_PATHS = {
 COMMON_BUILD_PATHS = (
     ".github/workflows/ci.yaml",
     ".github/workflows/component-image.yml",
-    ".github/workflows/release.yml",
-    ".github/scripts",
+    ".github/scripts/release.py",
 )
 REVISION = r"[0-9a-f]{40}"
 SHA256 = r"[0-9a-f]{64}"
@@ -216,35 +215,46 @@ def download_release(directory: Path, run_id: str) -> bool:
     return True
 
 
+def find_successful_master_ci(revision: str | None = None) -> tuple[str, str] | None:
+    commit_args = ("--commit", text(revision, REVISION)) if revision is not None else ()
+    candidate = gh(
+        "run",
+        "list",
+        "--repo",
+        os.environ["GITHUB_REPOSITORY"],
+        "--workflow",
+        "ci.yaml",
+        "--branch",
+        "master",
+        *commit_args,
+        "--status",
+        "success",
+        "--limit",
+        "20",
+        "--json",
+        "databaseId,headSha,event",
+        "--jq",
+        '[.[] | select(.event == "push" or .event == "workflow_dispatch")] | first // empty',
+    )
+    if not candidate:
+        return None
+    run = fields(json.loads(candidate), {"databaseId", "headSha", "event"})
+    source = text(run["headSha"], REVISION)
+    run_id = text(str(run["databaseId"]), r"[1-9][0-9]*")
+    text(run["event"], r"push|workflow_dispatch")
+    if revision is not None and source != revision:
+        raise ValueError("The selected CI run does not match the requested commit.")
+    return run_id, source
+
+
 def prepare(directory: Path, force: bool) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    repository = os.environ["GITHUB_REPOSITORY"]
     if os.environ["GITHUB_REF_TYPE"] == "tag":
         raise ValueError("Use the Release workflow to publish a version tag.")
     if not force:
-        candidate = gh(
-            "run",
-            "list",
-            "--repo",
-            repository,
-            "--workflow",
-            "ci.yaml",
-            "--branch",
-            "master",
-            "--status",
-            "success",
-            "--limit",
-            "20",
-            "--json",
-            "databaseId,headSha,event",
-            "--jq",
-            '[.[] | select(.event == "push" or .event == "workflow_dispatch")] | first // empty',
-        )
+        candidate = find_successful_master_ci()
         if candidate:
-            run = fields(json.loads(candidate), {"databaseId", "headSha", "event"})
-            source = text(run["headSha"], REVISION)
-            run_id = text(str(run["databaseId"]), r"[1-9][0-9]*")
-            text(run["event"], r"push|workflow_dispatch")
+            run_id, source = candidate
             ancestor = subprocess.run(
                 ["git", "merge-base", "--is-ancestor", source, "HEAD"], check=False
             ).returncode
@@ -320,30 +330,12 @@ def publish(directory: Path, run_id: str, release_tag: str) -> None:
     )
     automatic = tagged
     if automatic:
-        run_id = gh(
-            "run",
-            "list",
-            "--repo",
-            os.environ["GITHUB_REPOSITORY"],
-            "--workflow",
-            "ci.yaml",
-            "--branch",
-            "master",
-            "--commit",
-            revision,
-            "--status",
-            "success",
-            "--limit",
-            "20",
-            "--json",
-            "databaseId,event",
-            "--jq",
-            '[.[] | select(.event == "push" or .event == "workflow_dispatch")] | first | .databaseId // empty',
-        )
-        if not run_id:
+        candidate = find_successful_master_ci(revision)
+        if candidate is None:
             raise ValueError(
                 "Wait for successful master CI for the tagged commit, then rerun Release."
             )
+        run_id, _ = candidate
     text(run_id, r"[1-9][0-9]*")
     run = fields(
         json.loads(
@@ -491,15 +483,18 @@ def record_component(
     force: bool,
     digest: str,
 ) -> Image:
-    image = select_image(component, directory, dependencies, force)
     if digest:
-        image = {
+        if os.environ.get("GITHUB_REF_TYPE") == "tag":
+            raise ValueError("Production must reuse the complete tested App release.")
+        image: Image | None = {
             "image_ref": REPOSITORIES[component]
             + "@"
             + text(digest, "sha256:" + SHA256),
             "source_revision": head(),
             "inputs_sha256": fingerprint(component, head(), dependencies),
         }
+    else:
+        image = select_image(component, directory, dependencies, force)
     if image is None:
         raise ValueError("A successful build or verified reusable image is required.")
     write_json(Path(f"{component}.json"), image)
