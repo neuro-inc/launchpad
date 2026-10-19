@@ -365,6 +365,104 @@ class ReleaseTests(unittest.TestCase):
         ):
             assemble(self.root / "output", records, self.base)
 
+    def test_tag_dispatch_requires_an_explicit_verified_promotion(self) -> None:
+        destination = self.root / "production-base"
+
+        def download(directory: Path, run_id: str, name: str) -> bool:
+            self.assertEqual(run_id, "42")
+            self.assertEqual(name, "launchpad-production-release")
+            shutil.copytree(self.base, directory, dirs_exist_ok=True)
+            return True
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "GITHUB_REPOSITORY": "neuro-inc/launchpad",
+                    "GITHUB_REF_TYPE": "tag",
+                    "GITHUB_REF_NAME": "v1.2.3",
+                    "GITHUB_EVENT_NAME": "workflow_dispatch",
+                },
+            ),
+            patch("release.gh", return_value="") as api,
+            patch("release.download_release", side_effect=download),
+        ):
+            prepare(destination, False, "42")
+        self.assertEqual(api.call_args.args[:3], ("run", "view", "42"))
+        self.assertEqual(verify_promotion(destination, head()), self.release)
+
+    def test_tag_dispatch_rejects_invalid_release_inputs_before_network_access(
+        self,
+    ) -> None:
+        cases = (
+            ("push", "v1.2.3", False, "42"),
+            ("workflow_dispatch", "release", False, "42"),
+            ("workflow_dispatch", "v1.2.3", True, "42"),
+            ("workflow_dispatch", "v1.2.3", False, ""),
+            ("workflow_dispatch", "v1.2.3", False, "0"),
+            ("workflow_dispatch", "v1.2.3", False, "invalid"),
+        )
+        for event, ref_name, force, run_id in cases:
+            with self.subTest(
+                event=event, ref_name=ref_name, force=force, run_id=run_id
+            ):
+                with (
+                    patch.dict(
+                        os.environ,
+                        {
+                            "GITHUB_REPOSITORY": "neuro-inc/launchpad",
+                            "GITHUB_REF_TYPE": "tag",
+                            "GITHUB_REF_NAME": ref_name,
+                            "GITHUB_EVENT_NAME": event,
+                        },
+                    ),
+                    patch("release.gh") as api,
+                    self.assertRaises(ValueError),
+                ):
+                    prepare(self.root / "candidate", force, run_id)
+                api.assert_not_called()
+
+    def test_development_dispatch_rejects_a_production_release_selection(self) -> None:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "GITHUB_REPOSITORY": "neuro-inc/launchpad",
+                    "GITHUB_REF_TYPE": "branch",
+                },
+            ),
+            patch("release.gh") as api,
+            self.assertRaisesRegex(ValueError, "only for a version tag"),
+        ):
+            prepare(self.root / "candidate", False, "42")
+        api.assert_not_called()
+
+    def test_tag_dispatch_rejects_unavailable_or_failed_promotions(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "GITHUB_REPOSITORY": "neuro-inc/launchpad",
+                "GITHUB_REF_TYPE": "tag",
+                "GITHUB_REF_NAME": "v1.2.3",
+                "GITHUB_EVENT_NAME": "workflow_dispatch",
+            },
+        ):
+            with (
+                patch(
+                    "release.gh", side_effect=subprocess.CalledProcessError(1, ["gh"])
+                ),
+                patch("release.download_release") as download,
+                self.assertRaises(subprocess.CalledProcessError),
+            ):
+                prepare(self.root / "candidate", False, "42")
+            download.assert_not_called()
+            with (
+                patch("release.gh", return_value=""),
+                patch("release.download_release", return_value=False),
+                self.assertRaisesRegex(ValueError, "artifact is unavailable"),
+            ):
+                prepare(self.root / "candidate", False, "42")
+
     def test_empty_or_forced_reuse_base_builds_fresh(self) -> None:
         for force in (False, True):
             directory = self.root / str(force)

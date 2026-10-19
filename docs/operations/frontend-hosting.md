@@ -67,24 +67,70 @@ Every completed source revision must match its observed synchronized revision.
 The resolved Launchpad chart revision must have the recorded chart input fingerprint.
 Promotion evidence binds the complete release manifest by checksum, including the hook image and chart archive.
 
-Production tags reuse the complete promoted combination without rebuilding images or repackaging the chart.
+Production publication requires an explicit dispatch against an existing `v*` tag.
+Pushing a tag does not publish images.
+The dispatch requires `promotion_run_id`, which identifies a successful `Verify production App promotion` run.
+No repository variable selects the release.
+Tag dispatches reuse the complete promoted combination without rebuilding images or repackaging the chart.
 Each component's recorded inputs must match the tagged source.
 A different repository commit can qualify when every build input remains unchanged.
 Changed component or chart inputs require a new development release and promotion.
 The built-in `GITHUB_TOKEN` reads artifacts within this repository.
 
-Configure these Launchpad repository settings:
+### Environment setup
 
-| Setting | Purpose |
-| --- | --- |
-| `FONTAWESOME_NPM_AUTH_TOKEN` | An Actions secret for frontend dependency installation and Docker builds. |
-| `ARGOCD_SERVER` | The HTTPS origin for the development Argo CD API. |
-| `DEV_LAUNCHPAD_ARGO_APPLICATION` | The exact development App to verify. |
-| `ARGOCD_READ_TOKEN` | A secret with read-only access to that App. |
-| `APP_RELEASE_RUN_ID` | The successful promotion run containing the complete App combination. |
+Keep nonsecret promotion settings in [production.env](../../.github/environments/production.env).
+`ARGOCD_SERVER` identifies the development Argo CD HTTPS origin.
+`DEV_LAUNCHPAD_ARGO_APPLICATION` identifies the exact installed development App to verify.
+Confirm both values before importing them.
 
-Configure `FONTAWESOME_NPM_AUTH_TOKEN` separately as a Dependabot registry secret.
-Preserve or configure the `production` environment's approval rules in Launchpad before enabling promotion.
+Create the GitHub `production` environment with the required approval rules.
+Allow `master` because the promotion verifier runs from that branch.
+Import the versioned configuration with this command:
+
+```sh
+make setup-production-environment
+```
+
+The command uses `gh variable set --env-file` for `neuro-inc/launchpad` and the `production` environment.
+It rejects empty values before making a GitHub request.
+It does not create the environment or change its protection rules.
+Rerun the command after a reviewed configuration change.
+Removing a key from the file does not delete its GitHub variable.
+
+Configure these secrets separately:
+
+| Location | Secret | Purpose |
+| --- | --- | --- |
+| Repository Actions secrets | `FONTAWESOME_NPM_AUTH_TOKEN` | It permits frontend dependency installation and Docker builds. |
+| Repository Dependabot secrets | `FONTAWESOME_NPM_AUTH_TOKEN` | It permits private registry access for dependency updates. |
+| `production` environment secrets | `ARGOCD_READ_TOKEN` | It permits read-only access to the development Argo Application. |
+
+### Release commands
+
+Set `BUILD_RUN_ID` to the successful `master` CI run for the tested App combination.
+Dispatch the promotion verifier from `master` after development acceptance:
+
+```sh
+gh workflow run promote-release.yml --repo neuro-inc/launchpad --ref master \
+  -f build_run_id="$BUILD_RUN_ID"
+```
+
+Wait for the promotion workflow to succeed.
+Set `PROMOTION_RUN_ID` to that successful promotion run ID.
+Create the reviewed version tag before dispatching publication.
+Set `RELEASE_TAG` to that existing tag.
+Do not move an existing tag.
+
+```sh
+gh workflow run ci.yaml --repo neuro-inc/launchpad --ref "$RELEASE_TAG" \
+  -f promotion_run_id="$PROMOTION_RUN_ID"
+```
+
+The verifier rejects missing or invalid promotion IDs, unapproved artifacts, non-version tags, and forced production rebuilds.
+A branch dispatch cannot select a production promotion.
+Wait for image publication and final release assembly before installing the tagged App version.
+
 Confirm that Launchpad's Actions token can publish the existing frontend GHCR package.
 Grant package access to this repository if its current permissions permit only `launchpad-web-ui`.
 Keep the complete release artifact and chart package with the operational release record.

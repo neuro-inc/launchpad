@@ -232,11 +232,20 @@ def download_release(directory: Path, run_id: str, name: str) -> bool:
     return True
 
 
-def prepare(directory: Path, force: bool) -> None:
+def prepare(directory: Path, force: bool, promotion_run_id: str = "") -> None:
     directory.mkdir(parents=True, exist_ok=True)
     repository = os.environ["GITHUB_REPOSITORY"]
     if os.environ["GITHUB_REF_TYPE"] == "tag":
-        run_id = os.environ["APP_RELEASE_RUN_ID"]
+        if os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch":
+            raise ValueError(
+                "Dispatch the version tag with an explicit promotion run ID."
+            )
+        text(os.environ.get("GITHUB_REF_NAME"), r"v[a-zA-Z0-9_.-]*")
+        if force:
+            raise ValueError(
+                "Production must reuse the promoted images without rebuilding."
+            )
+        run_id = text(promotion_run_id, r"[1-9][0-9]*")
         gh(
             "run",
             "view",
@@ -251,6 +260,8 @@ def prepare(directory: Path, force: bool) -> None:
         if not download_release(directory, run_id, "launchpad-production-release"):
             raise ValueError("The verified App promotion artifact is unavailable.")
         verify_promotion(directory, head())
+    elif promotion_run_id:
+        raise ValueError("A promotion run ID is valid only for a version tag.")
     elif not force:
         candidate = gh(
             "run",
@@ -470,10 +481,11 @@ def main() -> None:
     parser.add_argument("--base", type=Path)
     parser.add_argument("--revision", default="")
     parser.add_argument("--run-id", default="")
+    parser.add_argument("--promotion-run-id", default="")
     args = parser.parse_args()
     force = os.environ.get("REBUILD_IMAGES") == "true"
     if args.operation == "prepare":
-        prepare(args.directory, force)
+        prepare(args.directory, force, args.promotion_run_id)
     elif args.operation == "assemble":
         if args.images is None or args.base is None:
             parser.error("Release assembly requires image records and a reuse base.")
