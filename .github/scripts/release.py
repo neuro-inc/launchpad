@@ -410,6 +410,53 @@ def assemble(directory: Path, image_directory: Path, base: Path) -> None:
     verify_release(directory)
 
 
+def select_component(
+    component: str, directory: Path, dependencies: tuple[str, ...], force: bool
+) -> dict[str, str]:
+    image = select_image(component, directory, dependencies, force)
+    tag = os.environ["GITHUB_REF_NAME"]
+    if component == "frontend":
+        tag = head()
+    elif os.environ["GITHUB_EVENT_NAME"] == "pull_request":
+        tag = re.sub(r"[^a-z0-9_.-]", "-", os.environ["PR_BRANCH"].lower())
+    elif os.environ["GITHUB_REF_TYPE"] != "tag":
+        tag = "master"
+    return {
+        "build": str(image is None).lower(),
+        "image_ref": image["image_ref"] if image else "",
+        "tag": REPOSITORIES[component] + ":" + tag,
+        "inputs_sha256": fingerprint(component, head(), dependencies),
+        "context": "frontend" if component == "frontend" else ".",
+        "dockerfile": {
+            "backend": "Dockerfile",
+            "frontend": "frontend/Dockerfile",
+            "hook": "hooks/hooks.Dockerfile",
+        }[component],
+    }
+
+
+def record_component(
+    component: str,
+    directory: Path,
+    dependencies: tuple[str, ...],
+    force: bool,
+    digest: str,
+) -> Image:
+    image = select_image(component, directory, dependencies, force)
+    if digest:
+        image = {
+            "image_ref": REPOSITORIES[component]
+            + "@"
+            + text(digest, "sha256:" + SHA256),
+            "source_revision": head(),
+            "inputs_sha256": fingerprint(component, head(), dependencies),
+        }
+    if image is None:
+        raise ValueError("A successful build or verified reusable image is required.")
+    write_json(Path(f"{component}.json"), image)
+    return image
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -447,51 +494,13 @@ def main() -> None:
             )
             for name, value in zip(("backend", "frontend"), dependencies, strict=True):
                 text(value, re.escape(REPOSITORIES[name]) + "@sha256:" + SHA256)
-        image = select_image(component, args.directory, dependencies, force)
         if args.operation == "select":
-            repository = REPOSITORIES[component]
-            tag = os.environ["GITHUB_REF_NAME"]
-            if component == "frontend":
-                tag = head()
-            elif os.environ["GITHUB_EVENT_NAME"] == "pull_request":
-                tag = re.sub(r"[^a-z0-9_.-]", "-", os.environ["PR_BRANCH"].lower())
-            elif os.environ["GITHUB_REF_TYPE"] != "tag":
-                tag = "master"
-            outputs(
-                {
-                    "build": str(image is None).lower(),
-                    "image_ref": image["image_ref"] if image else "",
-                    "tag": repository + ":" + tag,
-                    "inputs_sha256": fingerprint(component, head(), dependencies),
-                    "context": "frontend" if component == "frontend" else ".",
-                    "dockerfile": {
-                        "backend": "Dockerfile",
-                        "frontend": "frontend/Dockerfile",
-                        "hook": "hooks/hooks.Dockerfile",
-                    }[component],
-                }
-            )
+            outputs(select_component(component, args.directory, dependencies, force))
         else:
-            if args.digest:
-                image = {
-                    "image_ref": REPOSITORIES[component]
-                    + "@"
-                    + text(args.digest, "sha256:" + SHA256),
-                    "source_revision": head(),
-                    "inputs_sha256": fingerprint(component, head(), dependencies),
-                }
-            if image is None:
-                raise ValueError(
-                    "A successful build or verified reusable image is required."
-                )
-            path = Path(f"{component}.json")
-            write_json(path, image)
-            outputs(
-                {
-                    "image_ref": image["image_ref"],
-                    "image_digest": image["image_ref"].split("@", 1)[1],
-                }
+            image = record_component(
+                component, args.directory, dependencies, force, args.digest
             )
+            outputs({"image_ref": image["image_ref"]})
 
 
 if __name__ == "__main__":

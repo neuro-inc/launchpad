@@ -29,10 +29,9 @@ jobs:
           DEV_LAUNCHPAD_ARGO_APPLICATION: ${{ vars.DEV_LAUNCHPAD_ARGO_APPLICATION }}
           ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_READ_TOKEN }}
         run: |
-          gh run view "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion,headBranch,event,workflowName --jq \
-            'if .conclusion == "success" and .headBranch == "master" and (.event == "push" or .event == "workflow_dispatch") and .workflowName == "CI" then . else error("A successful master release is required.") end'
+          expected_revision=$(gh run view "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --json conclusion,headBranch,event,workflowName,headSha --jq \
+            'if .conclusion == "success" and .headBranch == "master" and (.event == "push" or .event == "workflow_dispatch") and .workflowName == "CI" then .headSha else error("A successful master release is required.") end')
           python3 .github/scripts/release.py download "$RUNNER_TEMP/app-release" --run-id "$BUILD_RUN_ID"
-          expected_revision=$(gh run view "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)
           python3 .github/scripts/release.py promote "$RUNNER_TEMP/app-release" --revision "$expected_revision"
       - uses: actions/upload-artifact@v4
         with:

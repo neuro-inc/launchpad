@@ -25,6 +25,8 @@ from release import (
     load_release,
     prepare,
     promote,
+    record_component,
+    select_component,
     select_image,
     verify_promotion,
     verify_release,
@@ -172,6 +174,76 @@ class ReleaseTests(unittest.TestCase):
                 select_image(component, self.base, dependencies, False),
                 self.images[component],
             )
+
+    def test_component_selection_preserves_publication_tags(self) -> None:
+        cases = (
+            ("backend", "pull_request", "branch", "feature", "feature-it-281-new"),
+            ("backend", "push", "branch", "master", "master"),
+            ("backend", "push", "tag", "v1.2.3", "v1.2.3"),
+            ("frontend", "pull_request", "branch", "feature", head()),
+        )
+        for component, event, ref_type, ref_name, expected_tag in cases:
+            with self.subTest(component=component, event=event, ref_type=ref_type):
+                with patch.dict(
+                    os.environ,
+                    {
+                        "GITHUB_EVENT_NAME": event,
+                        "GITHUB_REF_TYPE": ref_type,
+                        "GITHUB_REF_NAME": ref_name,
+                        "PR_BRANCH": "Feature/IT-281 New",
+                    },
+                ):
+                    selection = select_component(component, self.base, (), False)
+                self.assertEqual(selection["build"], "false")
+                self.assertEqual(
+                    selection["tag"], REPOSITORIES[component] + ":" + expected_tag
+                )
+                self.assertEqual(
+                    selection["image_ref"], self.images[component]["image_ref"]
+                )
+
+    def test_component_selection_identifies_a_required_frontend_build(self) -> None:
+        self.change("frontend/src/app.ts")
+        with patch.dict(
+            os.environ, {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "master"}
+        ):
+            selection = select_component("frontend", self.base, (), False)
+        self.assertEqual(selection["build"], "true")
+        self.assertEqual(selection["image_ref"], "")
+        self.assertEqual(selection["context"], "frontend")
+        self.assertEqual(selection["dockerfile"], "frontend/Dockerfile")
+        self.assertEqual(selection["inputs_sha256"], fingerprint("frontend", head()))
+
+    def test_component_record_preserves_the_reused_source_identity(self) -> None:
+        self.change("frontend/src/app.ts")
+        with patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}):
+            image = record_component("backend", self.base, (), False, "")
+        self.assertEqual(image, self.images["backend"])
+        self.assertNotEqual(image["source_revision"], head())
+        self.assertEqual(json.loads(Path("backend.json").read_text()), image)
+
+    def test_component_record_binds_a_new_build_to_its_source(self) -> None:
+        self.change("launchpad/app.py")
+        with patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}):
+            image = record_component(
+                "backend", self.base, (), True, "sha256:" + "a" * 64
+            )
+        self.assertEqual(
+            image["image_ref"], REPOSITORIES["backend"] + "@sha256:" + "a" * 64
+        )
+        self.assertEqual(image["source_revision"], head())
+        self.assertEqual(image["inputs_sha256"], fingerprint("backend", head()))
+        self.assertEqual(json.loads(Path("backend.json").read_text()), image)
+
+    def test_component_record_requires_a_build_digest_or_verified_reuse(self) -> None:
+        for digest in ("", "latest", "sha256:invalid"):
+            with self.subTest(digest=digest):
+                with (
+                    patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}),
+                    self.assertRaises(ValueError),
+                ):
+                    record_component("backend", self.base, (), True, digest)
+                self.assertFalse(Path("backend.json").exists())
 
     def test_backend_change_preserves_frontend_reuse(self) -> None:
         self.change("launchpad/app.py")
