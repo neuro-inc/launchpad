@@ -58,7 +58,7 @@ Frontend dependency installation does not install Git hooks.
 Configure `FONTAWESOME_NPM_AUTH_TOKEN` separately in the Launchpad repository's Actions secrets and Dependabot registry secrets.
 Frontend CI runs linting and a production build on PRs, `master` pushes, release tags, and the daily schedule.
 Bot auto-merge waits for backend and frontend validation.
-Require the frontend check in branch protection before merging the monorepo setup.
+Branch protection requires `Test and Lint` and `Frontend checks / build`.
 Fork PRs fail frontend validation before private dependency installation.
 A maintainer must copy fork changes to a branch in this repository and create a replacement PR.
 

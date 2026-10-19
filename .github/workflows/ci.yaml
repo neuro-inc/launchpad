@@ -15,7 +15,8 @@ jobs:
   frontend-test:
     name: Frontend checks
     uses: ./.github/workflows/frontend-validation.yml
-    secrets: inherit
+    secrets:
+      FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
 
   test:
     name: Test and Lint
