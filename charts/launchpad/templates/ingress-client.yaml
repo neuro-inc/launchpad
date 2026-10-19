@@ -18,4 +18,4 @@ spec:
               service:
                 name: {{ include "launchpad.name" $ }}-client
                 port:
-                  name: https
+                  name: {{ ternary "http" "https" (not (empty .Values.frontend.image.digest)) }}

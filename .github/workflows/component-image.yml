@@ -1,0 +1,122 @@
+name: Publish a Launchpad component
+
+on:
+  workflow_call:
+    secrets:
+      FONTAWESOME_NPM_AUTH_TOKEN:
+        required: false
+    inputs:
+      component:
+        required: true
+        type: string
+      backend_ref:
+        default: ''
+        type: string
+      frontend_ref:
+        default: ''
+        type: string
+      rebuild_images:
+        default: false
+        type: boolean
+    outputs:
+      image_ref:
+        value: ${{ jobs.image.outputs.image_ref }}
+
+permissions:
+  contents: read
+  actions: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    outputs:
+      image_ref: ${{ steps.record.outputs.image_ref }}
+    env:
+      BACKEND_REF: ${{ inputs.backend_ref }}
+      FRONTEND_REF: ${{ inputs.frontend_ref }}
+      REBUILD_IMAGES: ${{ inputs.rebuild_images }}
+      PR_BRANCH: ${{ github.head_ref }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: launchpad-reuse-base
+          path: ${{ runner.temp }}/release-base
+      - name: Select verified component inputs
+        id: selection
+        env:
+          COMPONENT: ${{ inputs.component }}
+        run: |
+          python3 .github/scripts/release.py select "$RUNNER_TEMP/release-base" --component "$COMPONENT"
+          echo "backend_digest=${BACKEND_REF#*@}" >> "$GITHUB_OUTPUT"
+          echo "frontend_digest=${FRONTEND_REF#*@}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Prepare the build-only npm configuration
+        if: inputs.component == 'frontend' && steps.selection.outputs.build == 'true'
+        env:
+          FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from string import Template
+          token = os.environ["FONTAWESOME_NPM_AUTH_TOKEN"]
+          if not token:
+              raise ValueError("The frontend build requires the Font Awesome registry credential.")
+          path = Path(os.environ["RUNNER_TEMP"]) / "frontend.npmrc"
+          path.touch(mode=0o600)
+          path.write_text(Template(Path("frontend/.npmrc").read_text()).substitute(FONTAWESOME_NPM_AUTH_TOKEN=token))
+          PY
+      - uses: docker/build-push-action@v6
+        id: build
+        if: steps.selection.outputs.build == 'true'
+        with:
+          context: ${{ steps.selection.outputs.context }}
+          file: ${{ steps.selection.outputs.dockerfile }}
+          tags: ${{ steps.selection.outputs.tag }}
+          push: true
+          pull: true
+          no-cache: ${{ inputs.rebuild_images }}
+          build-args: |
+            COMMIT_SHA=${{ github.sha }}
+            APP_IMAGE_DIGEST=${{ steps.selection.outputs.backend_digest }}
+            FRONTEND_IMAGE_DIGEST=${{ steps.selection.outputs.frontend_digest }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            us.apolo.launchpad.inputs-sha256=${{ steps.selection.outputs.inputs_sha256 }}
+          secret-files: ${{ inputs.component == 'frontend' && format('npmrc={0}/frontend.npmrc', runner.temp) || '' }}
+          cache-from: type=gha,scope=launchpad-${{ inputs.component }}
+          cache-to: type=gha,scope=launchpad-${{ inputs.component }},mode=max
+      - name: Remove the build-only npm configuration
+        if: always()
+        run: rm -f "$RUNNER_TEMP/frontend.npmrc"
+      - name: Publish the verified image alias
+        if: steps.selection.outputs.build == 'false'
+        env:
+          IMAGE_REF: ${{ steps.selection.outputs.image_ref }}
+          IMAGE_TAG: ${{ steps.selection.outputs.tag }}
+        run: |
+          docker buildx imagetools create --prefer-index=false --tag "$IMAGE_TAG" "$IMAGE_REF"
+          actual=$(docker buildx imagetools inspect "$IMAGE_TAG" --format '{{json .Manifest}}' | jq -er .digest)
+          test "$actual" = "${IMAGE_REF#*@}"
+      - name: Record the immutable component identity
+        id: record
+        env:
+          COMPONENT: ${{ inputs.component }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: python3 .github/scripts/release.py record "$RUNNER_TEMP/release-base" --component "$COMPONENT" --digest "$IMAGE_DIGEST"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launchpad-image-${{ inputs.component }}
+          path: ${{ inputs.component }}.json
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 90

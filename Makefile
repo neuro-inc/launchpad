@@ -3,6 +3,7 @@ all test clean:
 
 IMAGE_NAME ?= launchpad
 HOOK_IMAGE_NAME ?= launchpad-hook
+APP_IMAGE_TAG ?= latest
 
 SHELL := /bin/sh -e
 
@@ -61,7 +62,7 @@ hooks-install:
 	poetry install
 
 .PHONY: test-all
-test-all: test-unit test-integration test-hooks
+test-all: test-unit test-integration test-hooks test-release
 
 .PHONY: build-image
 build-image:
@@ -79,6 +80,8 @@ push-image:
 build-hook-image:
 	docker build \
 		--build-arg APP_IMAGE_TAG=$(APP_IMAGE_TAG) \
+		--build-arg APP_IMAGE_DIGEST=$(APP_IMAGE_DIGEST) \
+		--build-arg FRONTEND_IMAGE_DIGEST=$(FRONTEND_IMAGE_DIGEST) \
 		-t $(HOOK_IMAGE_NAME):latest \
 		-f ./hooks/hooks.Dockerfile \
 		.;
@@ -93,3 +96,11 @@ push-hook-image:
 gen-types-schemas:
 	app-types dump-types-schema .apolo/src/apolo_apps_launchpad LaunchpadAppInputs .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppInputs.json
 	app-types dump-types-schema .apolo/src/apolo_apps_launchpad LaunchpadAppOutputs .apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppOutputs.json
+
+.PHONY: test-release
+test-release:
+	python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+
+.PHONY: lint-release
+lint-release:
+	python3 -m mypy --strict --config-file=/dev/null .github/scripts

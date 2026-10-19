@@ -167,7 +167,17 @@ async def get_launchpad_outputs(
     print(f"Full middleware name: {middleware_name}")
 
     # -------------- FINAL OUTPUT ----------------
+    frontend = helm_values.get("frontend", {})
     outputs = LaunchpadAppOutputs(
+        frontend_session_secret=(
+            await create_apolo_secret_with_retry(
+                app_instance_id=apolo_app_id,
+                key=APP_SECRET_KEYS["FRONTEND"],
+                value=frontend["sessionSecret"],
+            )
+            if frontend.get("image", {}).get("digest")
+            else None
+        ),
         app_url=ServiceAPI[WebApp](
             internal_url=internal_web_app_url,
             external_url=external_web_app_url,

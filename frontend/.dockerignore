@@ -1,0 +1,13 @@
+.git
+.next
+node_modules
+.npmrc
+.env*
+.agents
+.codex
+docs
+tests-adhoc
+
+# Python release tools
+**/__pycache__
+**/*.py[cod]

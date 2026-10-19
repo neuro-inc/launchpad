@@ -25,6 +25,7 @@ const buildInfo = {
 };
 
 const nextConfig = {
+  output: 'standalone',
   env: {
     APP_VERSION: buildInfo.version,
     APP_COMMIT_SHA: buildInfo.commitSha,

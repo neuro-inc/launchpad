@@ -421,6 +421,17 @@
       "description": "The main application URL for accessing the service. This is the primary endpoint users should use to access the application.",
       "title": "Application URL"
     },
+    "frontend_session_secret": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ApoloSecret"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
     "keycloak_config": {
       "anyOf": [
         {

@@ -492,6 +492,7 @@ class LaunchpadAppInputs(AppInputs):
 
 
 class LaunchpadAppOutputs(AppOutputs):
+    frontend_session_secret: ApoloSecret | None = None
     keycloak_config: KeycloakConfig | None = None
     installed_apps: InstalledApps | None = None
     auth_middleware: AuthIngressMiddleware | None = Field(

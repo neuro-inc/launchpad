@@ -1,6 +1,8 @@
 import json
 import os
 import random
+import re
+import secrets
 import string
 import typing as t
 
@@ -405,6 +407,35 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         except apolo_sdk.ResourceNotFound:
             launchpad_admin_password = _generate_password()
 
+        backend_image = {"tag": os.getenv("APP_IMAGE_TAG", "latest")}
+        backend_digest = os.getenv("APP_IMAGE_DIGEST", "")
+        if backend_digest:
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", backend_digest):
+                raise ValueError(
+                    "APP_IMAGE_DIGEST must be an immutable SHA-256 image digest."
+                )
+            backend_image["digest"] = backend_digest
+
+        frontend_digest = os.getenv("FRONTEND_IMAGE_DIGEST", "")
+        frontend_values: dict[str, t.Any] = {}
+        if frontend_digest:
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", frontend_digest):
+                raise ValueError(
+                    "FRONTEND_IMAGE_DIGEST must be an immutable SHA-256 image digest."
+                )
+            try:
+                frontend_secret = await get_apolo_secret(
+                    app_instance_id=app_id, key=APP_SECRET_KEYS["FRONTEND"]
+                )
+            except apolo_sdk.ResourceNotFound:
+                frontend_secret = secrets.token_urlsafe(48)
+            frontend_values = {
+                "frontend": {
+                    "image": {"digest": frontend_digest},
+                    "sessionSecret": frontend_secret,
+                }
+            }
+
         keycloak_values = {
             "fullnameOverride": f"launchpad-{app_id}-keycloak",
             "auth": {
@@ -503,8 +534,9 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
 
         return {
             **values,
+            **frontend_values,
             "authResponseHeaders": list(AUTH_RESPONSE_HEADERS),
-            "image": {"tag": os.getenv("APP_IMAGE_TAG", "latest")},
+            "image": backend_image,
             "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": kc_realm_import_config_map_name,
             "postgresql": {
