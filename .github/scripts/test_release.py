@@ -280,6 +280,21 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "frontend image"):
             verify_release(self.base, head())
 
+    def test_target_cannot_hide_incompatible_recorded_source(self) -> None:
+        original = self.release["source_revision"]
+        for path, message in (
+            ("frontend/src/app.ts", "frontend image"),
+            ("charts/launchpad/values.yaml", "chart"),
+        ):
+            with self.subTest(path=path):
+                self.change(path)
+                release = copy.deepcopy(self.release)
+                release["source_revision"] = head()
+                write_json(self.base / "release.json", release)
+                with self.assertRaisesRegex(ValueError, message):
+                    verify_release(self.base, original)
+                self.git("checkout", original, "--", path)
+
     def test_chart_checksum_and_path_are_validated(self) -> None:
         (self.base / "launchpad-1.0.0.tgz").write_bytes(b"tampered archive")
         with self.assertRaisesRegex(ValueError, "checksum"):
@@ -312,8 +327,8 @@ class ReleaseTests(unittest.TestCase):
             self.registry[args[-2]] = self.registry[args[-1]]
             return ""
 
-        def download(directory: Path, run_id: str, name: str) -> bool:
-            self.assertEqual((run_id, name), ("42", "launchpad-release"))
+        def download(directory: Path, run_id: str) -> bool:
+            self.assertEqual(run_id, "42")
             shutil.copytree(self.base, directory, dirs_exist_ok=True)
             return True
 
@@ -580,22 +595,19 @@ class ReleaseTests(unittest.TestCase):
 
     def test_duplicate_attempt_artifacts_fail_before_download(self) -> None:
         with patch.dict(os.environ, {"GITHUB_REPOSITORY": "neuro-inc/launchpad"}):
-            for name in ("launchpad-release", "launchpad-production-release"):
-                with (
-                    patch("release.gh", return_value="2") as api,
-                    self.assertRaisesRegex(ValueError, "ambiguous release artifacts"),
-                ):
-                    download_release(self.root / "download", "42", name)
-                api.assert_called_once()
+            with (
+                patch("release.gh", return_value="2") as api,
+                self.assertRaisesRegex(ValueError, "ambiguous release artifacts"),
+            ):
+                download_release(self.root / "download", "42")
+            api.assert_called_once()
 
     def test_single_replacement_artifact_downloads(self) -> None:
         with (
             patch.dict(os.environ, {"GITHUB_REPOSITORY": "neuro-inc/launchpad"}),
             patch("release.gh", side_effect=["1\n0", ""]) as api,
         ):
-            self.assertTrue(
-                download_release(self.root / "download", "42", "launchpad-release")
-            )
+            self.assertTrue(download_release(self.root / "download", "42"))
         self.assertEqual(api.call_count, 2)
         self.assertNotIn("--slurp", api.call_args_list[0].args)
         self.assertEqual(api.call_args.args[:3], ("run", "download", "42"))
@@ -607,12 +619,10 @@ class ReleaseTests(unittest.TestCase):
                     patch("release.gh", return_value=counts) as api,
                     self.assertRaises(ValueError),
                 ):
-                    download_release(self.root / "download", "42", "launchpad-release")
+                    download_release(self.root / "download", "42")
                 api.assert_called_once()
             with patch("release.gh", return_value="0\n0") as api:
-                self.assertFalse(
-                    download_release(self.root / "download", "42", "launchpad-release")
-                )
+                self.assertFalse(download_release(self.root / "download", "42"))
                 api.assert_called_once()
 
     def test_development_assembly_rejects_a_hook_for_different_runtime_images(

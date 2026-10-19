@@ -150,14 +150,17 @@ def hook_dependencies(images: dict[str, Image]) -> tuple[str, ...]:
 
 def verify_release(directory: Path, revision: str | None = None) -> Release:
     release = load_release(directory)
-    selected_revision = revision or release["source_revision"]
+    revisions = {release["source_revision"]}
+    if revision is not None:
+        revisions.add(revision)
     for component, image in release["images"].items():
         dependencies = (
             hook_dependencies(release["images"]) if component == "hook" else ()
         )
-        built_inputs = fingerprint(component, image["source_revision"], dependencies)
-        selected_inputs = fingerprint(component, selected_revision, dependencies)
-        if image["inputs_sha256"] != built_inputs or built_inputs != selected_inputs:
+        if any(
+            fingerprint(component, source, dependencies) != image["inputs_sha256"]
+            for source in revisions | {image["source_revision"]}
+        ):
             raise ValueError(
                 f"The {component} image does not match the selected build inputs."
             )
@@ -167,7 +170,9 @@ def verify_release(directory: Path, revision: str | None = None) -> Release:
         raise ValueError(
             "The chart archive checksum does not match the tested release."
         )
-    if fingerprint("chart", selected_revision) != chart["inputs_sha256"]:
+    if any(
+        fingerprint("chart", source) != chart["inputs_sha256"] for source in revisions
+    ):
         raise ValueError("The chart does not match the selected release inputs.")
     return release
 
@@ -180,7 +185,7 @@ def gh(*args: str) -> str:
     return command("gh", *args)
 
 
-def download_release(directory: Path, run_id: str, name: str) -> bool:
+def download_release(directory: Path, run_id: str) -> bool:
     repository = os.environ["GITHUB_REPOSITORY"]
     text(run_id, r"[1-9][0-9]*")
     page_counts = gh(
@@ -188,7 +193,7 @@ def download_release(directory: Path, run_id: str, name: str) -> bool:
         f"repos/{repository}/actions/runs/{run_id}/artifacts",
         "--paginate",
         "--jq",
-        f'[.artifacts[] | select(.name == "{name}" and .expired == false)] | length',
+        '[.artifacts[] | select(.name == "launchpad-release" and .expired == false)] | length',
     ).splitlines()
     if not page_counts:
         raise ValueError("The artifact API returned no page counts.")
@@ -204,7 +209,7 @@ def download_release(directory: Path, run_id: str, name: str) -> bool:
         "--repo",
         repository,
         "--name",
-        name,
+        "launchpad-release",
         "--dir",
         str(directory),
     )
@@ -245,9 +250,7 @@ def prepare(directory: Path, force: bool) -> None:
             ).returncode
             if ancestor not in (0, 1):
                 raise ValueError("The reuse source commit is unavailable locally.")
-            if ancestor == 0 and download_release(
-                directory, run_id, "launchpad-release"
-            ):
+            if ancestor == 0 and download_release(directory, run_id):
                 release = verify_release(directory)
                 if release["source_revision"] != source:
                     raise ValueError(
@@ -338,12 +341,11 @@ def publish(directory: Path, run_id: str, release_tag: str) -> None:
     ) or run["event"] not in ("push", "workflow_dispatch"):
         raise ValueError("The release requires a successful master CI run.")
     source = text(run["headSha"], REVISION)
-    if not download_release(directory, run_id, "launchpad-release"):
+    if not download_release(directory, run_id):
         raise ValueError("The selected App release artifact is unavailable.")
-    release = verify_release(directory)
+    release = verify_release(directory, revision)
     if release["source_revision"] != source:
         raise ValueError("The release does not match its successful master CI run.")
-    verify_release(directory, revision)
     aliases: list[tuple[str, str, str, bool]] = []
     for component, image in release["images"].items():
         reference = image["image_ref"]
