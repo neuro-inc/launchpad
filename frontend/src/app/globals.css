@@ -1,0 +1,49 @@
+@import url('../styles/index.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply text-rebecca;
+}
+
+:where(#launchpad-root, #launchpad-body) {
+  background: var(--launchpad-background, #f1f1f3);
+}
+
+:where(.launchpad-background--image) {
+  background-image: var(--launchpad-background-image);
+  background-position: var(--launchpad-background-position);
+  background-repeat: var(--launchpad-background-repeat);
+  background-size: var(--launchpad-background-size);
+}
+
+:where(.launchpad-app-card) {
+  background-color: var(--launchpad-app-card-background, #ffffff);
+}
+
+.launchpad-admin-surface {
+  background-color: var(--launchpad-admin-surface-background);
+}
+
+.space-before::before,
+.space-after::after,
+.space-both:before,
+.space-both:after {
+  content: '\00a0';
+}
+
+.required-label:after {
+  content: '*';
+  display: inline-block;
+  font-size: smaller;
+  @apply inline-block relative left-0.5 -top-0.5 text-error;
+}
+
+/**
+ * Tailwindcss's `break-words` rule is not that expeted
+ */
+.word-break-case {
+  word-break: break-word;
+}

@@ -1,0 +1,66 @@
+import { getServerSession } from 'next-auth';
+import clsx from 'clsx';
+
+import { IS_LOCAL } from '@constants';
+import { getAuthOptions } from '@features';
+import {
+  canDeriveLaunchpadApiHostname,
+  getServerApiUrl,
+  getSiteUrl,
+} from '@utils/helpers';
+
+import { LayoutCookieSync } from '@components/Ui/Layout/LayoutCookieSync';
+
+import { LayoutContainer } from './LayoutContainer';
+import { LayoutHeader } from './LayoutHeader';
+import { LayoutWrapper } from './LayoutWrapper';
+
+type Props = {
+  className?: string;
+  children: React.ReactNode;
+};
+
+export const Layout = async ({ className, children }: Props) => {
+  const siteUrl = await getSiteUrl();
+  const siteHostname = new URL(siteUrl).hostname;
+  const localApiUrl = IS_LOCAL
+    ? await getServerApiUrl().catch(() => null)
+    : null;
+  const supportsLaunchpadAuth = IS_LOCAL
+    ? Boolean(localApiUrl)
+    : canDeriveLaunchpadApiHostname(siteHostname);
+
+  const authBootstrap = supportsLaunchpadAuth
+    ? await (async () => {
+        const authOptions = await getAuthOptions();
+        const [session, apiUrl] = await Promise.all([
+          getServerSession(authOptions),
+          localApiUrl ?? getServerApiUrl(),
+        ]);
+
+        return { session, apiUrl };
+      })()
+    : { session: null, apiUrl: null };
+
+  return (
+    <LayoutWrapper className="launchpad-layout flex flex-1 flex-col">
+      {authBootstrap.apiUrl && (
+        <LayoutCookieSync
+          token={authBootstrap.session?.accessToken}
+          sessionError={authBootstrap.session?.error}
+          apiUrl={authBootstrap.apiUrl}
+        />
+      )}
+      <LayoutHeader session={authBootstrap.session} />
+      <main
+        id="launchpad-main"
+        className={clsx('launchpad-main flex flex-1 flex-col', className)}
+      >
+        {children}
+      </main>
+    </LayoutWrapper>
+  );
+};
+
+Layout.Container = LayoutContainer;
+Layout.Wrapper = LayoutWrapper;

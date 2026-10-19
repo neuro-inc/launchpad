@@ -1,0 +1,35 @@
+img {
+  max-width: 100%;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  line-height: normal;
+}
+
+#root {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+}
+
+/**
+ * Hide arrows for input type number
+ */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield; /* Firefox */
+}
+
+:focus {
+  outline: 0;
+}
