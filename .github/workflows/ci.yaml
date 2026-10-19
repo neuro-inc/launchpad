@@ -141,7 +141,8 @@ jobs:
       - uses: azure/setup-helm@v4
         with:
           version: v3.16.3
-      - run: make test-release
+      - name: Verify release checks in a tag dispatch context
+        run: GITHUB_REF_TYPE=tag GITHUB_REF_NAME=v0.0.0 GITHUB_EVENT_NAME=workflow_dispatch make test-release
       - run: make lint-release
 
   hook-test:

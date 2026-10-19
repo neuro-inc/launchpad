@@ -87,6 +87,17 @@ def live_deployment(name: str, container: str, image: str) -> dict[str, object]:
 
 class ReleaseTests(unittest.TestCase):
     def setUp(self) -> None:
+        environment = patch.dict(
+            os.environ,
+            {
+                "GITHUB_REPOSITORY": "neuro-inc/launchpad",
+                "GITHUB_REF_TYPE": "branch",
+                "GITHUB_REF_NAME": "master",
+                "GITHUB_EVENT_NAME": "push",
+            },
+        )
+        environment.start()
+        self.addCleanup(environment.stop)
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
@@ -280,6 +291,18 @@ class ReleaseTests(unittest.TestCase):
         for component in REPOSITORIES:
             dependencies = hook_dependencies(self.images) if component == "hook" else ()
             self.assertIsNone(select_image(component, self.base, dependencies, True))
+
+    def test_tag_component_selection_never_requests_a_rebuild(self) -> None:
+        with patch.dict(os.environ, {"GITHUB_REF_TYPE": "tag"}):
+            for component in REPOSITORIES:
+                dependencies = (
+                    hook_dependencies(self.images) if component == "hook" else ()
+                )
+                with (
+                    self.subTest(component=component),
+                    self.assertRaisesRegex(ValueError, "complete promoted App release"),
+                ):
+                    select_component(component, self.base, dependencies, True)
 
     def test_reuse_rejects_forged_source_fingerprint(self) -> None:
         release = copy.deepcopy(self.release)
