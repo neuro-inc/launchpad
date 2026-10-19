@@ -346,13 +346,29 @@ class ReleaseTests(unittest.TestCase):
     def test_single_replacement_artifact_downloads(self) -> None:
         with (
             patch.dict(os.environ, {"GITHUB_REPOSITORY": "neuro-inc/launchpad"}),
-            patch("release.gh", side_effect=["1", ""]) as api,
+            patch("release.gh", side_effect=["1\n0", ""]) as api,
         ):
             self.assertTrue(
                 download_release(self.root / "download", "42", "launchpad-release")
             )
         self.assertEqual(api.call_count, 2)
+        self.assertNotIn("--slurp", api.call_args_list[0].args)
         self.assertEqual(api.call_args.args[:3], ("run", "download", "42"))
+
+    def test_artifact_counts_cover_every_page_and_reject_invalid_counts(self) -> None:
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": "neuro-inc/launchpad"}):
+            for counts in ("1\n1", "2\n0", "1\n-1", "invalid", ""):
+                with (
+                    patch("release.gh", return_value=counts) as api,
+                    self.assertRaises(ValueError),
+                ):
+                    download_release(self.root / "download", "42", "launchpad-release")
+                api.assert_called_once()
+            with patch("release.gh", return_value="0\n0") as api:
+                self.assertFalse(
+                    download_release(self.root / "download", "42", "launchpad-release")
+                )
+                api.assert_called_once()
 
     def test_development_assembly_rejects_a_hook_for_different_runtime_images(
         self,

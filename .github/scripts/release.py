@@ -204,17 +204,19 @@ def gh(*args: str) -> str:
 def download_release(directory: Path, run_id: str, name: str) -> bool:
     repository = os.environ["GITHUB_REPOSITORY"]
     text(run_id, r"[1-9][0-9]*")
-    count = gh(
+    page_counts = gh(
         "api",
         f"repos/{repository}/actions/runs/{run_id}/artifacts",
         "--paginate",
-        "--slurp",
         "--jq",
-        f'[.[].artifacts[] | select(.name == "{name}" and .expired == false)] | length',
-    )
-    if count == "0":
+        f'[.artifacts[] | select(.name == "{name}" and .expired == false)] | length',
+    ).splitlines()
+    if not page_counts:
+        raise ValueError("The artifact API returned no page counts.")
+    count = sum(int(text(value, r"0|[1-9][0-9]*")) for value in page_counts)
+    if count == 0:
         return False
-    if count != "1":
+    if count != 1:
         raise ValueError("The workflow run has ambiguous release artifacts.")
     gh(
         "run",
