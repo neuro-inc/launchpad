@@ -3,10 +3,6 @@ name: CI
 on:
   workflow_dispatch:
     inputs:
-      promotion_run_id:
-        description: Successful promotion run ID, required when dispatching a version tag
-        type: string
-        default: ''
       rebuild_images:
         description: Rebuild all images and refresh base images on master
         type: boolean
@@ -188,8 +184,7 @@ jobs:
     needs: release-test
     if: >-
       ${{ github.event_name == 'push' ||
-          (github.event_name == 'workflow_dispatch' &&
-           (github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))) ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
           (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' &&
            github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
@@ -200,14 +195,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: Verify the successful master release or approved production release
+      - name: Verify the successful master reuse base
         env:
           GH_TOKEN: ${{ github.token }}
-          PROMOTION_RUN_ID: ${{ inputs.promotion_run_id }}
           REBUILD_IMAGES: ${{ inputs.rebuild_images || false }}
-        run: >-
-          python3 .github/scripts/release.py prepare "$RUNNER_TEMP/release-base"
-          --promotion-run-id "$PROMOTION_RUN_ID"
+        run: python3 .github/scripts/release.py prepare "$RUNNER_TEMP/release-base"
       - uses: actions/upload-artifact@v4
         with:
           name: launchpad-reuse-base
@@ -277,17 +269,13 @@ jobs:
           version: v3.16.3
       - uses: actions/download-artifact@v4
         with:
-          name: launchpad-reuse-base
-          path: ${{ runner.temp }}/release-base
-      - uses: actions/download-artifact@v4
-        with:
           pattern: launchpad-image-*
           merge-multiple: true
           path: ${{ runner.temp }}/component-images
       - name: Verify and assemble the release
         run: >-
           python3 .github/scripts/release.py assemble "$RUNNER_TEMP/launchpad-release"
-          --images "$RUNNER_TEMP/component-images" --base "$RUNNER_TEMP/release-base"
+          --images "$RUNNER_TEMP/component-images"
       - uses: actions/upload-artifact@v4
         with:
           name: launchpad-release

@@ -56,84 +56,58 @@ Use `CI` workflow dispatch on `master` with `rebuild_images` enabled to refresh 
 That run disables Docker layer reuse and records the replacement combination for subsequent reuse.
 Floating base image tags refresh only during a forced build or another required rebuild.
 
-## Production promotion
+## Production publication
 
-The `Verify production App promotion` workflow selects a successful `master` CI release.
-It verifies both runtime images in the development App's managed backend and frontend Deployments.
-Both Deployments must report completed generations and fully updated, ready, available replicas.
-Aggregate image summaries cannot substitute for live Deployment manifests.
-The Argo CD Application must also be healthy and synchronized.
-Every completed source revision must match its observed synchronized revision.
-The resolved Launchpad chart revision must have the recorded chart input fingerprint.
-Promotion evidence binds the complete release manifest by checksum, including the hook image and chart archive.
+A maintainer verifies the selected App combination in any development installation before publishing it.
+Use the acceptance procedure below to check authentication, session continuity, custom hostnames, upgrades, and rollback.
+Development acceptance is manual.
+Do not rerun the selected CI build after development acceptance.
+Repeat acceptance if that build produces a replacement artifact.
+CI verifies artifact integrity and source compatibility without querying an installed App or Argo CD.
 
-Production publication requires an explicit dispatch against an existing `v*` tag.
-Pushing a tag does not publish images.
-The dispatch requires `promotion_run_id`, which identifies a successful `Verify production App promotion` run.
-No repository variable selects the release.
-Tag dispatches reuse the complete promoted combination without rebuilding images or repackaging the chart.
-Each component's recorded inputs must match the tagged source.
-A different repository commit can qualify when every build input remains unchanged.
-Changed component or chart inputs require a new development release and promotion.
-The built-in `GITHUB_TOKEN` reads artifacts within this repository.
+The `Release` workflow runs from `master` with two required inputs:
 
-### Environment setup
+| Input | Purpose |
+| --- | --- |
+| `build_run_id` | It selects the successful `master` CI run tested in development. |
+| `release_tag` | It selects an existing reviewed `v*` Git tag to publish. |
 
-Keep nonsecret promotion settings in [production.env](../../.github/environments/production.env).
-`ARGOCD_SERVER` identifies the development Argo CD HTTPS origin.
-`DEV_LAUNCHPAD_ARGO_APPLICATION` identifies the exact installed development App to verify.
-Confirm both values before importing them.
+The workflow accepts successful `CI` runs triggered by a master push or a manual master dispatch.
+It rejects PR runs, failed runs, expired artifacts, and ambiguous artifacts.
+The release manifest must identify the selected CI run's source commit.
+Every component and the chart must match the tagged build inputs.
+A different Git commit can qualify when every build input remains unchanged.
+Changed component or chart inputs require another CI build and development acceptance.
 
-Create the GitHub `production` environment with the required approval rules.
-Allow `master` because the promotion verifier runs from that branch.
-Import the versioned configuration with this command:
-
-```sh
-make setup-production-environment
-```
-
-The command uses `gh variable set --env-file` for `neuro-inc/launchpad` and the `production` environment.
-It rejects empty values before making a GitHub request.
-It does not create the environment or change its protection rules.
-Rerun the command after a reviewed configuration change.
-Removing a key from the file does not delete its GitHub variable.
-
-Configure these secrets separately:
-
-| Location | Secret | Purpose |
-| --- | --- | --- |
-| Repository Actions secrets | `FONTAWESOME_NPM_AUTH_TOKEN` | It permits frontend dependency installation and Docker builds. |
-| Repository Dependabot secrets | `FONTAWESOME_NPM_AUTH_TOKEN` | It permits private registry access for dependency updates. |
-| `production` environment secrets | `ARGOCD_READ_TOKEN` | It permits read-only access to the development Argo Application. |
-
-### Release commands
-
-Set `BUILD_RUN_ID` to the successful `master` CI run for the tested App combination.
-Dispatch the promotion verifier from `master` after development acceptance:
-
-```sh
-gh workflow run promote-release.yml --repo neuro-inc/launchpad --ref master \
-  -f build_run_id="$BUILD_RUN_ID"
-```
-
-Wait for the promotion workflow to succeed.
-Set `PROMOTION_RUN_ID` to that successful promotion run ID.
+Set `BUILD_RUN_ID` to the tested CI run ID.
 Create the reviewed version tag before dispatching publication.
 Set `RELEASE_TAG` to that existing tag.
 Do not move an existing tag.
+Dispatch publication after development acceptance:
 
 ```sh
-gh workflow run ci.yaml --repo neuro-inc/launchpad --ref "$RELEASE_TAG" \
-  -f promotion_run_id="$PROMOTION_RUN_ID"
+gh workflow run release.yml --repo neuro-inc/launchpad --ref master \
+  -f build_run_id="$BUILD_RUN_ID" -f release_tag="$RELEASE_TAG"
 ```
 
-The verifier rejects missing or invalid promotion IDs, unapproved artifacts, non-version tags, and forced production rebuilds.
-A branch dispatch cannot select a production promotion.
-Wait for image publication and final release assembly before installing the tagged App version.
+Pushing a tag does not publish images.
+The workflow verifies all source images and existing version aliases before publishing any alias.
+An existing alias must already select the tested digest.
+Publication preserves each image digest and retains the original release manifest and chart archive without rebuilding or repackaging.
+A retry with the same inputs can complete interrupted publication.
+Wait for the complete Release workflow before installing the tagged App version.
+Keep its `launchpad-release` artifact with the operational release record.
 
+The maintainer's manual dispatch records release approval after development acceptance.
+The GitHub `production` environment records the release job.
+Configure additional environment approval rules when the repository supports them and the team requires them.
+The built-in `GITHUB_TOKEN` reads repository artifacts and publishes registry aliases.
+Publication needs no Argo credentials, App-name setting, or environment configuration variables.
+
+Configure `FONTAWESOME_NPM_AUTH_TOKEN` as an Actions secret for frontend builds.
+Configure that credential separately as a Dependabot registry secret.
 Confirm that Launchpad's Actions token can publish the existing frontend GHCR package.
 Grant package access to this repository if its current permissions permit only `launchpad-web-ui`.
-Keep the complete release artifact and chart package with the operational release record.
 Local hook builds without `APP_IMAGE_DIGEST` retain the existing tag behavior.
 
 ## Publication prerequisites
@@ -146,7 +120,7 @@ Fork PRs run the separate release checks and fail frontend validation before pri
 GitHub does not provide repository secrets to forks.
 A maintainer must copy those changes to a repository branch and create a replacement PR for complete frontend validation.
 
-Verify the consolidated validation, publication, promotion, and App upgrade before archiving the old repository.
+Verify the consolidated validation, manual publication, and App upgrade before archiving the old repository.
 Retain old deployment records and Netlify rollback access throughout the hosting migration.
 The old `LAUNCHPAD_FRONTEND_IMAGE_DIGEST`, `FRONTEND_RELEASE_RUN_ID`, and `FRONTEND_RELEASE_READ_TOKEN` settings have no consumers in the consolidated pipeline.
 Remove those settings after confirming the replacement workflows.
@@ -159,7 +133,7 @@ Remove those settings after confirming the replacement workflows.
 4. Verify login, logout, token refresh, and backend requests in a browser.
 5. Upgrade the App and verify an existing session remains valid.
 6. Verify custom hostname authentication when the App uses a custom hostname.
-7. Promote the tested App combination after all development verification passes.
+7. Publish the tested App combination after all development verification passes.
 8. Upgrade production Apps with the verified release combination.
 
 Restore the previous verified App release combination for an ordinary rollback.
@@ -171,7 +145,7 @@ No replacement automatic PR preview environment is configured.
 ## Local validation
 
 Run `make test-hooks` to verify processors, chart routing, and ownership.
-Run `make test-release` with Python 3.12 and Helm 3.16.3 to verify provenance, reuse, packaging, and promotion.
+Run `make test-release` with Python 3.12 and Helm 3.16.3 to verify provenance, reuse, packaging, and publication.
 Run `make lint-release` with mypy 1.18.2 to check all release scripts and tests.
 The explicit configuration keeps release checks independent of backend mypy plugins.
 Run `npm ci`, `npm run lint`, and `npm run build` from `frontend/` with Node.js 22.

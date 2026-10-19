@@ -1,15 +1,13 @@
-"""Test component provenance, release assembly, and production promotion."""
+"""Test component provenance, release assembly, and manual publication."""
 
 import copy
 import hashlib
-import io
 import json
 import os
 import shutil
 import subprocess
 import tempfile
 import unittest
-import urllib.parse
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,71 +16,21 @@ from release import (
     Image,
     Release,
     assemble,
+    command,
     download_release,
     fingerprint,
     head,
     hook_dependencies,
     load_release,
     prepare,
-    promote,
+    publish,
     record_component,
+    registry_digest,
     select_component,
     select_image,
-    verify_promotion,
     verify_release,
     write_json,
 )
-from rollout import runtime_resources, verify_deployment, verify_rollout
-
-
-def argo_application(revision: str) -> dict[str, object]:
-    return {
-        "metadata": {"namespace": "argo"},
-        "spec": {
-            "sources": [
-                {
-                    "repoURL": "https://github.com/neuro-inc/launchpad",
-                    "path": "charts/launchpad",
-                }
-            ]
-        },
-        "status": {
-            "health": {"status": "Healthy"},
-            "sync": {"status": "Synced", "revision": revision},
-            "operationState": {
-                "phase": "Succeeded",
-                "syncResult": {"revision": revision},
-            },
-            "resources": [
-                {
-                    "group": "apps",
-                    "kind": "Deployment",
-                    "name": name,
-                    "namespace": "app-project",
-                }
-                for name in ("launchpad-test", "launchpad-test-client")
-            ],
-        },
-    }
-
-
-def live_deployment(name: str, container: str, image: str) -> dict[str, object]:
-    return {
-        "apiVersion": "apps/v1",
-        "kind": "Deployment",
-        "metadata": {"name": name, "namespace": "app-project", "generation": 2},
-        "spec": {
-            "replicas": 1,
-            "template": {"spec": {"containers": [{"name": container, "image": image}]}},
-        },
-        "status": {
-            "observedGeneration": 2,
-            "replicas": 1,
-            "updatedReplicas": 1,
-            "readyReplicas": 1,
-            "availableReplicas": 1,
-        },
-    }
 
 
 class ReleaseTests(unittest.TestCase):
@@ -94,6 +42,7 @@ class ReleaseTests(unittest.TestCase):
                 "GITHUB_REF_TYPE": "branch",
                 "GITHUB_REF_NAME": "master",
                 "GITHUB_EVENT_NAME": "push",
+                "GITHUB_REF": "refs/heads/master",
             },
         )
         environment.start()
@@ -149,19 +98,6 @@ class ReleaseTests(unittest.TestCase):
             },
         }
         write_json(self.base / "release.json", self.release)
-        write_json(
-            self.base / "development-rollout.json",
-            {
-                "application": "dev-launchpad",
-                "revision": "argo-revision",
-                "release_sha256": hashlib.sha256(
-                    (self.base / "release.json").read_bytes()
-                ).hexdigest(),
-                "images": [
-                    self.images[name]["image_ref"] for name in ("backend", "frontend")
-                ],
-            },
-        )
 
     def git(self, *args: str) -> str:
         return subprocess.check_output(
@@ -300,7 +236,7 @@ class ReleaseTests(unittest.TestCase):
                 )
                 with (
                     self.subTest(component=component),
-                    self.assertRaisesRegex(ValueError, "complete promoted App release"),
+                    self.assertRaisesRegex(ValueError, "complete tested App release"),
                 ):
                     select_component(component, self.base, dependencies, True)
 
@@ -322,7 +258,7 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 load_release(self.base)
 
-    def test_chart_change_reuses_images_but_rejects_old_promotion(self) -> None:
+    def test_chart_change_reuses_images_but_rejects_old_release(self) -> None:
         self.change("charts/launchpad/values.yaml")
         for component in REPOSITORIES:
             dependencies = hook_dependencies(self.images) if component == "hook" else ()
@@ -331,27 +267,18 @@ class ReleaseTests(unittest.TestCase):
                 self.images[component],
             )
         with self.assertRaisesRegex(ValueError, "chart"):
-            verify_promotion(self.base, head())
+            verify_release(self.base, head())
 
-    def test_promotion_allows_new_commit_with_identical_build_inputs(self) -> None:
+    def test_release_allows_new_commit_with_identical_build_inputs(self) -> None:
         (self.root / "notes.txt").write_text("documentation only\n")
         self.commit()
         self.assertNotEqual(head(), self.release["source_revision"])
-        self.assertEqual(verify_promotion(self.base, head()), self.release)
+        self.assertEqual(verify_release(self.base, head()), self.release)
 
-    def test_promotion_rejects_changed_component_inputs(self) -> None:
+    def test_release_rejects_changed_component_inputs(self) -> None:
         self.change("frontend/src/app.ts")
         with self.assertRaisesRegex(ValueError, "frontend image"):
-            verify_promotion(self.base, head())
-
-    def test_promotion_rejects_missing_or_tampered_evidence(self) -> None:
-        path = self.base / "development-rollout.json"
-        evidence = json.loads(path.read_text())
-        for key in ("release_sha256", "images", "application", "revision"):
-            invalid = {**evidence, key: ""}
-            write_json(path, invalid)
-            with self.subTest(key=key), self.assertRaises(ValueError):
-                verify_promotion(self.base, head())
+            verify_release(self.base, head())
 
     def test_chart_checksum_and_path_are_validated(self) -> None:
         (self.base / "launchpad-1.0.0.tgz").write_bytes(b"tampered archive")
@@ -363,128 +290,253 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_release(self.base)
 
-    def test_production_assembly_preserves_the_promoted_bytes(self) -> None:
-        records = self.root / "images"
-        records.mkdir()
-        for name, image in self.images.items():
-            write_json(records / f"{name}.json", image)
-        output = self.root / "output"
-        with patch.dict(os.environ, {"GITHUB_REF_TYPE": "tag"}):
-            assemble(output, records, self.base)
-        for name in ("release.json", "development-rollout.json", "launchpad-1.0.0.tgz"):
-            self.assertEqual(
-                (output / name).read_bytes(), (self.base / name).read_bytes()
-            )
+    def mock_publication(self) -> None:
+        self.git("-c", "tag.gpgsign=false", "tag", "v1.2.3")
+        self.run_metadata: dict[str, object] = {
+            "conclusion": "success",
+            "workflowName": "CI",
+            "headBranch": "master",
+            "headSha": self.release["source_revision"],
+            "event": "push",
+        }
+        self.registry = {
+            image["image_ref"]: image["image_ref"].split("@", 1)[1]
+            for image in self.images.values()
+        }
+        self.registry_writes: list[tuple[str, ...]] = []
 
-    def test_production_assembly_rejects_a_different_image_combination(self) -> None:
-        records = self.root / "images"
-        records.mkdir()
-        for name, image in self.images.items():
-            record = {**image, "image_ref": REPOSITORIES[name] + "@sha256:" + "f" * 64}
-            write_json(records / f"{name}.json", record)
-        with (
-            patch.dict(os.environ, {"GITHUB_REF_TYPE": "tag"}),
-            self.assertRaises(ValueError),
-        ):
-            assemble(self.root / "output", records, self.base)
-
-    def test_tag_dispatch_requires_an_explicit_verified_promotion(self) -> None:
-        destination = self.root / "production-base"
+        def execute(*args: str) -> str:
+            if args[0] != "docker":
+                return command(*args)
+            self.registry_writes.append(args)
+            self.registry[args[-2]] = self.registry[args[-1]]
+            return ""
 
         def download(directory: Path, run_id: str, name: str) -> bool:
-            self.assertEqual(run_id, "42")
-            self.assertEqual(name, "launchpad-production-release")
+            self.assertEqual((run_id, name), ("42", "launchpad-release"))
             shutil.copytree(self.base, directory, dirs_exist_ok=True)
             return True
 
-        with (
-            patch.dict(
-                os.environ,
-                {
-                    "GITHUB_REPOSITORY": "neuro-inc/launchpad",
-                    "GITHUB_REF_TYPE": "tag",
-                    "GITHUB_REF_NAME": "v1.2.3",
-                    "GITHUB_EVENT_NAME": "workflow_dispatch",
-                },
+        for mock in (
+            patch.dict(os.environ, {"GITHUB_EVENT_NAME": "workflow_dispatch"}),
+            patch(
+                "release.gh", side_effect=lambda *args: json.dumps(self.run_metadata)
             ),
-            patch("release.gh", return_value="") as api,
             patch("release.download_release", side_effect=download),
+            patch(
+                "release.registry_digest",
+                side_effect=lambda reference, allow_missing=False: self.registry.get(
+                    reference
+                ),
+            ),
+            patch("release.command", side_effect=execute),
         ):
-            prepare(destination, False, "42")
-        self.assertEqual(api.call_args.args[:3], ("run", "view", "42"))
-        self.assertEqual(verify_promotion(destination, head()), self.release)
+            mock.start()
+            self.addCleanup(mock.stop)
 
-    def test_tag_dispatch_rejects_invalid_release_inputs_before_network_access(
+    def test_publication_preserves_the_tested_combination_without_building(
         self,
     ) -> None:
-        cases = (
-            ("push", "v1.2.3", False, "42"),
-            ("workflow_dispatch", "release", False, "42"),
-            ("workflow_dispatch", "v1.2.3", True, "42"),
-            ("workflow_dispatch", "v1.2.3", False, ""),
-            ("workflow_dispatch", "v1.2.3", False, "0"),
-            ("workflow_dispatch", "v1.2.3", False, "invalid"),
-        )
-        for event, ref_name, force, run_id in cases:
-            with self.subTest(
-                event=event, ref_name=ref_name, force=force, run_id=run_id
-            ):
+        self.mock_publication()
+        output = self.root / "publication"
+        publish(output, "42", "v1.2.3")
+        for name in ("release.json", self.release["chart"]["filename"]):
+            self.assertEqual(
+                (output / name).read_bytes(), (self.base / name).read_bytes()
+            )
+        self.assertEqual(len(self.registry_writes), 3)
+        for arguments in self.registry_writes:
+            self.assertEqual(
+                arguments[:6],
+                (
+                    "docker",
+                    "buildx",
+                    "imagetools",
+                    "create",
+                    "--prefer-index=false",
+                    "--tag",
+                ),
+            )
+        for component, image in self.images.items():
+            self.assertEqual(
+                self.registry[REPOSITORIES[component] + ":v1.2.3"],
+                image["image_ref"].split("@", 1)[1],
+            )
+
+    def test_publication_retry_accepts_only_matching_existing_aliases(self) -> None:
+        self.mock_publication()
+        for component, image in self.images.items():
+            self.registry[REPOSITORIES[component] + ":v1.2.3"] = image[
+                "image_ref"
+            ].split("@", 1)[1]
+        publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_publication_retry_completes_matching_partial_publication(self) -> None:
+        self.mock_publication()
+        self.registry[REPOSITORIES["backend"] + ":v1.2.3"] = self.images["backend"][
+            "image_ref"
+        ].split("@", 1)[1]
+        publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(len(self.registry_writes), 2)
+        for component, image in self.images.items():
+            self.assertEqual(
+                self.registry[REPOSITORIES[component] + ":v1.2.3"],
+                image["image_ref"].split("@", 1)[1],
+            )
+
+    def test_publication_rejects_an_existing_conflict_before_any_write(self) -> None:
+        self.mock_publication()
+        self.registry[REPOSITORIES["hook"] + ":v1.2.3"] = "sha256:" + "f" * 64
+        with self.assertRaisesRegex(ValueError, "already selects a different image"):
+            publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_publication_rejects_a_missing_source_before_any_write(self) -> None:
+        self.mock_publication()
+        del self.registry[self.images["hook"]["image_ref"]]
+        with self.assertRaisesRegex(ValueError, "tested digest"):
+            publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_publication_requires_a_successful_master_ci_source(self) -> None:
+        self.mock_publication()
+        for field, value in (
+            ("conclusion", "failure"),
+            ("headBranch", "feature"),
+            ("event", "pull_request"),
+            ("workflowName", "Release"),
+            ("headSha", "f" * 40),
+        ):
+            with self.subTest(field=field):
+                original = self.run_metadata[field]
+                self.run_metadata[field] = value
+                with self.assertRaises(ValueError):
+                    publish(self.root / "publication", "42", "v1.2.3")
+                self.run_metadata[field] = original
+                self.assertEqual(self.registry_writes, [])
+
+    def test_publication_rejects_changed_tag_inputs_before_any_write(self) -> None:
+        self.mock_publication()
+        self.change("frontend/src/app.ts")
+        self.git("-c", "tag.gpgsign=false", "tag", "v1.2.4")
+        with self.assertRaisesRegex(ValueError, "frontend image"):
+            publish(self.root / "publication", "42", "v1.2.4")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_publication_allows_a_tag_with_only_documentation_changes(self) -> None:
+        self.mock_publication()
+        (self.root / "notes.txt").write_text("documentation only\n")
+        self.commit()
+        self.git("-c", "tag.gpgsign=false", "tag", "v1.2.4")
+        publish(self.root / "publication", "42", "v1.2.4")
+        self.assertEqual(len(self.registry_writes), 3)
+
+    def test_publication_requires_a_manual_master_dispatch_and_valid_inputs(
+        self,
+    ) -> None:
+        self.mock_publication()
+        for event, ref, run_id, tag in (
+            ("push", "refs/heads/master", "42", "v1.2.3"),
+            ("workflow_dispatch", "refs/heads/feature", "42", "v1.2.3"),
+            ("workflow_dispatch", "refs/tags/v1.2.3", "42", "v1.2.3"),
+            ("workflow_dispatch", "refs/heads/master", "", "v1.2.3"),
+            ("workflow_dispatch", "refs/heads/master", "invalid", "v1.2.3"),
+            ("workflow_dispatch", "refs/heads/master", "42", "release"),
+            ("workflow_dispatch", "refs/heads/master", "42", "v/unsafe"),
+        ):
+            with self.subTest(event=event, ref=ref, run_id=run_id, tag=tag):
                 with (
                     patch.dict(
-                        os.environ,
-                        {
-                            "GITHUB_REPOSITORY": "neuro-inc/launchpad",
-                            "GITHUB_REF_TYPE": "tag",
-                            "GITHUB_REF_NAME": ref_name,
-                            "GITHUB_EVENT_NAME": event,
-                        },
+                        os.environ, {"GITHUB_EVENT_NAME": event, "GITHUB_REF": ref}
                     ),
-                    patch("release.gh") as api,
                     self.assertRaises(ValueError),
                 ):
-                    prepare(self.root / "candidate", force, run_id)
-                api.assert_not_called()
+                    publish(self.root / "publication", run_id, tag)
+                self.assertEqual(self.registry_writes, [])
 
-    def test_development_dispatch_rejects_a_production_release_selection(self) -> None:
+    def test_publication_rejects_an_unavailable_build_artifact(self) -> None:
+        self.mock_publication()
         with (
-            patch.dict(
-                os.environ,
-                {
-                    "GITHUB_REPOSITORY": "neuro-inc/launchpad",
-                    "GITHUB_REF_TYPE": "branch",
-                },
-            ),
-            patch("release.gh") as api,
-            self.assertRaisesRegex(ValueError, "only for a version tag"),
+            patch("release.download_release", return_value=False),
+            self.assertRaisesRegex(ValueError, "artifact is unavailable"),
         ):
-            prepare(self.root / "candidate", False, "42")
-        api.assert_not_called()
+            publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(self.registry_writes, [])
 
-    def test_tag_dispatch_rejects_unavailable_or_failed_promotions(self) -> None:
-        with patch.dict(
-            os.environ,
-            {
-                "GITHUB_REPOSITORY": "neuro-inc/launchpad",
-                "GITHUB_REF_TYPE": "tag",
-                "GITHUB_REF_NAME": "v1.2.3",
-                "GITHUB_EVENT_NAME": "workflow_dispatch",
-            },
+    def test_publication_detects_an_alias_digest_change(self) -> None:
+        self.mock_publication()
+
+        def digest(reference: str, allow_missing: bool = False) -> str | None:
+            if self.registry_writes and ":v1.2.3" in reference:
+                return "sha256:" + "f" * 64
+            return self.registry.get(reference)
+
+        with (
+            patch("release.registry_digest", side_effect=digest),
+            self.assertRaisesRegex(ValueError, "alias changed the tested digest"),
         ):
+            publish(self.root / "publication", "42", "v1.2.3")
+
+    def test_publication_requires_an_existing_git_tag(self) -> None:
+        self.mock_publication()
+        with self.assertRaises(subprocess.CalledProcessError):
+            publish(self.root / "publication", "42", "v9.9.9")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_publication_rejects_chart_tampering_before_any_write(self) -> None:
+        self.mock_publication()
+        (self.base / self.release["chart"]["filename"]).write_bytes(b"tampered")
+        with self.assertRaisesRegex(ValueError, "checksum"):
+            publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_registry_inspection_distinguishes_missing_tags_from_failures(self) -> None:
+        reference = REPOSITORIES["backend"] + ":v1.2.3"
+        for error in ("unauthorized", "connection timed out", "invalid response"):
             with (
                 patch(
-                    "release.gh", side_effect=subprocess.CalledProcessError(1, ["gh"])
+                    "release.subprocess.run",
+                    return_value=subprocess.CompletedProcess([], 1, "", error),
                 ),
-                patch("release.download_release") as download,
-                self.assertRaises(subprocess.CalledProcessError),
+                self.assertRaises(RuntimeError),
             ):
-                prepare(self.root / "candidate", False, "42")
-            download.assert_not_called()
+                registry_digest(reference, allow_missing=True)
+        with patch(
+            "release.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                [], 1, "", f"ERROR: {reference}: not found\n"
+            ),
+        ):
+            self.assertIsNone(registry_digest(reference, allow_missing=True))
+            with self.assertRaises(RuntimeError):
+                registry_digest(reference)
+        for output in ("[]", '{"digest":"latest"}'):
             with (
-                patch("release.gh", return_value=""),
-                patch("release.download_release", return_value=False),
-                self.assertRaisesRegex(ValueError, "artifact is unavailable"),
+                patch(
+                    "release.subprocess.run",
+                    return_value=subprocess.CompletedProcess([], 0, output, ""),
+                ),
+                self.assertRaises(ValueError),
             ):
-                prepare(self.root / "candidate", False, "42")
+                registry_digest(reference)
+        expected = "sha256:" + "a" * 64
+        with patch(
+            "release.subprocess.run",
+            return_value=subprocess.CompletedProcess(
+                [], 0, json.dumps({"digest": expected}), ""
+            ),
+        ):
+            self.assertEqual(registry_digest(reference), expected)
+
+    def test_ci_tag_dispatch_uses_the_release_workflow_instead(self) -> None:
+        with (
+            patch.dict(os.environ, {"GITHUB_REF_TYPE": "tag"}),
+            patch("release.gh") as api,
+            self.assertRaisesRegex(ValueError, "Use the Release workflow"),
+        ):
+            prepare(self.root / "candidate", False)
+        api.assert_not_called()
 
     def test_empty_or_forced_reuse_base_builds_fresh(self) -> None:
         for force in (False, True):
@@ -576,7 +628,7 @@ class ReleaseTests(unittest.TestCase):
 
         with patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}):
             with self.assertRaisesRegex(ValueError, "hook image"):
-                assemble(self.root / "output", records, self.base)
+                assemble(self.root / "output", records)
 
     def test_development_assembly_keeps_verified_reused_records(self) -> None:
         records = self.root / "records"
@@ -585,240 +637,8 @@ class ReleaseTests(unittest.TestCase):
             write_json(records / f"{name}.json", image)
 
         with patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}):
-            assemble(self.root / "output", records, self.base)
+            assemble(self.root / "output", records)
         self.assertEqual(verify_release(self.root / "output")["images"], self.images)
-
-    def test_promotion_binds_the_running_pair_and_deployed_chart(self) -> None:
-        application = argo_application(head())
-        backend = live_deployment(
-            "launchpad-test", "launchpad", self.images["backend"]["image_ref"]
-        )
-        frontend = live_deployment(
-            "launchpad-test-client", "frontend", self.images["frontend"]["image_ref"]
-        )
-
-        def responses() -> list[io.StringIO]:
-            return [
-                io.StringIO(json.dumps(application)),
-                io.StringIO(json.dumps({"manifest": json.dumps(backend)})),
-                io.StringIO(json.dumps({"manifest": json.dumps(frontend)})),
-            ]
-
-        environment = {
-            "ARGOCD_SERVER": "https://argo.example.invalid",
-            "DEV_LAUNCHPAD_ARGO_APPLICATION": "dev-launchpad",
-            "ARGOCD_AUTH_TOKEN": "synthetic-test-token",
-        }
-        with patch.dict(os.environ, environment):
-            with patch(
-                "release.urllib.request.urlopen",
-                side_effect=responses(),
-            ) as api:
-                promote(self.base, self.release["source_revision"])
-        query = urllib.parse.parse_qs(
-            urllib.parse.urlparse(api.call_args_list[1].args[0].full_url).query
-        )
-        self.assertEqual(
-            query,
-            {
-                "appNamespace": ["argo"],
-                "namespace": ["app-project"],
-                "resourceName": ["launchpad-test"],
-                "group": ["apps"],
-                "version": ["v1"],
-                "kind": ["Deployment"],
-            },
-        )
-        self.assertEqual(verify_promotion(self.base, head()), self.release)
-        status = application["status"]
-        assert isinstance(status, dict)
-        for wrong_image in (
-            REPOSITORIES["frontend"] + "@sha256:" + "f" * 64,
-            "unrelated.example/frontend@sha256:" + "f" * 64,
-        ):
-            status["summary"] = {
-                "images": [
-                    self.images[name]["image_ref"] for name in ("backend", "frontend")
-                ]
-                + [wrong_image]
-            }
-            frontend = live_deployment("launchpad-test-client", "frontend", wrong_image)
-            with (
-                patch.dict(os.environ, environment),
-                patch("release.urllib.request.urlopen", side_effect=responses()),
-                self.assertRaisesRegex(ValueError, "live Deployment does not run"),
-            ):
-                promote(self.base, self.release["source_revision"])
-        frontend = live_deployment(
-            "launchpad-test-client", "frontend", self.images["frontend"]["image_ref"]
-        )
-        self.change("charts/launchpad/values.yaml")
-        status = application["status"]
-        assert isinstance(status, dict)
-        status["sync"]["revision"] = head()
-        status["operationState"]["syncResult"]["revision"] = head()
-        with patch.dict(os.environ, environment):
-            with patch(
-                "release.urllib.request.urlopen",
-                side_effect=responses(),
-            ):
-                with self.assertRaisesRegex(ValueError, "deployed chart"):
-                    promote(self.base, self.release["source_revision"])
-
-
-class RolloutTests(unittest.TestCase):
-    def application(self) -> dict[str, object]:
-        return argo_application("selected")
-
-    def test_rollout_requires_health_and_the_completed_revision(self) -> None:
-        self.assertEqual(verify_rollout(self.application()), "selected")
-        for section, key, value in (
-            ("health", "status", "Degraded"),
-            ("sync", "status", "OutOfSync"),
-            ("operationState", "phase", "Running"),
-        ):
-            application = self.application()
-            status = application["status"]
-            assert isinstance(status, dict)
-            status[section][key] = value
-            with self.assertRaises(ValueError):
-                verify_rollout(application)
-        application = self.application()
-        status = application["status"]
-        assert isinstance(status, dict)
-        status["operationState"]["syncResult"]["revision"] = "stale"
-        with self.assertRaises(ValueError):
-            verify_rollout(application)
-
-    def test_multisource_rollout_selects_the_chart_revision_and_checks_all_sources(
-        self,
-    ) -> None:
-        application = self.application()
-        application["spec"] = {
-            "sources": [
-                {
-                    "repoURL": "https://github.com/neuro-inc/app-types.git",
-                    "path": "charts/hook",
-                },
-                {
-                    "repoURL": "https://github.com/neuro-inc/launchpad.git",
-                    "path": "charts/launchpad",
-                },
-            ]
-        }
-        status = application["status"]
-        assert isinstance(status, dict)
-        status["sync"] = {
-            "status": "Synced",
-            "revisions": ["hook-revision", "chart-revision"],
-        }
-        status["operationState"] = {
-            "phase": "Succeeded",
-            "syncResult": {"revisions": ["hook-revision", "chart-revision"]},
-        }
-        self.assertEqual(verify_rollout(application), "chart-revision")
-        status["operationState"]["syncResult"]["revisions"][0] = "stale-hook-revision"
-        with self.assertRaises(ValueError):
-            verify_rollout(application)
-
-    def test_rollout_rejects_missing_or_ambiguous_chart_sources(self) -> None:
-        for sources in (
-            [],
-            [{"repoURL": "https://example.invalid", "path": "charts/launchpad"}],
-            [
-                {
-                    "repoURL": "https://github.com/neuro-inc/launchpad",
-                    "path": "charts/launchpad",
-                }
-            ]
-            * 2,
-        ):
-            application = self.application()
-            application["spec"] = {"sources": sources}
-            with self.assertRaises(ValueError):
-                verify_rollout(application)
-
-    def test_rollout_rejects_malformed_objects(self) -> None:
-        for path in (
-            ("status",),
-            ("status", "health"),
-            ("status", "sync"),
-            ("status", "operationState"),
-            ("status", "operationState", "syncResult"),
-        ):
-            invalid_values: tuple[object, ...] = (None, [], "invalid")
-            for value in invalid_values:
-                application = self.application()
-                parent: object = application
-                for key in path[:-1]:
-                    assert isinstance(parent, dict)
-                    parent = parent[key]
-                assert isinstance(parent, dict)
-                parent[path[-1]] = value
-                with self.assertRaises(ValueError):
-                    verify_rollout(application)
-
-    def test_runtime_resources_reject_missing_or_ambiguous_pairs(self) -> None:
-        application = self.application()
-        expected = runtime_resources(application)
-        self.assertEqual(expected[0]["name"], "launchpad-test")
-        self.assertEqual(expected[1]["name"], "launchpad-test-client")
-        self.assertEqual(expected[0]["app_namespace"], "argo")
-        status = application["status"]
-        assert isinstance(status, dict)
-        original = status["resources"]
-        assert isinstance(original, list)
-        for resources in (None, [], original[:1], original * 2, [None]):
-            status["resources"] = resources
-            with self.assertRaises(ValueError):
-                runtime_resources(application)
-
-    def test_live_deployment_requires_exact_image_and_completed_generation(
-        self,
-    ) -> None:
-        for resource, container in zip(
-            runtime_resources(self.application()),
-            ("launchpad", "frontend"),
-            strict=True,
-        ):
-            deployment = live_deployment(
-                resource["name"], container, "selected@sha256:digest"
-            )
-            verify_deployment(deployment, resource, container, "selected@sha256:digest")
-            with self.assertRaisesRegex(ValueError, "runtime image"):
-                verify_deployment(
-                    deployment, resource, container, "different@sha256:digest"
-                )
-            for section, key, value in (
-                ("metadata", "generation", 3),
-                ("metadata", "deletionTimestamp", "2026-01-01T00:00:00Z"),
-                ("metadata", "namespace", "wrong-project"),
-                ("metadata", "name", "historical-deployment"),
-                ("spec", "replicas", 0),
-                ("spec", "paused", True),
-                ("status", "observedGeneration", 1),
-                ("status", "replicas", 2),
-                ("status", "updatedReplicas", 0),
-                ("status", "readyReplicas", 0),
-                ("status", "availableReplicas", 0),
-                ("status", "unavailableReplicas", 1),
-                ("status", "observedGeneration", True),
-            ):
-                changed = copy.deepcopy(deployment)
-                parent = changed[section]
-                assert isinstance(parent, dict)
-                parent[key] = value
-                with self.assertRaises(ValueError):
-                    verify_deployment(
-                        changed, resource, container, "selected@sha256:digest"
-                    )
-            for section in ("metadata", "spec", "status"):
-                changed = copy.deepcopy(deployment)
-                changed[section] = []
-                with self.assertRaises(ValueError):
-                    verify_deployment(
-                        changed, resource, container, "selected@sha256:digest"
-                    )
 
 
 if __name__ == "__main__":

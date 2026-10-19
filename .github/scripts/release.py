@@ -5,14 +5,9 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import subprocess
-import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import TypedDict
-
-from rollout import runtime_resources, verify_deployment, verify_rollout
 
 
 REPOSITORIES = {
@@ -49,6 +44,7 @@ BUILD_PATHS = {
 COMMON_BUILD_PATHS = (
     ".github/workflows/ci.yaml",
     ".github/workflows/component-image.yml",
+    ".github/workflows/release.yml",
     ".github/scripts",
 )
 REVISION = r"[0-9a-f]{40}"
@@ -180,23 +176,6 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
 
 
-def verify_promotion(directory: Path, revision: str) -> Release:
-    release = verify_release(directory, revision)
-    evidence = fields(
-        json.loads((directory / "development-rollout.json").read_text()),
-        {"application", "revision", "release_sha256", "images"},
-    )
-    text(evidence["application"], r"[^\s]+")
-    text(evidence["revision"], r"[^\s]+")
-    checksum = hashlib.sha256((directory / "release.json").read_bytes()).hexdigest()
-    images = [release["images"][name]["image_ref"] for name in ("backend", "frontend")]
-    if evidence["release_sha256"] != checksum or evidence["images"] != images:
-        raise ValueError(
-            "The development rollout does not bind the complete App release."
-        )
-    return release
-
-
 def gh(*args: str) -> str:
     return command("gh", *args)
 
@@ -232,37 +211,12 @@ def download_release(directory: Path, run_id: str, name: str) -> bool:
     return True
 
 
-def prepare(directory: Path, force: bool, promotion_run_id: str = "") -> None:
+def prepare(directory: Path, force: bool) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     repository = os.environ["GITHUB_REPOSITORY"]
     if os.environ["GITHUB_REF_TYPE"] == "tag":
-        if os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch":
-            raise ValueError(
-                "Dispatch the version tag with an explicit promotion run ID."
-            )
-        text(os.environ.get("GITHUB_REF_NAME"), r"v[a-zA-Z0-9_.-]*")
-        if force:
-            raise ValueError(
-                "Production must reuse the promoted images without rebuilding."
-            )
-        run_id = text(promotion_run_id, r"[1-9][0-9]*")
-        gh(
-            "run",
-            "view",
-            run_id,
-            "--repo",
-            repository,
-            "--json",
-            "conclusion,workflowName,headBranch,event",
-            "--jq",
-            'if .conclusion == "success" and .workflowName == "Verify production App promotion" and .headBranch == "master" and .event == "workflow_dispatch" then . else error("Verified App promotion is required.") end',
-        )
-        if not download_release(directory, run_id, "launchpad-production-release"):
-            raise ValueError("The verified App promotion artifact is unavailable.")
-        verify_promotion(directory, head())
-    elif promotion_run_id:
-        raise ValueError("A promotion run ID is valid only for a version tag.")
-    elif not force:
+        raise ValueError("Use the Release workflow to publish a version tag.")
+    if not force:
         candidate = gh(
             "run",
             "list",
@@ -312,7 +266,7 @@ def select_image(
         if image["inputs_sha256"] == fingerprint(component, head(), dependencies):
             return image
     if os.environ.get("GITHUB_REF_TYPE") == "tag":
-        raise ValueError("Production must reuse the complete promoted App release.")
+        raise ValueError("Production must reuse the complete tested App release.")
     return None
 
 
@@ -321,64 +275,105 @@ def outputs(values: dict[str, str]) -> None:
         stream.write("".join(f"{key}={value}\n" for key, value in values.items()))
 
 
-def promote(directory: Path, expected_revision: str) -> None:
-    release = verify_release(directory)
-    if release["source_revision"] != text(expected_revision, REVISION):
-        raise ValueError("The release does not match its successful master CI run.")
-    server = os.environ["ARGOCD_SERVER"].rstrip("/")
-    if urllib.parse.urlparse(server).scheme != "https":
-        raise ValueError("ARGOCD_SERVER must use HTTPS.")
-    name = os.environ["DEV_LAUNCHPAD_ARGO_APPLICATION"]
-    base_url = f"{server}/api/v1/applications/{urllib.parse.quote(name, safe='')}"
-
-    def read_argo(suffix: str) -> object:
-        request = urllib.request.Request(
-            base_url + suffix,
-            headers={"Authorization": "Bearer " + os.environ["ARGOCD_AUTH_TOKEN"]},
-        )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return json.load(response)
-
-    application = read_argo("")
-    images = tuple(
-        release["images"][name]["image_ref"] for name in ("backend", "frontend")
+def registry_digest(reference: str, allow_missing: bool = False) -> str | None:
+    result = subprocess.run(
+        [
+            "docker",
+            "buildx",
+            "imagetools",
+            "inspect",
+            reference,
+            "--format",
+            "{{json .Manifest}}",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
     )
-    revision = verify_rollout(application)
+    if result.returncode:
+        if allow_missing and result.stderr.strip() == f"ERROR: {reference}: not found":
+            return None
+        raise RuntimeError(
+            f"The registry could not verify {reference}: {result.stderr.strip()}"
+        )
+    manifest: object = json.loads(result.stdout)
+    if not isinstance(manifest, dict):
+        raise ValueError("The registry must return an image manifest descriptor.")
+    return text(manifest.get("digest"), "sha256:" + SHA256)
+
+
+def publish(directory: Path, run_id: str, release_tag: str) -> None:
     if (
-        fingerprint("chart", text(revision, REVISION))
-        != release["chart"]["inputs_sha256"]
+        os.environ.get("GITHUB_EVENT_NAME") != "workflow_dispatch"
+        or os.environ.get("GITHUB_REF") != "refs/heads/master"
     ):
-        raise ValueError("The deployed chart does not match the selected App release.")
-    for resource, container, image in zip(
-        runtime_resources(application), ("launchpad", "frontend"), images, strict=True
-    ):
-        query = urllib.parse.urlencode(
-            {
-                "appNamespace": resource["app_namespace"],
-                "namespace": resource["namespace"],
-                "resourceName": resource["name"],
-                "version": "v1",
-                "kind": "Deployment",
-                "group": "apps",
-            }
+        raise ValueError(
+            "Dispatch the Release workflow from master after development acceptance."
         )
-        response = fields(read_argo("/resource?" + query), {"manifest"})
-        deployment = json.loads(text(response["manifest"], r"(?s).+"))
-        verify_deployment(deployment, resource, container, image)
-    write_json(
-        directory / "development-rollout.json",
-        {
-            "application": name,
-            "revision": revision,
-            "images": images,
-            "release_sha256": hashlib.sha256(
-                (directory / "release.json").read_bytes()
-            ).hexdigest(),
-        },
+    text(run_id, r"[1-9][0-9]*")
+    text(release_tag, r"v[a-zA-Z0-9_.-]{0,127}")
+    revision = text(
+        command("git", "rev-parse", "--verify", f"refs/tags/{release_tag}^{{commit}}"),
+        REVISION,
     )
+    run = fields(
+        json.loads(
+            gh(
+                "run",
+                "view",
+                run_id,
+                "--repo",
+                os.environ["GITHUB_REPOSITORY"],
+                "--json",
+                "conclusion,workflowName,headBranch,headSha,event",
+            )
+        ),
+        {"conclusion", "workflowName", "headBranch", "headSha", "event"},
+    )
+    if (run["conclusion"], run["workflowName"], run["headBranch"]) != (
+        "success",
+        "CI",
+        "master",
+    ) or run["event"] not in ("push", "workflow_dispatch"):
+        raise ValueError("The release requires a successful master CI run.")
+    source = text(run["headSha"], REVISION)
+    if not download_release(directory, run_id, "launchpad-release"):
+        raise ValueError("The selected App release artifact is unavailable.")
+    release = verify_release(directory)
+    if release["source_revision"] != source:
+        raise ValueError("The release does not match its successful master CI run.")
+    verify_release(directory, revision)
+    aliases: list[tuple[str, str, str, bool]] = []
+    for component, image in release["images"].items():
+        reference = image["image_ref"]
+        expected = reference.split("@", 1)[1]
+        if registry_digest(reference) != expected:
+            raise ValueError("The registry image does not match the tested digest.")
+        alias = REPOSITORIES[component] + ":" + release_tag
+        existing = registry_digest(alias, allow_missing=True)
+        if existing is not None and existing != expected:
+            raise ValueError(
+                f"The published version already selects a different image: {alias}."
+            )
+        aliases.append((alias, reference, expected, existing is None))
+    for alias, reference, expected, missing in aliases:
+        if missing:
+            command(
+                "docker",
+                "buildx",
+                "imagetools",
+                "create",
+                "--prefer-index=false",
+                "--tag",
+                alias,
+                reference,
+            )
+        if registry_digest(alias) != expected:
+            raise ValueError(f"The published alias changed the tested digest: {alias}.")
 
 
-def assemble(directory: Path, image_directory: Path, base: Path) -> None:
+def assemble(directory: Path, image_directory: Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     images = {
         name: load_image(
@@ -386,19 +381,6 @@ def assemble(directory: Path, image_directory: Path, base: Path) -> None:
         )
         for name in REPOSITORIES
     }
-    if os.environ.get("GITHUB_REF_TYPE") == "tag":
-        release = verify_promotion(base, head())
-        if release["images"] != images:
-            raise ValueError(
-                "Production image selection changed the promoted combination."
-            )
-        for name in (
-            "release.json",
-            "development-rollout.json",
-            release["chart"]["filename"],
-        ):
-            shutil.copy2(base / name, directory / name)
-        return
     subprocess.run(
         ["helm", "package", "charts/launchpad", "--destination", str(directory)],
         check=True,
@@ -472,29 +454,24 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "operation",
-        choices=("prepare", "select", "record", "assemble", "promote", "download"),
+        choices=("prepare", "select", "record", "assemble", "publish"),
     )
     parser.add_argument("directory", type=Path)
     parser.add_argument("--component", choices=tuple(REPOSITORIES))
     parser.add_argument("--digest", default="")
     parser.add_argument("--images", type=Path)
-    parser.add_argument("--base", type=Path)
-    parser.add_argument("--revision", default="")
     parser.add_argument("--run-id", default="")
-    parser.add_argument("--promotion-run-id", default="")
+    parser.add_argument("--release-tag", default="")
     args = parser.parse_args()
     force = os.environ.get("REBUILD_IMAGES") == "true"
     if args.operation == "prepare":
-        prepare(args.directory, force, args.promotion_run_id)
+        prepare(args.directory, force)
     elif args.operation == "assemble":
-        if args.images is None or args.base is None:
-            parser.error("Release assembly requires image records and a reuse base.")
-        assemble(args.directory, args.images, args.base)
-    elif args.operation == "download":
-        if not download_release(args.directory, args.run_id, "launchpad-release"):
-            raise ValueError("The selected App release artifact is unavailable.")
-    elif args.operation == "promote":
-        promote(args.directory, args.revision)
+        if args.images is None:
+            parser.error("Release assembly requires image records.")
+        assemble(args.directory, args.images)
+    elif args.operation == "publish":
+        publish(args.directory, args.run_id, args.release_tag)
     else:
         if args.component is None:
             parser.error("Component selection requires a component name.")

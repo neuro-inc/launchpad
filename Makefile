@@ -104,11 +104,3 @@ test-release:
 .PHONY: lint-release
 lint-release:
 	python3 -m mypy --strict --config-file=/dev/null .github/scripts
-
-.PHONY: setup-production-environment
-setup-production-environment:
-	unset ARGOCD_SERVER DEV_LAUNCHPAD_ARGO_APPLICATION; \
-	. ./.github/environments/production.env; \
-	: "$${ARGOCD_SERVER:?Set ARGOCD_SERVER in .github/environments/production.env}"; \
-	: "$${DEV_LAUNCHPAD_ARGO_APPLICATION:?Set DEV_LAUNCHPAD_ARGO_APPLICATION in .github/environments/production.env}"; \
-	gh variable set --repo neuro-inc/launchpad --env production --env-file .github/environments/production.env
