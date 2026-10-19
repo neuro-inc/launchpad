@@ -2,6 +2,10 @@
 
 A Next.js 16 web application for cloud-native application management. Provides a web interface for deploying, monitoring, and managing applications in a Kubernetes environment.
 
+Run the commands in this guide from `frontend/`.
+The repository root contains the Python backend, App processors, and Helm chart.
+Existing Netlify deployments continue to use `launchpad-web-ui` until a separate hosting migration changes their source.
+
 ## Tech Stack
 
 - **Next.js 16** with App Router
@@ -45,15 +49,26 @@ Add the local development callback URL to your Keycloak configuration:
 
 ### 3. Install Dependencies
 
-Use npm for dependency installation and local commands.
+Use Node.js 22 and npm for dependency installation and local commands.
+Set `FONTAWESOME_NPM_AUTH_TOKEN` through your secret manager before installing dependencies.
+The committed `.npmrc` reads this environment variable.
+The repository uses its root pre-commit configuration.
+Frontend dependency installation does not install Git hooks.
+
+Configure `FONTAWESOME_NPM_AUTH_TOKEN` separately in the Launchpad repository's Actions secrets and Dependabot registry secrets.
+Frontend CI runs linting and a production build on PRs, `master` pushes, release tags, and the daily schedule.
+Bot auto-merge waits for backend and frontend validation.
+Require the frontend check in branch protection before merging the monorepo setup.
+Fork PRs fail frontend validation before private dependency installation.
+A maintainer must copy fork changes to a branch in this repository and create a replacement PR.
 
 ```bash
-npm install
+npm ci
 ```
 
 ### 4. Environment Variables
 
-Create a `.env.local` file in the root directory with the following variables:
+Create a `.env.local` file in the `frontend/` directory with the following variables:
 
 ```bash
 # NextAuth Configuration
@@ -97,7 +112,7 @@ npm run start           # Start dev server with Turbopack
 npm run build         # Build production bundle
 
 # Production
-npm run start:prod         # Start production server
+npm run start:build         # Start production server
 
 # Linting
 npm run lint          # Run both TypeScript and ESLint checks

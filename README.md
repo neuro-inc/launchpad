@@ -4,6 +4,10 @@ Launchpad is a FastAPI-based application service that manages application deploy
 
 See the [documentation index](docs/README.md) for architecture and operations guides.
 
+The Python backend, Next.js frontend, App processors, and Helm chart share this repository.
+See the [frontend guide](frontend/README.md) for frontend setup and validation.
+Root Docker builds exclude `frontend/` from their build context.
+
 ## Table of Contents
 
 - [API Usage](#api-usage)

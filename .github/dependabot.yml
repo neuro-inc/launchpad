@@ -1,4 +1,9 @@
 version: 2
+registries:
+  fontawesome:
+    type: npm-registry
+    url: https://npm.fontawesome.com
+    token: ${{secrets.FONTAWESOME_NPM_AUTH_TOKEN}}
 updates:
 - package-ecosystem: pip
   allow:
@@ -14,4 +19,11 @@ updates:
   schedule:
     interval: daily
     time: "03:00"
+  open-pull-requests-limit: 10
+- package-ecosystem: npm
+  directory: /frontend
+  schedule:
+    interval: weekly
+  registries:
+    - fontawesome
   open-pull-requests-limit: 10
