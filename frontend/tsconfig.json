@@ -1,0 +1,107 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@actions/*": [
+        "./src/actions/*"
+      ],
+      "@components": [
+        "./src/components"
+      ],
+      "@components/*": [
+        "./src/components/*"
+      ],
+      "@constants": [
+        "./src/constants"
+      ],
+      "@constants/*": [
+        "./src/constants/*"
+      ],
+      "@content": [
+        "./src/content"
+      ],
+      "@content/*": [
+        "./src/content/*"
+      ],
+      "@features": [
+        "./src/features"
+      ],
+      "@features/*": [
+        "./src/features/*"
+      ],
+      "@hooks/*": [
+        "./src/hooks/*"
+      ],
+      "@images": [
+        "./src/images"
+      ],
+      "@images/*": [
+        "./src/images/*"
+      ],
+      "@layouts": [
+        "./src/layouts"
+      ],
+      "@layouts/*": [
+        "./src/layouts/*"
+      ],
+      "@providers/*": [
+        "./src/providers/*"
+      ],
+      "@selectors/*": [
+        "./src/redux/selectors/*"
+      ],
+      "@services/*": [
+        "./src/services/*"
+      ],
+      "@slices/*": [
+        "./src/redux/slices/*"
+      ],
+      "@store": [
+        "./src/redux/store"
+      ],
+      "@styles/*": [
+        "./src/styles/*"
+      ],
+      "@typings": [
+        "./src/types"
+      ],
+      "@utils": [
+        "./src/utils"
+      ],
+      "@utils/*": [
+        "./src/utils/*"
+      ]
+    }
+  },
+  "include": [
+    "src/dev-types/**/*.d.ts",
+    "src",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "next.config.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

@@ -1,0 +1,37 @@
+.Toastify {
+  flex: 0 1 auto;
+}
+.Toastify__toast-container {
+  max-width: 360px;
+  width: 100%;
+}
+.Toastify__toast {
+  padding: 16px 32px 16px 16px;
+  font-size: 16px;
+  line-height: 24px;
+  border-radius: 8px;
+}
+.Toastify__toast--success {
+  border-bottom: 4px solid #42ba94;
+}
+.Toastify__toast--warning {
+  border-bottom: 4px solid #ffcc00;
+}
+.Toastify__toast--error {
+  border-bottom: 4px solid #eb404e;
+}
+.Toastify__toast--info {
+  border-bottom: 4px solid #ffffff;
+}
+.Toastify__toast-body {
+  padding: 0;
+}
+.Toastify .close-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 20px;
+}
+.Toastify .type-icon {
+  font-size: 24px;
+}
