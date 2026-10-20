@@ -1,4 +1,4 @@
-"""Verify component reuse and assemble one immutable Launchpad release."""
+"""Assemble and publish one immutable Launchpad App release."""
 
 import argparse
 import hashlib
@@ -15,57 +15,19 @@ REPOSITORIES = {
     "frontend": "ghcr.io/neuro-inc/launchpad-web-ui",
     "hook": "ghcr.io/neuro-inc/launchpad-hook",
 }
-BUILD_PATHS = {
-    "backend": (
-        "Dockerfile",
-        ".dockerignore",
-        "poetry.lock",
-        "pyproject.toml",
-        "Makefile",
-        "README.md",
-        ".apolo",
-        "launchpad",
-        "alembic.ini",
-        "alembic",
-        "scripts",
-    ),
-    "frontend": ("frontend",),
-    "hook": (
-        "hooks/hooks.Dockerfile",
-        "hooks/poetry.lock",
-        "hooks/pyproject.toml",
-        ".apolo",
-        "README.md",
-        ".dockerignore",
-        "Makefile",
-    ),
-    "chart": ("charts/launchpad", ".apolo/applications.yaml"),
-}
-COMMON_BUILD_PATHS = (
-    ".github/workflows/ci.yaml",
-    ".github/workflows/component-image.yml",
-    ".github/scripts/release.py",
-)
 REVISION = r"[0-9a-f]{40}"
 SHA256 = r"[0-9a-f]{64}"
-
-
-class Image(TypedDict):
-    image_ref: str
-    source_revision: str
-    inputs_sha256: str
 
 
 class Chart(TypedDict):
     filename: str
     sha256: str
-    inputs_sha256: str
 
 
 class Release(TypedDict):
     schema_version: int
     source_revision: str
-    images: dict[str, Image]
+    images: dict[str, str]
     chart: Chart
 
 
@@ -89,90 +51,39 @@ def head() -> str:
     return text(command("git", "rev-parse", "HEAD"), REVISION)
 
 
-def fingerprint(
-    component: str, revision: str, dependencies: tuple[str, ...] = ()
-) -> str:
-    text(revision, REVISION)
-    records = subprocess.check_output(
-        [
-            "git",
-            "ls-tree",
-            "-r",
-            "-z",
-            revision,
-            "--",
-            *BUILD_PATHS[component],
-            *COMMON_BUILD_PATHS,
-        ],
-        timeout=60,
-    )
-    identity = json.dumps([component, dependencies], separators=(",", ":")).encode()
-    return hashlib.sha256(identity + b"\0" + records).hexdigest()
-
-
-def load_image(value: object, component: str) -> Image:
-    record = fields(value, {"image_ref", "source_revision", "inputs_sha256"})
-    return {
-        "image_ref": text(
-            record["image_ref"],
-            re.escape(REPOSITORIES[component]) + "@sha256:" + SHA256,
-        ),
-        "source_revision": text(record["source_revision"], REVISION),
-        "inputs_sha256": text(record["inputs_sha256"], SHA256),
-    }
-
-
 def load_release(directory: Path) -> Release:
     value = fields(
         json.loads((directory / "release.json").read_text()),
         {"schema_version", "source_revision", "images", "chart"},
     )
-    if type(value["schema_version"]) is not int or value["schema_version"] != 1:
+    if type(value["schema_version"]) is not int or value["schema_version"] != 2:
         raise ValueError("The App release schema version is unsupported.")
     images = fields(value["images"], set(REPOSITORIES))
-    chart = fields(value["chart"], {"filename", "sha256", "inputs_sha256"})
+    chart = fields(value["chart"], {"filename", "sha256"})
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "source_revision": text(value["source_revision"], REVISION),
-        "images": {name: load_image(record, name) for name, record in images.items()},
+        "images": {
+            name: text(images[name], re.escape(repository) + "@sha256:" + SHA256)
+            for name, repository in REPOSITORIES.items()
+        },
         "chart": {
             "filename": text(chart["filename"], r"launchpad-[a-zA-Z0-9.+-]+\.tgz"),
             "sha256": text(chart["sha256"], SHA256),
-            "inputs_sha256": text(chart["inputs_sha256"], SHA256),
         },
     }
 
 
-def hook_dependencies(images: dict[str, Image]) -> tuple[str, ...]:
-    return tuple(images[name]["image_ref"] for name in ("backend", "frontend"))
-
-
-def verify_release(directory: Path, revision: str | None = None) -> Release:
+def verify_release(directory: Path, revision: str) -> Release:
     release = load_release(directory)
-    revisions = {release["source_revision"]}
-    if revision is not None:
-        revisions.add(revision)
-    for component, image in release["images"].items():
-        dependencies = (
-            hook_dependencies(release["images"]) if component == "hook" else ()
-        )
-        if any(
-            fingerprint(component, source, dependencies) != image["inputs_sha256"]
-            for source in revisions | {image["source_revision"]}
-        ):
-            raise ValueError(
-                f"The {component} image does not match the selected build inputs."
-            )
+    if release["source_revision"] != text(revision, REVISION):
+        raise ValueError("The release does not match the tested source commit.")
     chart = release["chart"]
     archive = directory / chart["filename"]
     if hashlib.sha256(archive.read_bytes()).hexdigest() != chart["sha256"]:
         raise ValueError(
             "The chart archive checksum does not match the tested release."
         )
-    if any(
-        fingerprint("chart", source) != chart["inputs_sha256"] for source in revisions
-    ):
-        raise ValueError("The chart does not match the selected release inputs.")
     return release
 
 
@@ -213,79 +124,6 @@ def download_release(directory: Path, run_id: str) -> bool:
         str(directory),
     )
     return True
-
-
-def find_successful_master_ci(revision: str | None = None) -> tuple[str, str] | None:
-    commit_args = ("--commit", text(revision, REVISION)) if revision is not None else ()
-    candidate = gh(
-        "run",
-        "list",
-        "--repo",
-        os.environ["GITHUB_REPOSITORY"],
-        "--workflow",
-        "ci.yaml",
-        "--branch",
-        "master",
-        *commit_args,
-        "--status",
-        "success",
-        "--limit",
-        "20",
-        "--json",
-        "databaseId,headSha,event",
-        "--jq",
-        '[.[] | select(.event == "push" or .event == "workflow_dispatch")] | first // empty',
-    )
-    if not candidate:
-        return None
-    run = fields(json.loads(candidate), {"databaseId", "headSha", "event"})
-    source = text(run["headSha"], REVISION)
-    run_id = text(str(run["databaseId"]), r"[1-9][0-9]*")
-    text(run["event"], r"push|workflow_dispatch")
-    if revision is not None and source != revision:
-        raise ValueError("The selected CI run does not match the requested commit.")
-    return run_id, source
-
-
-def prepare(directory: Path, force: bool) -> None:
-    directory.mkdir(parents=True, exist_ok=True)
-    if os.environ["GITHUB_REF_TYPE"] == "tag":
-        raise ValueError("Use the Release workflow to publish a version tag.")
-    if not force:
-        candidate = find_successful_master_ci()
-        if candidate:
-            run_id, source = candidate
-            ancestor = subprocess.run(
-                ["git", "merge-base", "--is-ancestor", source, "HEAD"], check=False
-            ).returncode
-            if ancestor not in (0, 1):
-                raise ValueError("The reuse source commit is unavailable locally.")
-            if ancestor == 0 and download_release(directory, run_id):
-                release = verify_release(directory)
-                if release["source_revision"] != source:
-                    raise ValueError(
-                        "The reuse artifact does not match its successful master run."
-                    )
-    if not (directory / "release.json").exists():
-        (directory / "empty.txt").write_text("No reusable release is available.\n")
-
-
-def select_image(
-    component: str, directory: Path, dependencies: tuple[str, ...], force: bool
-) -> Image | None:
-    if not force and (directory / "release.json").exists():
-        release = verify_release(directory)
-        image = release["images"][component]
-        if image["inputs_sha256"] == fingerprint(component, head(), dependencies):
-            return image
-    if os.environ.get("GITHUB_REF_TYPE") == "tag":
-        raise ValueError("Production must reuse the complete tested App release.")
-    return None
-
-
-def outputs(values: dict[str, str]) -> None:
-    with Path(os.environ["GITHUB_OUTPUT"]).open("a") as stream:
-        stream.write("".join(f"{key}={value}\n" for key, value in values.items()))
 
 
 def registry_digest(reference: str, allow_missing: bool = False) -> str | None:
@@ -330,12 +168,30 @@ def publish(directory: Path, run_id: str, release_tag: str) -> None:
     )
     automatic = tagged
     if automatic:
-        candidate = find_successful_master_ci(revision)
-        if candidate is None:
+        run_id = gh(
+            "run",
+            "list",
+            "--repo",
+            os.environ["GITHUB_REPOSITORY"],
+            "--workflow",
+            "ci.yaml",
+            "--branch",
+            "master",
+            "--commit",
+            revision,
+            "--status",
+            "success",
+            "--limit",
+            "20",
+            "--json",
+            "databaseId,event",
+            "--jq",
+            '[.[] | select(.event == "push" or .event == "workflow_dispatch")] | first | .databaseId // empty',
+        )
+        if not run_id:
             raise ValueError(
                 "Wait for successful master CI for the tagged commit, then rerun Release."
             )
-        run_id, _ = candidate
     text(run_id, r"[1-9][0-9]*")
     run = fields(
         json.loads(
@@ -358,15 +214,11 @@ def publish(directory: Path, run_id: str, release_tag: str) -> None:
     ) or run["event"] not in ("push", "workflow_dispatch"):
         raise ValueError("The release requires a successful master CI run.")
     source = text(run["headSha"], REVISION)
-    if automatic and source != revision:
-        raise ValueError(
-            "Automatic publication requires CI for the exact tagged commit."
-        )
+    if source != revision:
+        raise ValueError("Publication requires CI for the exact tagged commit.")
     if not download_release(directory, run_id):
         raise ValueError("The selected App release artifact is unavailable.")
-    release = verify_release(directory, revision)
-    if release["source_revision"] != source:
-        raise ValueError("The release does not match its successful master CI run.")
+    release = verify_release(directory, source)
     publish_aliases(release, release_tag)
 
 
@@ -378,8 +230,6 @@ def publish_development(directory: Path) -> None:
         raise ValueError("Development publication requires a master CI run.")
     source = head()
     release = verify_release(directory, source)
-    if release["source_revision"] != source:
-        raise ValueError("The development release must identify the current commit.")
     current = text(
         gh(
             "api",
@@ -397,8 +247,7 @@ def publish_development(directory: Path) -> None:
 def publish_aliases(release: Release, tag: str, *, replace: bool = False) -> None:
     aliases: list[tuple[str, str, str, bool]] = []
     for component in REPOSITORIES:
-        image = release["images"][component]
-        reference = image["image_ref"]
+        reference = release["images"][component]
         expected = reference.split("@", 1)[1]
         if registry_digest(reference) != expected:
             raise ValueError("The registry image does not match the tested digest.")
@@ -425,14 +274,8 @@ def publish_aliases(release: Release, tag: str, *, replace: bool = False) -> Non
             raise ValueError(f"The published alias changed the tested digest: {alias}.")
 
 
-def assemble(directory: Path, image_directory: Path) -> None:
+def assemble(directory: Path, images: dict[str, str]) -> None:
     directory.mkdir(parents=True, exist_ok=True)
-    images = {
-        name: load_image(
-            json.loads((image_directory / f"{name}.json").read_text()), name
-        )
-        for name in REPOSITORIES
-    }
     subprocess.run(
         ["helm", "package", "charts/launchpad", "--destination", str(directory)],
         check=True,
@@ -441,115 +284,37 @@ def assemble(directory: Path, image_directory: Path) -> None:
     archives = list(directory.glob("launchpad-*.tgz"))
     if len(archives) != 1:
         raise ValueError("One packaged Launchpad chart is required.")
-    release = {
-        "schema_version": 1,
+    release: Release = {
+        "schema_version": 2,
         "source_revision": head(),
         "images": images,
         "chart": {
             "filename": archives[0].name,
             "sha256": hashlib.sha256(archives[0].read_bytes()).hexdigest(),
-            "inputs_sha256": fingerprint("chart", head()),
         },
     }
     write_json(directory / "release.json", release)
-    verify_release(directory)
-
-
-def select_component(
-    component: str, directory: Path, dependencies: tuple[str, ...], force: bool
-) -> dict[str, str]:
-    image = select_image(component, directory, dependencies, force)
-    tag = head()
-    if component != "frontend" and os.environ["GITHUB_EVENT_NAME"] == "pull_request":
-        tag = re.sub(r"[^a-z0-9_.-]", "-", os.environ["PR_BRANCH"].lower())
-    return {
-        "build": str(image is None).lower(),
-        "image_ref": image["image_ref"] if image else "",
-        "tag": REPOSITORIES[component] + ":" + tag,
-        "inputs_sha256": fingerprint(component, head(), dependencies),
-        "context": "frontend" if component == "frontend" else ".",
-        "dockerfile": {
-            "backend": "Dockerfile",
-            "frontend": "frontend/Dockerfile",
-            "hook": "hooks/hooks.Dockerfile",
-        }[component],
-    }
-
-
-def record_component(
-    component: str,
-    directory: Path,
-    dependencies: tuple[str, ...],
-    force: bool,
-    digest: str,
-) -> Image:
-    if digest:
-        if os.environ.get("GITHUB_REF_TYPE") == "tag":
-            raise ValueError("Production must reuse the complete tested App release.")
-        image: Image | None = {
-            "image_ref": REPOSITORIES[component]
-            + "@"
-            + text(digest, "sha256:" + SHA256),
-            "source_revision": head(),
-            "inputs_sha256": fingerprint(component, head(), dependencies),
-        }
-    else:
-        image = select_image(component, directory, dependencies, force)
-    if image is None:
-        raise ValueError("A successful build or verified reusable image is required.")
-    write_json(Path(f"{component}.json"), image)
-    return image
+    verify_release(directory, head())
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "operation",
-        choices=(
-            "prepare",
-            "select",
-            "record",
-            "assemble",
-            "publish",
-            "publish-development",
-        ),
+        "operation", choices=("assemble", "publish", "publish-development")
     )
     parser.add_argument("directory", type=Path)
-    parser.add_argument("--component", choices=tuple(REPOSITORIES))
-    parser.add_argument("--digest", default="")
-    parser.add_argument("--images", type=Path)
     parser.add_argument("--run-id", default="")
     parser.add_argument("--release-tag", default="")
     args = parser.parse_args()
-    force = os.environ.get("REBUILD_IMAGES") == "true"
-    if args.operation == "prepare":
-        prepare(args.directory, force)
-    elif args.operation == "assemble":
-        if args.images is None:
-            parser.error("Release assembly requires image records.")
-        assemble(args.directory, args.images)
+    if args.operation == "assemble":
+        assemble(
+            args.directory,
+            {name: os.environ[name.upper() + "_REF"] for name in REPOSITORIES},
+        )
     elif args.operation == "publish-development":
         publish_development(args.directory)
-    elif args.operation == "publish":
-        publish(args.directory, args.run_id, args.release_tag)
     else:
-        if args.component is None:
-            parser.error("Component selection requires a component name.")
-        component: str = args.component
-        dependencies: tuple[str, ...] = ()
-        if component == "hook":
-            dependencies = tuple(
-                os.environ[key] for key in ("BACKEND_REF", "FRONTEND_REF")
-            )
-            for name, value in zip(("backend", "frontend"), dependencies, strict=True):
-                text(value, re.escape(REPOSITORIES[name]) + "@sha256:" + SHA256)
-        if args.operation == "select":
-            outputs(select_component(component, args.directory, dependencies, force))
-        else:
-            image = record_component(
-                component, args.directory, dependencies, force, args.digest
-            )
-            outputs({"image_ref": image["image_ref"]})
+        publish(args.directory, args.run_id, args.release_tag)
 
 
 if __name__ == "__main__":

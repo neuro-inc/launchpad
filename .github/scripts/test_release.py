@@ -1,4 +1,4 @@
-"""Test component provenance, release assembly, and version publication."""
+"""Test complete App release assembly and publication without rebuilding."""
 
 import copy
 import hashlib
@@ -13,23 +13,15 @@ from unittest.mock import patch
 
 from release import (
     REPOSITORIES,
-    Image,
     Release,
     assemble,
     command,
     download_release,
-    find_successful_master_ci,
-    fingerprint,
     head,
-    hook_dependencies,
     load_release,
-    prepare,
     publish,
     publish_development,
-    record_component,
     registry_digest,
-    select_component,
-    select_image,
     verify_release,
     write_json,
 )
@@ -79,24 +71,19 @@ class ReleaseTests(unittest.TestCase):
         self.commit()
         self.base = self.root / "release-base"
         self.base.mkdir()
-        self.images: dict[str, Image] = {}
-        for index, name in enumerate(REPOSITORIES):
-            dependencies = hook_dependencies(self.images) if name == "hook" else ()
-            self.images[name] = {
-                "image_ref": REPOSITORIES[name] + "@sha256:" + str(index + 1) * 64,
-                "source_revision": head(),
-                "inputs_sha256": fingerprint(name, head(), dependencies),
-            }
+        self.images = {
+            name: repository + "@sha256:" + str(index + 1) * 64
+            for index, (name, repository) in enumerate(REPOSITORIES.items())
+        }
         archive = self.base / "launchpad-1.0.0.tgz"
         archive.write_bytes(b"chart archive")
         self.release: Release = {
-            "schema_version": 1,
+            "schema_version": 2,
             "source_revision": head(),
             "images": self.images,
             "chart": {
                 "filename": archive.name,
                 "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
-                "inputs_sha256": fingerprint("chart", head()),
             },
         }
         write_json(self.base / "release.json", self.release)
@@ -112,260 +99,12 @@ class ReleaseTests(unittest.TestCase):
 
     def change(self, path: str) -> None:
         (self.root / path).write_text("changed\n")
-        # Release artifacts are outside the tracked build input paths.
         self.commit()
-
-    def test_unchanged_components_reuse_verified_digests(self) -> None:
-        verify_release(self.base)
-        for component in REPOSITORIES:
-            dependencies = hook_dependencies(self.images) if component == "hook" else ()
-            self.assertEqual(
-                select_image(component, self.base, dependencies, False),
-                self.images[component],
-            )
-
-    def test_component_selection_preserves_publication_tags(self) -> None:
-        cases = (
-            ("backend", "pull_request", "branch", "feature", "feature-it-281-new"),
-            ("backend", "push", "branch", "master", head()),
-            ("hook", "push", "branch", "master", head()),
-            ("frontend", "pull_request", "branch", "feature", head()),
-        )
-        for component, event, ref_type, ref_name, expected_tag in cases:
-            with self.subTest(component=component, event=event, ref_type=ref_type):
-                with patch.dict(
-                    os.environ,
-                    {
-                        "GITHUB_EVENT_NAME": event,
-                        "GITHUB_REF_TYPE": ref_type,
-                        "GITHUB_REF_NAME": ref_name,
-                        "PR_BRANCH": "Feature/IT-281 New",
-                    },
-                ):
-                    dependencies = (
-                        hook_dependencies(self.images) if component == "hook" else ()
-                    )
-                    selection = select_component(
-                        component, self.base, dependencies, False
-                    )
-                self.assertEqual(selection["build"], "false")
-                self.assertEqual(
-                    selection["tag"], REPOSITORIES[component] + ":" + expected_tag
-                )
-                self.assertEqual(
-                    selection["image_ref"], self.images[component]["image_ref"]
-                )
-
-    def test_component_selection_identifies_a_required_frontend_build(self) -> None:
-        self.change("frontend/src/app.ts")
-        with patch.dict(
-            os.environ, {"GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "master"}
-        ):
-            selection = select_component("frontend", self.base, (), False)
-        self.assertEqual(selection["build"], "true")
-        self.assertEqual(selection["image_ref"], "")
-        self.assertEqual(selection["context"], "frontend")
-        self.assertEqual(selection["dockerfile"], "frontend/Dockerfile")
-        self.assertEqual(selection["inputs_sha256"], fingerprint("frontend", head()))
-
-    def test_component_record_preserves_the_reused_source_identity(self) -> None:
-        self.change("frontend/src/app.ts")
-        with patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}):
-            image = record_component("backend", self.base, (), False, "")
-        self.assertEqual(image, self.images["backend"])
-        self.assertNotEqual(image["source_revision"], head())
-        self.assertEqual(json.loads(Path("backend.json").read_text()), image)
-
-    def test_component_record_binds_a_new_build_to_its_source(self) -> None:
-        self.change("launchpad/app.py")
-        with patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}):
-            image = record_component(
-                "backend", self.base, (), True, "sha256:" + "a" * 64
-            )
-        self.assertEqual(
-            image["image_ref"], REPOSITORIES["backend"] + "@sha256:" + "a" * 64
-        )
-        self.assertEqual(image["source_revision"], head())
-        self.assertEqual(image["inputs_sha256"], fingerprint("backend", head()))
-        self.assertEqual(json.loads(Path("backend.json").read_text()), image)
-
-    def test_fresh_component_record_does_not_inspect_the_unused_reuse_base(
-        self,
-    ) -> None:
-        (self.base / "release.json").write_text("invalid unused baseline")
-        image = record_component("backend", self.base, (), False, "sha256:" + "a" * 64)
-        self.assertEqual(image["source_revision"], head())
-        self.assertEqual(image["inputs_sha256"], fingerprint("backend", head()))
-        with self.assertRaises(json.JSONDecodeError):
-            record_component("backend", self.base, (), False, "")
-
-    def test_promotion_and_release_test_changes_preserve_image_reuse(self) -> None:
-        for name in (
-            ".github/workflows/release.yml",
-            ".github/scripts/test_release.py",
-        ):
-            with self.subTest(path=name):
-                path = self.root / name
-                path.parent.mkdir(parents=True, exist_ok=True)
-                self.change(name)
-                for component in REPOSITORIES:
-                    dependencies = (
-                        hook_dependencies(self.images) if component == "hook" else ()
-                    )
-                    self.assertEqual(
-                        select_image(component, self.base, dependencies, False),
-                        self.images[component],
-                    )
-
-    def test_build_recipe_and_provenance_changes_require_new_images(self) -> None:
-        for name in (
-            ".github/workflows/ci.yaml",
-            ".github/workflows/component-image.yml",
-            ".github/scripts/release.py",
-        ):
-            with self.subTest(path=name):
-                path = self.root / name
-                path.parent.mkdir(parents=True, exist_ok=True)
-                original = path.read_text() if path.exists() else None
-                self.change(name)
-                for component in REPOSITORIES:
-                    dependencies = (
-                        hook_dependencies(self.images) if component == "hook" else ()
-                    )
-                    self.assertIsNone(
-                        select_image(component, self.base, dependencies, False)
-                    )
-                if original is None:
-                    path.unlink()
-                else:
-                    path.write_text(original)
-                self.commit()
-
-    def test_fresh_component_record_rejects_tag_builds(self) -> None:
-        with (
-            patch.dict(os.environ, {"GITHUB_REF_TYPE": "tag"}),
-            self.assertRaisesRegex(ValueError, "complete tested App release"),
-        ):
-            record_component("backend", self.base, (), False, "sha256:" + "a" * 64)
-        self.assertFalse(Path("backend.json").exists())
-
-    def test_component_record_requires_a_build_digest_or_verified_reuse(self) -> None:
-        for digest in ("", "latest", "sha256:invalid"):
-            with self.subTest(digest=digest):
-                with (
-                    patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}),
-                    self.assertRaises(ValueError),
-                ):
-                    record_component("backend", self.base, (), True, digest)
-                self.assertFalse(Path("backend.json").exists())
-
-    def test_backend_change_preserves_frontend_reuse(self) -> None:
-        self.change("launchpad/app.py")
-        self.assertIsNone(select_image("backend", self.base, (), False))
-        self.assertEqual(
-            select_image("frontend", self.base, (), False), self.images["frontend"]
-        )
-
-    def test_frontend_change_preserves_backend_reuse(self) -> None:
-        self.change("frontend/src/app.ts")
-        self.assertIsNone(select_image("frontend", self.base, (), False))
-        self.assertEqual(
-            select_image("backend", self.base, (), False), self.images["backend"]
-        )
-
-    def test_hook_change_preserves_both_runtime_images(self) -> None:
-        self.change("hooks/hooks.Dockerfile")
-        for name in ("backend", "frontend"):
-            self.assertEqual(
-                select_image(name, self.base, (), False), self.images[name]
-            )
-        self.assertIsNone(
-            select_image("hook", self.base, hook_dependencies(self.images), False)
-        )
-
-    def test_changed_runtime_digest_invalidates_hook(self) -> None:
-        dependencies = (
-            REPOSITORIES["backend"] + "@sha256:" + "a" * 64,
-            self.images["frontend"]["image_ref"],
-        )
-        self.assertIsNone(select_image("hook", self.base, dependencies, False))
-
-    def test_force_rebuild_does_not_reuse_images(self) -> None:
-        for component in REPOSITORIES:
-            dependencies = hook_dependencies(self.images) if component == "hook" else ()
-            self.assertIsNone(select_image(component, self.base, dependencies, True))
-
-    def test_tag_component_selection_never_requests_a_rebuild(self) -> None:
-        with patch.dict(os.environ, {"GITHUB_REF_TYPE": "tag"}):
-            for component in REPOSITORIES:
-                dependencies = (
-                    hook_dependencies(self.images) if component == "hook" else ()
-                )
-                with (
-                    self.subTest(component=component),
-                    self.assertRaisesRegex(ValueError, "complete tested App release"),
-                ):
-                    select_component(component, self.base, dependencies, True)
-
-    def test_reuse_rejects_forged_source_fingerprint(self) -> None:
-        release = copy.deepcopy(self.release)
-        release["images"]["backend"]["inputs_sha256"] = "f" * 64
-        write_json(self.base / "release.json", release)
-        with self.assertRaisesRegex(ValueError, "backend image"):
-            select_image("frontend", self.base, (), False)
-
-    def test_reuse_rejects_mutable_or_wrong_repository_images(self) -> None:
-        for image_ref in (
-            REPOSITORIES["frontend"] + ":master",
-            REPOSITORIES["backend"] + "@sha256:" + "a" * 64,
-        ):
-            release = copy.deepcopy(self.release)
-            release["images"]["frontend"]["image_ref"] = image_ref
-            write_json(self.base / "release.json", release)
-            with self.assertRaises(ValueError):
-                load_release(self.base)
-
-    def test_chart_change_reuses_images_but_rejects_old_release(self) -> None:
-        self.change("charts/launchpad/values.yaml")
-        for component in REPOSITORIES:
-            dependencies = hook_dependencies(self.images) if component == "hook" else ()
-            self.assertEqual(
-                select_image(component, self.base, dependencies, False),
-                self.images[component],
-            )
-        with self.assertRaisesRegex(ValueError, "chart"):
-            verify_release(self.base, head())
-
-    def test_release_allows_new_commit_with_identical_build_inputs(self) -> None:
-        (self.root / "notes.txt").write_text("documentation only\n")
-        self.commit()
-        self.assertNotEqual(head(), self.release["source_revision"])
-        self.assertEqual(verify_release(self.base, head()), self.release)
-
-    def test_release_rejects_changed_component_inputs(self) -> None:
-        self.change("frontend/src/app.ts")
-        with self.assertRaisesRegex(ValueError, "frontend image"):
-            verify_release(self.base, head())
-
-    def test_target_cannot_hide_incompatible_recorded_source(self) -> None:
-        original = self.release["source_revision"]
-        for path, message in (
-            ("frontend/src/app.ts", "frontend image"),
-            ("charts/launchpad/values.yaml", "chart"),
-        ):
-            with self.subTest(path=path):
-                self.change(path)
-                release = copy.deepcopy(self.release)
-                release["source_revision"] = head()
-                write_json(self.base / "release.json", release)
-                with self.assertRaisesRegex(ValueError, message):
-                    verify_release(self.base, original)
-                self.git("checkout", original, "--", path)
 
     def test_chart_checksum_and_path_are_validated(self) -> None:
         (self.base / "launchpad-1.0.0.tgz").write_bytes(b"tampered archive")
         with self.assertRaisesRegex(ValueError, "checksum"):
-            verify_release(self.base)
+            verify_release(self.base, self.release["source_revision"])
         release = copy.deepcopy(self.release)
         release["chart"]["filename"] = "../launchpad-1.0.0.tgz"
         write_json(self.base / "release.json", release)
@@ -382,8 +121,7 @@ class ReleaseTests(unittest.TestCase):
             "event": "push",
         }
         self.registry = {
-            image["image_ref"]: image["image_ref"].split("@", 1)[1]
-            for image in self.images.values()
+            image: image.split("@", 1)[1] for image in self.images.values()
         }
         self.registry_writes: list[tuple[str, ...]] = []
 
@@ -445,29 +183,27 @@ class ReleaseTests(unittest.TestCase):
         for component, image in self.images.items():
             self.assertEqual(
                 self.registry[REPOSITORIES[component] + ":v1.2.3"],
-                image["image_ref"].split("@", 1)[1],
+                image.split("@", 1)[1],
             )
 
     def test_publication_retry_accepts_only_matching_existing_aliases(self) -> None:
         self.mock_publication()
         for component, image in self.images.items():
-            self.registry[REPOSITORIES[component] + ":v1.2.3"] = image[
-                "image_ref"
-            ].split("@", 1)[1]
+            self.registry[REPOSITORIES[component] + ":v1.2.3"] = image.split("@", 1)[1]
         publish(self.root / "publication", "42", "v1.2.3")
         self.assertEqual(self.registry_writes, [])
 
     def test_publication_retry_completes_matching_partial_publication(self) -> None:
         self.mock_publication()
-        self.registry[REPOSITORIES["backend"] + ":v1.2.3"] = self.images["backend"][
-            "image_ref"
+        self.registry[REPOSITORIES["backend"] + ":v1.2.3"] = self.images[
+            "backend"
         ].split("@", 1)[1]
         publish(self.root / "publication", "42", "v1.2.3")
         self.assertEqual(len(self.registry_writes), 2)
         for component, image in self.images.items():
             self.assertEqual(
                 self.registry[REPOSITORIES[component] + ":v1.2.3"],
-                image["image_ref"].split("@", 1)[1],
+                image.split("@", 1)[1],
             )
 
     def test_publication_rejects_an_existing_conflict_before_any_write(self) -> None:
@@ -479,7 +215,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_publication_rejects_a_missing_source_before_any_write(self) -> None:
         self.mock_publication()
-        del self.registry[self.images["hook"]["image_ref"]]
+        del self.registry[self.images["hook"]]
         with self.assertRaisesRegex(ValueError, "tested digest"):
             publish(self.root / "publication", "42", "v1.2.3")
         self.assertEqual(self.registry_writes, [])
@@ -505,17 +241,9 @@ class ReleaseTests(unittest.TestCase):
         self.mock_publication()
         self.change("frontend/src/app.ts")
         self.git("-c", "tag.gpgsign=false", "tag", "v1.2.4")
-        with self.assertRaisesRegex(ValueError, "frontend image"):
+        with self.assertRaisesRegex(ValueError, "exact tagged commit"):
             publish(self.root / "publication", "42", "v1.2.4")
         self.assertEqual(self.registry_writes, [])
-
-    def test_publication_allows_a_tag_with_only_documentation_changes(self) -> None:
-        self.mock_publication()
-        (self.root / "notes.txt").write_text("documentation only\n")
-        self.commit()
-        self.git("-c", "tag.gpgsign=false", "tag", "v1.2.4")
-        publish(self.root / "publication", "42", "v1.2.4")
-        self.assertEqual(len(self.registry_writes), 3)
 
     def test_tag_push_selects_the_successful_ci_run_for_its_commit(self) -> None:
         self.mock_publication()
@@ -527,13 +255,7 @@ class ReleaseTests(unittest.TestCase):
             patch(
                 "release.gh",
                 side_effect=[
-                    json.dumps(
-                        {
-                            "databaseId": 42,
-                            "headSha": self.release["source_revision"],
-                            "event": "push",
-                        }
-                    ),
+                    "42",
                     json.dumps(self.run_metadata),
                 ],
             ) as api,
@@ -567,13 +289,7 @@ class ReleaseTests(unittest.TestCase):
                 patch(
                     "release.gh",
                     side_effect=[
-                        json.dumps(
-                            {
-                                "databaseId": 42,
-                                "headSha": self.release["source_revision"],
-                                "event": "push",
-                            }
-                        ),
+                        "42",
                         json.dumps(self.run_metadata),
                     ],
                 ),
@@ -605,7 +321,7 @@ class ReleaseTests(unittest.TestCase):
         for component, image in self.images.items():
             self.assertEqual(
                 self.registry[REPOSITORIES[component] + ":master"],
-                image["image_ref"].split("@", 1)[1],
+                image.split("@", 1)[1],
             )
         publish_development(self.base)
         self.assertEqual(len(self.registry_writes), 3)
@@ -624,7 +340,7 @@ class ReleaseTests(unittest.TestCase):
                 self.assertRaises(ValueError),
             ):
                 publish_development(self.base)
-        del self.registry[self.images["hook"]["image_ref"]]
+        del self.registry[self.images["hook"]]
         with self.assertRaisesRegex(ValueError, "tested digest"):
             publish_development(self.base)
         self.assertEqual(self.registry_writes, [])
@@ -644,7 +360,7 @@ class ReleaseTests(unittest.TestCase):
         self.mock_publication()
         (self.root / "notes.txt").write_text("documentation only\n")
         self.commit()
-        with self.assertRaisesRegex(ValueError, "current commit"):
+        with self.assertRaisesRegex(ValueError, "tested source commit"):
             publish_development(self.base)
         self.assertEqual(self.registry_writes, [])
 
@@ -745,98 +461,6 @@ class ReleaseTests(unittest.TestCase):
         ):
             self.assertEqual(registry_digest(reference), expected)
 
-    def test_ci_discovery_supports_latest_and_exact_commit_selection(self) -> None:
-        candidate = {"databaseId": 42, "headSha": head(), "event": "push"}
-        for revision in (None, head()):
-            with (
-                self.subTest(revision=revision),
-                patch("release.gh", return_value=json.dumps(candidate)) as api,
-            ):
-                self.assertEqual(find_successful_master_ci(revision), ("42", head()))
-                arguments = api.call_args.args
-                if revision is None:
-                    self.assertNotIn("--commit", arguments)
-                else:
-                    self.assertEqual(
-                        arguments[arguments.index("--commit") + 1], revision
-                    )
-        with patch("release.gh", return_value=""):
-            self.assertIsNone(find_successful_master_ci())
-
-    def test_ci_discovery_rejects_invalid_candidates_and_wrong_commits(self) -> None:
-        candidate: dict[str, object] = {
-            "databaseId": 42,
-            "headSha": head(),
-            "event": "push",
-        }
-        for field, value in (
-            ("databaseId", "invalid"),
-            ("headSha", "master"),
-            ("event", "pull_request"),
-        ):
-            with (
-                self.subTest(field=field),
-                patch(
-                    "release.gh", return_value=json.dumps({**candidate, field: value})
-                ),
-                self.assertRaises(ValueError),
-            ):
-                find_successful_master_ci()
-        with (
-            patch("release.gh", return_value=json.dumps(candidate)),
-            self.assertRaisesRegex(ValueError, "requested commit"),
-        ):
-            find_successful_master_ci("f" * 40)
-
-    def test_ci_tag_dispatch_uses_the_release_workflow_instead(self) -> None:
-        with (
-            patch.dict(os.environ, {"GITHUB_REF_TYPE": "tag"}),
-            patch("release.gh") as api,
-            self.assertRaisesRegex(ValueError, "Use the Release workflow"),
-        ):
-            prepare(self.root / "candidate", False)
-        api.assert_not_called()
-
-    def test_empty_or_forced_reuse_base_builds_fresh(self) -> None:
-        for force in (False, True):
-            directory = self.root / str(force)
-            with patch.dict(
-                os.environ,
-                {
-                    "GITHUB_REPOSITORY": "neuro-inc/launchpad",
-                    "GITHUB_REF_TYPE": "branch",
-                },
-            ):
-                with patch("release.gh", return_value="") as api:
-                    prepare(directory, force)
-            self.assertTrue((directory / "empty.txt").exists())
-            if force:
-                api.assert_not_called()
-            self.assertIsNone(select_image("backend", directory, (), False))
-
-    def test_reuse_base_requires_the_successful_runs_source_identity(self) -> None:
-        self.change("frontend/src/app.ts")
-        candidate = json.dumps({"databaseId": 42, "headSha": head(), "event": "push"})
-        destination = self.root / "candidate"
-
-        def api(*args: str) -> str:
-            if args[:2] == ("run", "list"):
-                return candidate
-            if args[0] == "api":
-                return "1"
-            shutil.copytree(self.base, destination, dirs_exist_ok=True)
-            return ""
-
-        with patch.dict(
-            os.environ,
-            {"GITHUB_REPOSITORY": "neuro-inc/launchpad", "GITHUB_REF_TYPE": "branch"},
-        ):
-            with (
-                patch("release.gh", side_effect=api),
-                self.assertRaisesRegex(ValueError, "successful master run"),
-            ):
-                prepare(destination, False)
-
     def test_duplicate_attempt_artifacts_fail_before_download(self) -> None:
         with patch.dict(os.environ, {"GITHUB_REPOSITORY": "neuro-inc/launchpad"}):
             with (
@@ -869,30 +493,52 @@ class ReleaseTests(unittest.TestCase):
                 self.assertFalse(download_release(self.root / "download", "42"))
                 api.assert_called_once()
 
-    def test_development_assembly_rejects_a_hook_for_different_runtime_images(
+    def test_publication_requires_the_exact_commit_even_for_documentation(self) -> None:
+        self.mock_publication()
+        (self.root / "notes.txt").write_text("documentation only\n")
+        self.commit()
+        self.git("-c", "tag.gpgsign=false", "tag", "v1.2.4")
+        with self.assertRaisesRegex(ValueError, "exact tagged commit"):
+            publish(self.root / "publication", "42", "v1.2.4")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_manifest_requires_all_three_immutable_images_from_the_expected_repositories(
         self,
     ) -> None:
-        records = self.root / "records"
-        records.mkdir()
-        for name, image in self.images.items():
-            record = dict(image)
-            if name == "backend":
-                record["image_ref"] = REPOSITORIES[name] + "@sha256:" + "f" * 64
-            write_json(records / f"{name}.json", record)
+        for reference in (
+            "ghcr.io/neuro-inc/launchpad:master",
+            "ghcr.io/other/launchpad@sha256:" + "a" * 64,
+            "ghcr.io/neuro-inc/launchpad@sha256:invalid",
+        ):
+            with self.subTest(reference=reference):
+                release = copy.deepcopy(self.release)
+                release["images"]["backend"] = reference
+                write_json(self.base / "release.json", release)
+                with self.assertRaises(ValueError):
+                    load_release(self.base)
+        release = copy.deepcopy(self.release)
+        del release["images"]["hook"]
+        write_json(self.base / "release.json", release)
+        with self.assertRaises(ValueError):
+            load_release(self.base)
 
-        with patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}):
-            with self.assertRaisesRegex(ValueError, "hook image"):
-                assemble(self.root / "output", records)
+    def test_old_schema_and_mismatched_manifest_source_cannot_publish(self) -> None:
+        self.mock_publication()
+        for field, value in (("schema_version", 1), ("source_revision", "f" * 40)):
+            with self.subTest(field=field):
+                write_json(self.base / "release.json", {**self.release, field: value})
+                with self.assertRaises(ValueError):
+                    publish(self.root / "publication", "42", "v1.2.3")
+                self.assertEqual(self.registry_writes, [])
 
-    def test_development_assembly_keeps_verified_reused_records(self) -> None:
-        records = self.root / "records"
-        records.mkdir()
-        for name, image in self.images.items():
-            write_json(records / f"{name}.json", image)
-
-        with patch.dict(os.environ, {"GITHUB_REF_TYPE": "branch"}):
-            assemble(self.root / "output", records)
-        self.assertEqual(verify_release(self.root / "output")["images"], self.images)
+    def test_complete_build_assembly_records_the_chart_and_exact_source(self) -> None:
+        output = self.root / "output"
+        assemble(output, self.images)
+        release = verify_release(output, head())
+        self.assertEqual(release["images"], self.images)
+        self.assertEqual(release["source_revision"], head())
+        self.assertEqual(release["schema_version"], 2)
+        self.assertTrue((output / release["chart"]["filename"]).is_file())
 
 
 if __name__ == "__main__":

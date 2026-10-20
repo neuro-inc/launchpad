@@ -16,56 +16,38 @@ An empty `FRONTEND_IMAGE_DIGEST` retains Netlify routing and Netlify chart hooks
 Remove that compatibility path only after every installed App has migrated and its rollback period has ended.
 Do not remove its persistent session secret during rollback.
 
-## Component builds and release assembly
+## Complete App builds and release assembly
 
 Backend, frontend, and hook images retain their existing registry names.
-Each build waits for its own component checks and the release verifier checks.
-Backend tests and frontend tests run independently.
-Hook publication also waits for the selected backend and frontend images because the hook embeds their digests.
+Backend, frontend, hook, and release checks run before the build job.
+One CI job builds all three images from the same checked-out commit.
+The hook build receives the backend and frontend digests directly from the preceding build steps.
+The workflow does not select images from earlier runs.
+Docker can reuse its normal build layers, and each build pulls current base images.
 
-A successful `master` CI run records one `launchpad-release` artifact after every required check and image selection succeeds.
-The artifact contains all three immutable image references, their build commits, their input fingerprints, and the packaged chart.
-The chart record includes its source fingerprint and archive checksum.
-This artifact identifies the tested App combination.
+A successful `master` CI run records one `launchpad-release` artifact after every required check and build succeeds.
+Its schema version is `2`.
+The manifest contains the source commit, all three immutable image references, and the packaged chart's filename and SHA-256 checksum.
+The complete CI job provides the source association for all three images.
+No component fingerprints or baseline artifacts are required.
+Earlier schema versions are rejected and require a new successful CI build.
 Publishing an individual image does not establish a complete App release.
-Component builds use commit tags before final assembly.
-After all checks pass, master CI publishes the verified combination through the three `master` image aliases.
+
+Builds use staging tags before final assembly.
+After all checks and builds pass, master CI publishes the verified combination through the three `master` image aliases.
 The hook alias changes last and embeds the selected backend and frontend digests.
 Failed validation or assembly cannot advance these aliases.
 A superseded master run cannot replace the current development aliases.
+Runs for the same Git ref publish serially to avoid concurrent alias updates.
+Workflow retries replace their named artifacts.
+Release downloads reject duplicate artifacts instead of selecting an earlier attempt.
+Malformed release evidence or registry failures stop the release.
+
 The development catalog discovers the `master` template through its existing Git loader.
 Catalog refresh can occur before image publication finishes.
 Wait for successful master CI before installing or updating that template.
 This workflow does not request App upgrades.
 Apps tracking a Git branch can still synchronize chart changes through Argo CD.
-
-Subsequent runs can reuse images from the latest successful `master` release when its artifact remains available.
-Development reuse requires the baseline source commit to be an ancestor of the selected revision.
-The verifier reconstructs each recorded fingerprint from its original Git commit.
-It compares that fingerprint with the selected component's current inputs before permitting reuse.
-The fingerprint covers tracked Docker inputs, CI build recipes, and release verification code.
-Promotion workflow changes and release test changes do not invalidate image reuse.
-The hook fingerprint also includes the selected backend and frontend digests.
-
-A backend-only change can therefore reuse the frontend image.
-Changes to shared Python packaging or processor files can rebuild both backend and hook images.
-Chart-only changes reuse images and create a different App release combination.
-
-Reused images retain their original build commit in the release record and image metadata.
-Registry alias publication must preserve the recorded digest.
-CI verifies the published alias before accepting the component record.
-Runs for the same Git ref publish serially to avoid concurrent alias updates.
-
-An unavailable or expired baseline artifact causes fresh development builds.
-Workflow retries replace their named artifacts.
-Release downloads reject duplicate artifacts instead of selecting an earlier attempt.
-Malformed release evidence or registry failures stop the release.
-The first run without an available baseline builds all images.
-If an earlier artifact lacks provenance, dispatch a forced rebuild.
-
-Use `CI` workflow dispatch on `master` with `rebuild_images` enabled to refresh all images and their base images.
-That run disables Docker layer reuse and records the replacement combination for subsequent reuse.
-Floating base image tags refresh only during a forced build or another required rebuild.
 
 ## Production publication
 
@@ -85,7 +67,7 @@ The workflow does not rebuild images or select a nearby commit.
 The workflow accepts successful `CI` runs triggered by a master push or a manual master dispatch.
 It rejects PR runs, failed runs, expired artifacts, and ambiguous artifacts.
 The release manifest must identify the selected CI run's source commit.
-Every component and the chart must match the tagged build inputs.
+The tagged commit, successful CI run, and release manifest must identify the same exact source commit.
 
 Complete development acceptance before pushing the version tag:
 
@@ -110,8 +92,8 @@ gh workflow run release.yml --repo neuro-inc/launchpad --ref master \
   -f build_run_id="$BUILD_RUN_ID" -f release_tag="$RELEASE_TAG"
 ```
 
-An explicit run can use a different commit when every component and chart input remains unchanged.
-Changed build inputs require another successful CI build and development acceptance.
+Manual recovery also requires the exact tagged commit.
+A different commit requires another successful CI build and development acceptance, even when only documentation changes.
 
 The workflow verifies all source images and existing version aliases before publishing any alias.
 An existing alias must already select the tested digest.
@@ -142,7 +124,7 @@ Fork PRs run the separate release checks and fail frontend validation before pri
 GitHub does not provide repository secrets to forks.
 A maintainer must copy those changes to a repository branch and create a replacement PR for complete frontend validation.
 
-Verify the consolidated validation, manual publication, and App upgrade before archiving the old repository.
+Verify the consolidated validation, tag publication, and App upgrade before archiving the old repository.
 Retain old deployment records and Netlify rollback access throughout the hosting migration.
 The old `LAUNCHPAD_FRONTEND_IMAGE_DIGEST`, `FRONTEND_RELEASE_RUN_ID`, and `FRONTEND_RELEASE_READ_TOKEN` settings have no consumers in the consolidated pipeline.
 Remove those settings after confirming the replacement workflows.
@@ -167,7 +149,7 @@ No replacement automatic PR preview environment is configured.
 ## Local validation
 
 Run `make test-hooks` to verify processors, chart routing, and ownership.
-Run `make test-release` with Python 3.12 and Helm 3.16.3 to verify provenance, reuse, packaging, and publication.
+Run `make test-release` with Python 3.12 and Helm 3.16.3 to verify source identity, packaging, and publication.
 Run `make lint-release` with mypy 1.18.2 to check all release scripts and tests.
 The explicit configuration keeps release checks independent of backend mypy plugins.
 Run `npm ci`, `npm run lint`, and `npm run build` from `frontend/` with Node.js 22.

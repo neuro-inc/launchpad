@@ -2,11 +2,6 @@ name: CI
 
 on:
   workflow_dispatch:
-    inputs:
-      rebuild_images:
-        description: Rebuild all images and refresh base images on master
-        type: boolean
-        default: false
   push:
     branches: [master]
   pull_request:
@@ -179,112 +174,115 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
-  release-plan:
-    name: Verify the reuse base
-    needs: release-test
-    if: >-
-      ${{ github.event_name == 'push' ||
-          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
-          (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' &&
-           github.event.pull_request.head.repo.full_name == github.repository) }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-      - name: Verify the successful master reuse base
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REBUILD_IMAGES: ${{ inputs.rebuild_images || false }}
-        run: python3 .github/scripts/release.py prepare "$RUNNER_TEMP/release-base"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launchpad-reuse-base
-          path: ${{ runner.temp }}/release-base/
-          overwrite: true
-          if-no-files-found: error
-          retention-days: 1
-
-  backend-image:
-    name: Backend image
-    needs: [release-plan, test]
-    permissions:
-      contents: read
-      actions: read
-      packages: write
-    uses: ./.github/workflows/component-image.yml
-    with:
-      component: backend
-      rebuild_images: ${{ inputs.rebuild_images || false }}
-
-  frontend-image:
-    name: Frontend image
-    needs: [release-plan, frontend-test]
-    permissions:
-      contents: read
-      actions: read
-      packages: write
-    uses: ./.github/workflows/component-image.yml
-    secrets:
-      FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
-    with:
-      component: frontend
-      rebuild_images: ${{ inputs.rebuild_images || false }}
-
-  hook-image:
-    name: Hook image
-    needs: [release-plan, hook-test, backend-image, frontend-image]
-    permissions:
-      contents: read
-      actions: read
-      packages: write
-    uses: ./.github/workflows/component-image.yml
-    with:
-      component: hook
-      backend_ref: ${{ needs.backend-image.outputs.image_ref }}
-      frontend_ref: ${{ needs.frontend-image.outputs.image_ref }}
-      rebuild_images: ${{ inputs.rebuild_images || false }}
-
   release-combination:
     name: Record the tested App release combination
     runs-on: ubuntu-latest
-    needs: [release-plan, test, hook-test, frontend-test, release-test, backend-image, frontend-image, hook-image]
-    if: ${{ !cancelled() && needs.release-plan.result == 'success' }}
+    needs: [test, hook-test, frontend-test, release-test]
+    if: >-
+      ${{ !cancelled() && (github.event_name == 'push' ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+          (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' &&
+           github.event.pull_request.head.repo.full_name == github.repository)) }}
     permissions:
       contents: read
-      actions: read
       packages: write
+    outputs:
+      backend_ref: ghcr.io/neuro-inc/launchpad@${{ steps.backend.outputs.digest }}
     steps:
-      - name: Require every check and image selection to succeed
+      - name: Require every check to succeed
         env:
           REQUIRED_JOBS: ${{ toJSON(needs) }}
         run: jq -e 'all(.[]; .result == "success")' <<< "$REQUIRED_JOBS"
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
       - uses: azure/setup-helm@v4
         with:
           version: v3.16.3
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: launchpad-image-*
-          merge-multiple: true
-          path: ${{ runner.temp }}/component-images
-      - name: Verify and assemble the release
-        run: >-
-          python3 .github/scripts/release.py assemble "$RUNNER_TEMP/launchpad-release"
-          --images "$RUNNER_TEMP/component-images"
       - uses: docker/setup-buildx-action@v4
-        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
       - uses: docker/login-action@v4.3.0
-        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - name: Select staging image tag
+        id: metadata
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          import re
+          from pathlib import Path
+          tag = os.environ["GITHUB_SHA"]
+          if os.environ["GITHUB_EVENT_NAME"] == "pull_request":
+              tag = re.sub(r"[^a-z0-9_.-]", "-", os.environ["PR_BRANCH"].lower())
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a") as stream:
+              stream.write(f"tag={tag}\n")
+          PYTHON
+      - name: Build backend
+        id: backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          tags: ghcr.io/neuro-inc/launchpad:${{ steps.metadata.outputs.tag }}
+          push: true
+          pull: true
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=launchpad-backend
+          cache-to: type=gha,scope=launchpad-backend,mode=max
+      - name: Prepare the build-only npm configuration
+        env:
+          FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          from pathlib import Path
+          from string import Template
+          token = os.environ["FONTAWESOME_NPM_AUTH_TOKEN"]
+          if not token:
+              raise ValueError("The frontend build requires the Font Awesome registry credential.")
+          path = Path(os.environ["RUNNER_TEMP"]) / "frontend.npmrc"
+          path.touch(mode=0o600)
+          path.write_text(Template(Path("frontend/.npmrc").read_text()).substitute(FONTAWESOME_NPM_AUTH_TOKEN=token))
+          PYTHON
+      - name: Build frontend
+        id: frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          tags: ghcr.io/neuro-inc/launchpad-web-ui:${{ github.sha }}
+          push: true
+          pull: true
+          build-args: COMMIT_SHA=${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          secret-files: npmrc=${{ runner.temp }}/frontend.npmrc
+          cache-from: type=gha,scope=launchpad-frontend
+          cache-to: type=gha,scope=launchpad-frontend,mode=max
+      - name: Remove the build-only npm configuration
+        if: always()
+        run: rm -f "$RUNNER_TEMP/frontend.npmrc"
+      - name: Build hook with the selected runtime images
+        id: hook
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: hooks/hooks.Dockerfile
+          tags: ghcr.io/neuro-inc/launchpad-hook:${{ steps.metadata.outputs.tag }}
+          push: true
+          pull: true
+          build-args: |
+            APP_IMAGE_DIGEST=${{ steps.backend.outputs.digest }}
+            FRONTEND_IMAGE_DIGEST=${{ steps.frontend.outputs.digest }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=launchpad-hook
+          cache-to: type=gha,scope=launchpad-hook,mode=max
+      - name: Verify and assemble the release
+        env:
+          BACKEND_REF: ghcr.io/neuro-inc/launchpad@${{ steps.backend.outputs.digest }}
+          FRONTEND_REF: ghcr.io/neuro-inc/launchpad-web-ui@${{ steps.frontend.outputs.digest }}
+          HOOK_REF: ghcr.io/neuro-inc/launchpad-hook@${{ steps.hook.outputs.digest }}
+        run: python3 .github/scripts/release.py assemble "$RUNNER_TEMP/launchpad-release"
       - name: Publish the verified development combination
         if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
         env:
@@ -300,7 +298,7 @@ jobs:
 
   pr-image-comment:
     name: Record the PR backend image
-    needs: backend-image
+    needs: release-combination
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -308,7 +306,7 @@ jobs:
     steps:
       - name: Comment on PR
         env:
-          IMAGE_REF: ${{ needs.backend-image.outputs.image_ref }}
+          IMAGE_REF: ${{ needs.release-combination.outputs.backend_ref }}
         uses: actions/github-script@v9
         with:
           script: |
