@@ -109,6 +109,8 @@ The built-in `GITHUB_TOKEN` reads repository artifacts and publishes registry al
 Publication needs no Argo credentials, App-name setting, or environment configuration variables.
 
 Configure `FONTAWESOME_NPM_AUTH_TOKEN` as an Actions secret for frontend builds.
+BuildKit mounts the committed `.npmrc` template and exposes the token only to the dependency installation command.
+The workflow does not generate a credential file on the runner.
 Configure that credential separately as a Dependabot registry secret.
 Confirm that Launchpad's Actions token can publish the existing frontend GHCR package.
 Grant package access to this repository if its current permissions permit only `launchpad-web-ui`.

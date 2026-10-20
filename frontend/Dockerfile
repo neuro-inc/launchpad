@@ -2,7 +2,9 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN --mount=type=secret,id=npmrc,target=/root/.npmrc npm ci
+RUN --mount=type=secret,id=npmrc,target=/root/.npmrc,required=true \
+    --mount=type=secret,id=npm_token,env=FONTAWESOME_NPM_AUTH_TOKEN,required=true \
+    npm ci
 COPY . .
 ARG COMMIT_SHA
 ENV APP_COMMIT_SHA=$COMMIT_SHA NEXT_PUBLIC_ENVIRONMENT=production NEXT_TELEMETRY_DISABLED=1

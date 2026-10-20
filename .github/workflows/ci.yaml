@@ -193,6 +193,10 @@ jobs:
         env:
           REQUIRED_JOBS: ${{ toJSON(needs) }}
         run: jq -e 'all(.[]; .result == "success")' <<< "$REQUIRED_JOBS"
+      - name: Require the frontend registry credential
+        env:
+          FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
+        run: test -n "$FONTAWESOME_NPM_AUTH_TOKEN"
       - uses: actions/checkout@v7
       - uses: azure/setup-helm@v4
         with:
@@ -230,24 +234,11 @@ jobs:
           labels: org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=gha,scope=launchpad-backend
           cache-to: type=gha,scope=launchpad-backend,mode=max
-      - name: Prepare the build-only npm configuration
-        env:
-          FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
-        run: |
-          python3 - <<'PYTHON'
-          import os
-          from pathlib import Path
-          from string import Template
-          token = os.environ["FONTAWESOME_NPM_AUTH_TOKEN"]
-          if not token:
-              raise ValueError("The frontend build requires the Font Awesome registry credential.")
-          path = Path(os.environ["RUNNER_TEMP"]) / "frontend.npmrc"
-          path.touch(mode=0o600)
-          path.write_text(Template(Path("frontend/.npmrc").read_text()).substitute(FONTAWESOME_NPM_AUTH_TOKEN=token))
-          PYTHON
       - name: Build frontend
         id: frontend
         uses: docker/build-push-action@v6
+        env:
+          FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
         with:
           context: frontend
           file: frontend/Dockerfile
@@ -256,12 +247,10 @@ jobs:
           pull: true
           build-args: COMMIT_SHA=${{ github.sha }}
           labels: org.opencontainers.image.revision=${{ github.sha }}
-          secret-files: npmrc=${{ runner.temp }}/frontend.npmrc
+          secret-files: npmrc=frontend/.npmrc
+          secret-envs: npm_token=FONTAWESOME_NPM_AUTH_TOKEN
           cache-from: type=gha,scope=launchpad-frontend
           cache-to: type=gha,scope=launchpad-frontend,mode=max
-      - name: Remove the build-only npm configuration
-        if: always()
-        run: rm -f "$RUNNER_TEMP/frontend.npmrc"
       - name: Build hook with the selected runtime images
         id: hook
         uses: docker/build-push-action@v6

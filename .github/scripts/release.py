@@ -95,7 +95,7 @@ def gh(*args: str) -> str:
     return command("gh", *args)
 
 
-def download_release(directory: Path, run_id: str) -> bool:
+def download_release(directory: Path, run_id: str) -> None:
     repository = os.environ["GITHUB_REPOSITORY"]
     text(run_id, r"[1-9][0-9]*")
     page_counts = gh(
@@ -109,7 +109,7 @@ def download_release(directory: Path, run_id: str) -> bool:
         raise ValueError("The artifact API returned no page counts.")
     count = sum(int(text(value, r"0|[1-9][0-9]*")) for value in page_counts)
     if count == 0:
-        return False
+        raise ValueError("The selected App release artifact is unavailable.")
     if count != 1:
         raise ValueError("The workflow run has ambiguous release artifacts.")
     gh(
@@ -123,7 +123,6 @@ def download_release(directory: Path, run_id: str) -> bool:
         "--dir",
         str(directory),
     )
-    return True
 
 
 def registry_digest(reference: str, allow_missing: bool = False) -> str | None:
@@ -216,8 +215,7 @@ def publish(directory: Path, run_id: str, release_tag: str) -> None:
     source = text(run["headSha"], REVISION)
     if source != revision:
         raise ValueError("Publication requires CI for the exact tagged commit.")
-    if not download_release(directory, run_id):
-        raise ValueError("The selected App release artifact is unavailable.")
+    download_release(directory, run_id)
     release = verify_release(directory, source)
     publish_aliases(release, release_tag)
 

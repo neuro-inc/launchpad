@@ -132,10 +132,9 @@ class ReleaseTests(unittest.TestCase):
             self.registry[args[-2]] = self.registry[args[-1]]
             return ""
 
-        def download(directory: Path, run_id: str) -> bool:
+        def download(directory: Path, run_id: str) -> None:
             self.assertEqual(run_id, "42")
             shutil.copytree(self.base, directory, dirs_exist_ok=True)
-            return True
 
         for mock in (
             patch.dict(os.environ, {"GITHUB_EVENT_NAME": "workflow_dispatch"}),
@@ -390,7 +389,12 @@ class ReleaseTests(unittest.TestCase):
     def test_publication_rejects_an_unavailable_build_artifact(self) -> None:
         self.mock_publication()
         with (
-            patch("release.download_release", return_value=False),
+            patch(
+                "release.download_release",
+                side_effect=ValueError(
+                    "The selected App release artifact is unavailable."
+                ),
+            ),
             self.assertRaisesRegex(ValueError, "artifact is unavailable"),
         ):
             publish(self.root / "publication", "42", "v1.2.3")
@@ -475,7 +479,7 @@ class ReleaseTests(unittest.TestCase):
             patch.dict(os.environ, {"GITHUB_REPOSITORY": "neuro-inc/launchpad"}),
             patch("release.gh", side_effect=["1\n0", ""]) as api,
         ):
-            self.assertTrue(download_release(self.root / "download", "42"))
+            download_release(self.root / "download", "42")
         self.assertEqual(api.call_count, 2)
         self.assertNotIn("--slurp", api.call_args_list[0].args)
         self.assertEqual(api.call_args.args[:3], ("run", "download", "42"))
@@ -489,9 +493,12 @@ class ReleaseTests(unittest.TestCase):
                 ):
                     download_release(self.root / "download", "42")
                 api.assert_called_once()
-            with patch("release.gh", return_value="0\n0") as api:
-                self.assertFalse(download_release(self.root / "download", "42"))
-                api.assert_called_once()
+            with (
+                patch("release.gh", return_value="0\n0") as api,
+                self.assertRaisesRegex(ValueError, "artifact is unavailable"),
+            ):
+                download_release(self.root / "download", "42")
+            api.assert_called_once()
 
     def test_publication_requires_the_exact_commit_even_for_documentation(self) -> None:
         self.mock_publication()
