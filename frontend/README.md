@@ -25,6 +25,9 @@ See [frontend hosting](../docs/operations/frontend-hosting.md) for container pub
 
 ## Local Development Setup
 
+To run PostgreSQL, Keycloak, the backend, and the frontend locally, follow the [full-stack development guide](../docs/engineering/local-development.md).
+The instructions below connect a local frontend to a deployed Launchpad backend.
+
 ### 1. Deploy Launchpad Backend
 
 Before running the frontend locally, you need to deploy a Launchpad instance:

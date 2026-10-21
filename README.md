@@ -180,10 +180,4 @@ curl -X GET "${LAUNCHPAD_URL}/instances" \
 
 ## Development
 
-See [CLAUDE.md](./CLAUDE.md) for detailed development instructions, including:
-- Setup and installation
-- Code quality tools
-- Testing
-- Running the application
-- Database migrations
-- Architecture overview
+See [local development](docs/engineering/local-development.md) to run the full stack with Docker Compose, Python, and Next.js.
