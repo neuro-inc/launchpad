@@ -6,6 +6,7 @@ import os
 import re
 import tempfile
 from datetime import datetime, timedelta, timezone
+from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import TypedDict
 from urllib.parse import quote
@@ -17,6 +18,7 @@ from release import (
     command,
     download_asset,
     gh,
+    list_releases,
     load_release,
     registry_digest,
     text,
@@ -112,33 +114,17 @@ def children(repository: str, digest: str) -> set[str]:
 
 
 def release_digests() -> dict[str, set[str]]:
-    pages: object = json.loads(
-        gh(
-            "api",
-            f"repos/{os.environ['GITHUB_REPOSITORY']}/releases?per_page=100",
-            "--paginate",
-            "--slurp",
-        )
-    )
-    if not isinstance(pages, list):
-        raise ValueError("GitHub must return release pages.")
     protected = {repository: set[str]() for repository in REPOSITORIES.values()}
-    for page in pages:
-        if not isinstance(page, list):
-            raise ValueError("GitHub must return a release list.")
-        for item in page:
-            if not isinstance(item, dict):
-                raise ValueError("GitHub returned an invalid release.")
-            existing = {str(key): value for key, value in item.items()}
-            if "release.json" not in asset_names(existing):
-                continue
-            tag = text(item.get("tag_name"), r"v[a-zA-Z0-9_.-]{0,127}")
-            with tempfile.TemporaryDirectory() as temporary:
-                directory = Path(temporary)
-                download_asset(tag, "release.json", directory)
-                release = load_release(directory)
-            for name, reference in release["images"].items():
-                protected[REPOSITORIES[name]].add(reference.split("@", 1)[1])
+    for existing in list_releases():
+        if "release.json" not in asset_names(existing):
+            continue
+        tag = text(existing.get("tag_name"), r"v[a-zA-Z0-9_.-]{0,127}")
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            download_asset(tag, "release.json", directory)
+            release = load_release(directory)
+        for name, reference in release["images"].items():
+            protected[REPOSITORIES[name]].add(reference.split("@", 1)[1])
     return protected
 
 
@@ -192,14 +178,15 @@ def candidates(
     remaining = {
         v["digest"]: v for v in versions if v["digest"] in eligible - protected
     }
-    ordered: list[Version] = []
-    while remaining:
-        descendants = set().union(*(graph[digest] for digest in remaining))
-        parents = sorted(set(remaining) - descendants)
-        if not parents:
-            raise ValueError("The image manifest graph contains a cycle.")
-        ordered.extend(remaining.pop(digest) for digest in parents)
-    return ordered
+    try:
+        child_first = tuple(
+            TopologicalSorter(
+                {digest: graph[digest] & remaining.keys() for digest in remaining}
+            ).static_order()
+        )
+    except CycleError as error:
+        raise ValueError("The image manifest graph contains a cycle.") from error
+    return [remaining[digest] for digest in reversed(child_first)]
 
 
 def cleanup(*, apply: bool = False) -> None:

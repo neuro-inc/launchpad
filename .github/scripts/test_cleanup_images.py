@@ -66,6 +66,16 @@ class CleanupTests(unittest.TestCase):
         }
         self.assertEqual(self.selected([child, index, root]), [5, 3, 1])
 
+    def test_manifest_cycle_aborts_before_deletion(self) -> None:
+        root = self.version(1, ["ci-" + "a" * 40])
+        child = self.version(2, [])
+        self.graph = {
+            root["digest"]: {child["digest"]},
+            child["digest"]: {root["digest"]},
+        }
+        with self.assertRaisesRegex(ValueError, "manifest graph contains a cycle"):
+            self.selected([root, child])
+
     def test_preserves_version_master_branch_unknown_and_recent_tags(self) -> None:
         for tag in ["v1.0", "master", "feature-test", "unknown", "a" * 40]:
             with self.subTest(tag=tag):
@@ -232,10 +242,10 @@ class CleanupTests(unittest.TestCase):
         with (
             patch.dict("os.environ", {"GITHUB_REPOSITORY": "org/repo"}),
             patch(
-                "cleanup_images.gh",
-                return_value=json.dumps(
-                    [[{"tag_name": "v1.0", "assets": [{"name": "release.json"}]}]]
-                ),
+                "cleanup_images.list_releases",
+                return_value=[
+                    {"tag_name": "v1.0", "assets": [{"name": "release.json"}]}
+                ],
             ),
             patch("cleanup_images.download_asset", side_effect=download),
         ):
@@ -270,7 +280,9 @@ class CleanupTests(unittest.TestCase):
     def test_release_api_failure_does_not_allow_cleanup(self) -> None:
         with (
             patch.dict("os.environ", {"GITHUB_REPOSITORY": "org/repo"}),
-            patch("cleanup_images.gh", side_effect=RuntimeError("unavailable")),
+            patch(
+                "cleanup_images.list_releases", side_effect=RuntimeError("unavailable")
+            ),
             self.assertRaises(RuntimeError),
         ):
             release_digests()

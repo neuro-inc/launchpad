@@ -50,10 +50,3 @@ jobs:
         run: >-
           python3 .github/scripts/release.py publish "$RUNNER_TEMP/launchpad-release"
           --run-id "$BUILD_RUN_ID" --release-tag "$RELEASE_TAG"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: launchpad-release
-          path: ${{ runner.temp }}/launchpad-release/
-          overwrite: true
-          if-no-files-found: error
-          retention-days: 90

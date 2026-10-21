@@ -127,7 +127,7 @@ def download_release(directory: Path, run_id: str) -> None:
     )
 
 
-def find_release(tag: str) -> dict[str, object] | None:
+def list_releases() -> list[dict[str, object]]:
     pages: object = json.loads(
         gh(
             "api",
@@ -138,15 +138,19 @@ def find_release(tag: str) -> dict[str, object] | None:
     )
     if not isinstance(pages, list):
         raise ValueError("GitHub must return release pages.")
-    matches: list[dict[str, object]] = []
+    releases: list[dict[str, object]] = []
     for page in pages:
         if not isinstance(page, list):
             raise ValueError("GitHub must return a release list.")
         for item in page:
             if not isinstance(item, dict):
                 raise ValueError("GitHub returned an invalid release.")
-            if item.get("tag_name") == tag:
-                matches.append({str(key): value for key, value in item.items()})
+            releases.append({str(key): value for key, value in item.items()})
+    return releases
+
+
+def find_release(tag: str) -> dict[str, object] | None:
+    matches = [release for release in list_releases() if release.get("tag_name") == tag]
     if len(matches) > 1:
         raise ValueError("GitHub returned duplicate releases for the tag.")
     return matches[0] if matches else None
