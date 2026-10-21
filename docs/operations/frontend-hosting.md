@@ -100,12 +100,17 @@ An existing alias must already select the tested digest.
 Publication preserves each image digest and retains the original release manifest and chart archive without rebuilding or repackaging.
 A retry with the same inputs can complete interrupted publication.
 Wait for the complete Release workflow before installing the tagged App version.
-Keep its `launchpad-release` artifact with the operational release record.
+The workflow stores `release.json` and the original chart archive on the version's GitHub Release.
+It uploads and verifies assets before publishing image aliases, then publishes the draft release after all aliases pass verification.
+Existing assets must match exactly; the workflow never overwrites them.
+A retry uses complete GitHub Release assets even after the 90-day Actions artifact expires.
+Initial publication still requires the successful master CI artifact.
+Keep these release assets and versioned images for supported App versions.
 
 The maintainer's tag push or manual dispatch records release approval after development acceptance.
 The GitHub `production` environment records the release job.
 Configure additional environment approval rules when the repository supports them and the team requires them.
-The built-in `GITHUB_TOKEN` reads repository artifacts and publishes registry aliases.
+The built-in `GITHUB_TOKEN` reads repository artifacts, writes GitHub Releases, and publishes registry aliases.
 Publication needs no Argo credentials, App-name setting, or environment configuration variables.
 
 Configure `FONTAWESOME_NPM_AUTH_TOKEN` as an Actions secret for frontend builds.
@@ -115,6 +120,36 @@ Configure that credential separately as a Dependabot registry secret.
 Confirm that Launchpad's Actions token can publish the existing frontend GHCR package.
 Grant package access to this repository if its current permissions permit only `launchpad-web-ui`.
 Local hook builds without `APP_IMAGE_DIGEST` retain the existing tag behavior.
+
+## Temporary image retention
+
+CI marks staging images with `ci-<commit>` tags.
+PR backend and hook images also retain their branch aliases for development catalog access.
+The weekly cleanup workflow removes CI images older than 90 days and their orphaned manifest versions.
+It preserves every version with a non-CI tag, including version, `master`, and branch aliases.
+It also preserves digests recorded in draft and published release manifests and all descendants of protected image indexes.
+Unknown untagged versions remain unless they belong to an expired CI image graph.
+Before deletion, cleanup tags eligible untagged descendants with `ci-gc-<digest>` markers.
+These markers preserve cleanup ownership after an interrupted run.
+Retries can remove marked versions without another retention delay, unless publication has protected them.
+Cleanup deletes parent indexes before their descendants.
+Registry or metadata errors stop cleanup before deletion begins.
+
+CI image publication, version publication, and cleanup share the `launchpad-registry` concurrency group.
+This prevents these workflows from publishing aliases during cleanup.
+The group queues pending jobs instead of replacing them with newer jobs.
+Do not publish or delete package versions outside that group while cleanup runs.
+Temporary CI images are unsuitable for installations that must remain supported beyond the retention window.
+Use a published version for those installations.
+
+Manual cleanup dispatch defaults to a dry run.
+Set its `apply` input to `true` only after reviewing the proposed deletions.
+Scheduled cleanup applies the same policy weekly.
+The Actions token needs admin access to each of the three GHCR packages for version deletion.
+The cleanup workflow uses `packages: write`; package-level access must also permit deletion.
+It also needs `contents: write` to include draft releases in the protected digest set.
+It requires no additional stored credential.
+
 
 ## Publication prerequisites
 

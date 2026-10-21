@@ -19,13 +19,17 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
   actions: read
   packages: write
 
 jobs:
   release:
     if: github.ref_type == 'tag' || github.ref == 'refs/heads/master'
+    concurrency:
+      group: launchpad-registry
+      queue: max
+      cancel-in-progress: false
     environment: production
     runs-on: ubuntu-latest
     steps:

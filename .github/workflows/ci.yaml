@@ -176,6 +176,10 @@ jobs:
 
   release-combination:
     name: Record the tested App release combination
+    concurrency:
+      group: launchpad-registry
+      queue: max
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     needs: [test, hook-test, frontend-test, release-test]
     if: >-
@@ -216,7 +220,7 @@ jobs:
           import os
           import re
           from pathlib import Path
-          tag = os.environ["GITHUB_SHA"]
+          tag = "ci-" + os.environ["GITHUB_SHA"]
           if os.environ["GITHUB_EVENT_NAME"] == "pull_request":
               tag = re.sub(r"[^a-z0-9_.-]", "-", os.environ["PR_BRANCH"].lower())
           with Path(os.environ["GITHUB_OUTPUT"]).open("a") as stream:
@@ -228,7 +232,9 @@ jobs:
         with:
           context: .
           file: Dockerfile
-          tags: ghcr.io/neuro-inc/launchpad:${{ steps.metadata.outputs.tag }}
+          tags: |
+            ghcr.io/neuro-inc/launchpad:${{ steps.metadata.outputs.tag }}
+            ghcr.io/neuro-inc/launchpad:ci-${{ github.sha }}
           push: true
           pull: true
           labels: org.opencontainers.image.revision=${{ github.sha }}
@@ -242,7 +248,7 @@ jobs:
         with:
           context: frontend
           file: frontend/Dockerfile
-          tags: ghcr.io/neuro-inc/launchpad-web-ui:${{ github.sha }}
+          tags: ghcr.io/neuro-inc/launchpad-web-ui:ci-${{ github.sha }}
           push: true
           pull: true
           build-args: COMMIT_SHA=${{ github.sha }}
@@ -257,7 +263,9 @@ jobs:
         with:
           context: .
           file: hooks/hooks.Dockerfile
-          tags: ghcr.io/neuro-inc/launchpad-hook:${{ steps.metadata.outputs.tag }}
+          tags: |
+            ghcr.io/neuro-inc/launchpad-hook:${{ steps.metadata.outputs.tag }}
+            ghcr.io/neuro-inc/launchpad-hook:ci-${{ github.sha }}
           push: true
           pull: true
           build-args: |

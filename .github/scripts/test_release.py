@@ -16,12 +16,15 @@ from release import (
     Release,
     assemble,
     command,
+    download_github_release,
     download_release,
+    find_release,
     head,
     load_release,
     publish,
     publish_development,
     registry_digest,
+    store_release_assets,
     verify_release,
     write_json,
 )
@@ -145,6 +148,8 @@ class ReleaseTests(unittest.TestCase):
                 else json.dumps(self.run_metadata),
             ),
             patch("release.download_release", side_effect=download),
+            patch("release.download_github_release", return_value=False),
+            patch("release.store_release_assets", return_value=False),
             patch(
                 "release.registry_digest",
                 side_effect=lambda reference, allow_missing=False: self.registry.get(
@@ -155,6 +160,130 @@ class ReleaseTests(unittest.TestCase):
         ):
             mock.start()
             self.addCleanup(mock.stop)
+
+    def test_release_lookup_includes_paginated_drafts(self) -> None:
+        draft = {"tag_name": "v1.2.3", "draft": True, "assets": []}
+        with patch(
+            "release.gh", return_value=json.dumps([[{"tag_name": "v1.0"}], [draft]])
+        ) as api:
+            self.assertEqual(find_release("v1.2.3"), draft)
+        self.assertIn("--paginate", api.call_args.args)
+        self.assertIn("--slurp", api.call_args.args)
+
+    def test_release_lookup_rejects_duplicates_and_invalid_pages(self) -> None:
+        for value in [{}, [{}], [[{"tag_name": "v1.2.3"}, {"tag_name": "v1.2.3"}]]]:
+            with (
+                patch("release.gh", return_value=json.dumps(value)),
+                self.assertRaises(ValueError),
+            ):
+                find_release("v1.2.3")
+        with patch("release.gh", return_value="[[]]"):
+            self.assertIsNone(find_release("v1.2.3"))
+
+    def test_saved_release_supports_retry_after_ci_artifact_expiry(self) -> None:
+        self.mock_publication()
+
+        def saved(directory: Path, tag: str) -> bool:
+            shutil.copytree(self.base, directory)
+            return True
+
+        with (
+            patch("release.download_github_release", side_effect=saved),
+            patch(
+                "release.download_release",
+                side_effect=AssertionError("Expired CI artifact"),
+            ),
+            patch("release.gh", side_effect=AssertionError("CI history expired")),
+        ):
+            publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(len(self.registry_writes), 3)
+
+    def test_asset_storage_failure_prevents_registry_publication(self) -> None:
+        self.mock_publication()
+        with patch(
+            "release.store_release_assets", side_effect=ValueError("conflicting asset")
+        ):
+            with self.assertRaisesRegex(ValueError, "conflicting asset"):
+                publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_new_github_release_stays_draft_until_images_publish(self) -> None:
+        self.mock_publication()
+        with (
+            patch("release.store_release_assets", return_value=True),
+            patch("release.gh", return_value=json.dumps(self.run_metadata)) as api,
+        ):
+            publish(self.root / "publication", "42", "v1.2.3")
+        self.assertEqual(api.call_args.args[:3], ("release", "edit", "v1.2.3"))
+        self.assertIn("--draft=false", api.call_args.args)
+
+    def test_durable_assets_are_uploaded_without_clobbering(self) -> None:
+        with (
+            patch(
+                "release.find_release",
+                side_effect=[None, {"draft": True, "assets": []}],
+            ),
+            patch("release.gh") as api,
+        ):
+            self.assertTrue(store_release_assets(self.base, "v1.2.3"))
+        self.assertEqual(
+            api.call_args_list[0].args[:3], ("release", "create", "v1.2.3")
+        )
+        self.assertIn("--verify-tag", api.call_args_list[0].args)
+        self.assertIn("--draft", api.call_args_list[0].args)
+        self.assertEqual(len(api.call_args_list), 3)
+        for call in api.call_args_list:
+            self.assertNotIn("--clobber", call.args)
+
+    def test_existing_assets_must_match_before_upload(self) -> None:
+        existing: dict[str, object] = {
+            "draft": True,
+            "assets": [{"name": "release.json"}],
+        }
+
+        def download(tag: str, name: str, directory: Path) -> None:
+            (directory / name).write_bytes(b"different")
+
+        with (
+            patch("release.find_release", return_value=existing),
+            patch("release.download_asset", side_effect=download),
+            patch("release.gh") as api,
+        ):
+            with self.assertRaisesRegex(ValueError, "conflicts"):
+                store_release_assets(self.base, "v1.2.3")
+        api.assert_not_called()
+
+    def test_published_release_assets_are_verified_without_modification(self) -> None:
+        existing: dict[str, object] = {
+            "draft": False,
+            "assets": [
+                {"name": name}
+                for name in ("release.json", self.release["chart"]["filename"])
+            ],
+        }
+
+        def download(tag: str, name: str, directory: Path) -> None:
+            shutil.copy(self.base / name, directory / name)
+
+        with (
+            patch("release.find_release", return_value=existing),
+            patch("release.download_asset", side_effect=download),
+            patch("release.gh") as api,
+        ):
+            self.assertFalse(store_release_assets(self.base, "v1.2.3"))
+            output = self.root / "saved"
+            self.assertTrue(download_github_release(output, "v1.2.3"))
+            self.assertEqual(verify_release(output, head()), self.release)
+        api.assert_not_called()
+
+    def test_incomplete_published_release_is_rejected(self) -> None:
+        with (
+            patch("release.find_release", return_value={"draft": False, "assets": []}),
+            patch("release.gh") as api,
+        ):
+            with self.assertRaisesRegex(ValueError, "incomplete"):
+                store_release_assets(self.base, "v1.2.3")
+        api.assert_not_called()
 
     def test_publication_preserves_the_tested_combination_without_building(
         self,

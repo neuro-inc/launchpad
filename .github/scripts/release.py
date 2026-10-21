@@ -5,7 +5,9 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import TypedDict
 
@@ -125,6 +127,121 @@ def download_release(directory: Path, run_id: str) -> None:
     )
 
 
+def find_release(tag: str) -> dict[str, object] | None:
+    pages: object = json.loads(
+        gh(
+            "api",
+            f"repos/{os.environ['GITHUB_REPOSITORY']}/releases?per_page=100",
+            "--paginate",
+            "--slurp",
+        )
+    )
+    if not isinstance(pages, list):
+        raise ValueError("GitHub must return release pages.")
+    matches: list[dict[str, object]] = []
+    for page in pages:
+        if not isinstance(page, list):
+            raise ValueError("GitHub must return a release list.")
+        for item in page:
+            if not isinstance(item, dict):
+                raise ValueError("GitHub returned an invalid release.")
+            if item.get("tag_name") == tag:
+                matches.append({str(key): value for key, value in item.items()})
+    if len(matches) > 1:
+        raise ValueError("GitHub returned duplicate releases for the tag.")
+    return matches[0] if matches else None
+
+
+def asset_names(release: dict[str, object]) -> set[str]:
+    assets = release.get("assets")
+    if not isinstance(assets, list):
+        raise ValueError("GitHub Release assets must be a list.")
+    names: set[str] = set()
+    for asset in assets:
+        if not isinstance(asset, dict) or not isinstance(asset.get("name"), str):
+            raise ValueError("GitHub returned an invalid release asset.")
+        if asset["name"] in names:
+            raise ValueError("GitHub returned duplicate release assets.")
+        names.add(asset["name"])
+    return names
+
+
+def download_asset(tag: str, name: str, directory: Path) -> None:
+    gh(
+        "release",
+        "download",
+        tag,
+        "--repo",
+        os.environ["GITHUB_REPOSITORY"],
+        "--pattern",
+        name,
+        "--dir",
+        str(directory),
+    )
+
+
+def download_github_release(directory: Path, tag: str) -> bool:
+    existing = find_release(tag)
+    if existing is None or "release.json" not in asset_names(existing):
+        return False
+    with tempfile.TemporaryDirectory() as temporary:
+        staging = Path(temporary)
+        download_asset(tag, "release.json", staging)
+        release = load_release(staging)
+        chart = release["chart"]["filename"]
+        if chart not in asset_names(existing):
+            return False
+        download_asset(tag, chart, staging)
+        verify_release(staging, release["source_revision"])
+        shutil.copytree(staging, directory, dirs_exist_ok=True)
+    return True
+
+
+def store_release_assets(directory: Path, tag: str) -> bool:
+    release = load_release(directory)
+    existing = find_release(tag)
+    if existing is None:
+        gh(
+            "release",
+            "create",
+            tag,
+            "--repo",
+            os.environ["GITHUB_REPOSITORY"],
+            "--verify-tag",
+            "--draft",
+            "--title",
+            tag,
+            "--notes",
+            "Publish the tested Launchpad App image and chart combination.",
+        )
+        existing = find_release(tag)
+        if existing is None:
+            raise ValueError("The draft GitHub Release was not created.")
+    draft = existing.get("draft")
+    if not isinstance(draft, bool):
+        raise ValueError("GitHub returned an invalid release state.")
+    names = asset_names(existing)
+    for name in ("release.json", release["chart"]["filename"]):
+        if name in names:
+            with tempfile.TemporaryDirectory() as temporary:
+                staging = Path(temporary)
+                download_asset(tag, name, staging)
+                if (staging / name).read_bytes() != (directory / name).read_bytes():
+                    raise ValueError(f"The existing release asset conflicts: {name}.")
+        else:
+            if not draft:
+                raise ValueError("The published GitHub Release is incomplete.")
+            gh(
+                "release",
+                "upload",
+                tag,
+                str(directory / name),
+                "--repo",
+                os.environ["GITHUB_REPOSITORY"],
+            )
+    return draft
+
+
 def registry_digest(reference: str, allow_missing: bool = False) -> str | None:
     result = subprocess.run(
         [
@@ -165,59 +282,72 @@ def publish(directory: Path, run_id: str, release_tag: str) -> None:
         command("git", "rev-parse", "--verify", f"refs/tags/{release_tag}^{{commit}}"),
         REVISION,
     )
-    automatic = tagged
-    if automatic:
-        run_id = gh(
-            "run",
-            "list",
-            "--repo",
-            os.environ["GITHUB_REPOSITORY"],
-            "--workflow",
-            "ci.yaml",
-            "--branch",
-            "master",
-            "--commit",
-            revision,
-            "--status",
-            "success",
-            "--limit",
-            "20",
-            "--json",
-            "databaseId,event",
-            "--jq",
-            '[.[] | select(.event == "push" or .event == "workflow_dispatch")] | first | .databaseId // empty',
-        )
-        if not run_id:
-            raise ValueError(
-                "Wait for successful master CI for the tagged commit, then rerun Release."
-            )
-    text(run_id, r"[1-9][0-9]*")
-    run = fields(
-        json.loads(
-            gh(
+    if download_github_release(directory, release_tag):
+        release = verify_release(directory, revision)
+    else:
+        automatic = tagged
+        if automatic:
+            run_id = gh(
                 "run",
-                "view",
-                run_id,
+                "list",
                 "--repo",
                 os.environ["GITHUB_REPOSITORY"],
+                "--workflow",
+                "ci.yaml",
+                "--branch",
+                "master",
+                "--commit",
+                revision,
+                "--status",
+                "success",
+                "--limit",
+                "20",
                 "--json",
-                "conclusion,workflowName,headBranch,headSha,event",
+                "databaseId,event",
+                "--jq",
+                '[.[] | select(.event == "push" or .event == "workflow_dispatch")] | first | .databaseId // empty',
             )
-        ),
-        {"conclusion", "workflowName", "headBranch", "headSha", "event"},
-    )
-    if (run["conclusion"], run["workflowName"], run["headBranch"]) != (
-        "success",
-        "CI",
-        "master",
-    ) or run["event"] not in ("push", "workflow_dispatch"):
-        raise ValueError("The release requires a successful master CI run.")
-    source = text(run["headSha"], REVISION)
-    if source != revision:
-        raise ValueError("Publication requires CI for the exact tagged commit.")
-    download_release(directory, run_id)
-    release = verify_release(directory, source)
+            if not run_id:
+                raise ValueError(
+                    "Wait for successful master CI for the tagged commit, then rerun Release."
+                )
+        text(run_id, r"[1-9][0-9]*")
+        run = fields(
+            json.loads(
+                gh(
+                    "run",
+                    "view",
+                    run_id,
+                    "--repo",
+                    os.environ["GITHUB_REPOSITORY"],
+                    "--json",
+                    "conclusion,workflowName,headBranch,headSha,event",
+                )
+            ),
+            {"conclusion", "workflowName", "headBranch", "headSha", "event"},
+        )
+        if (run["conclusion"], run["workflowName"], run["headBranch"]) != (
+            "success",
+            "CI",
+            "master",
+        ) or run["event"] not in ("push", "workflow_dispatch"):
+            raise ValueError("The release requires a successful master CI run.")
+        source = text(run["headSha"], REVISION)
+        if source != revision:
+            raise ValueError("Publication requires CI for the exact tagged commit.")
+        download_release(directory, run_id)
+        release = verify_release(directory, source)
+    draft = store_release_assets(directory, release_tag)
     publish_aliases(release, release_tag)
+    if draft:
+        gh(
+            "release",
+            "edit",
+            release_tag,
+            "--repo",
+            os.environ["GITHUB_REPOSITORY"],
+            "--draft=false",
+        )
 
 
 def publish_development(directory: Path) -> None:
