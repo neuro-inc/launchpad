@@ -109,7 +109,42 @@ class CleanupTests(unittest.TestCase):
         root = self.version(1, ["ci-" + "a" * 40])
         child = self.version(2, [], recent=True)
         self.graph[root["digest"]] = {child["digest"]}
-        self.assertEqual(self.selected([root, child]), [1])
+        self.assertEqual(self.selected([root, child]), [])
+
+    def test_retained_ci_graph_is_removed_after_its_last_child_expires(self) -> None:
+        root = self.version(1, ["ci-" + "a" * 40])
+        index = self.version(2, [])
+        child = self.version(3, [], recent=True)
+        expired_child = self.version(4, [])
+        independent = self.version(5, ["ci-" + "b" * 40])
+        unknown = self.version(6, [])
+        self.graph = {
+            root["digest"]: {index["digest"]},
+            index["digest"]: {child["digest"], expired_child["digest"]},
+            child["digest"]: set(),
+            expired_child["digest"]: set(),
+            independent["digest"]: set(),
+            unknown["digest"]: set(),
+        }
+        versions = [root, index, child, expired_child, independent, unknown]
+
+        with patch(
+            "cleanup_images.children",
+            side_effect=lambda repository, digest: self.graph[digest],
+        ):
+            first_pass = self.selected(versions)
+            self.assertEqual(first_pass, [5])
+            for version in versions:
+                if version["id"] in first_pass:
+                    del self.graph[version["digest"]]
+            versions = [
+                version for version in versions if version["id"] not in first_pass
+            ]
+            self.cutoff += timedelta(days=2)
+
+            second_pass = self.selected(versions)
+            self.assertEqual(second_pass[:2], [1, 2])
+            self.assertCountEqual(second_pass[2:], [3, 4])
 
     def test_apply_marks_descendants_before_deleting_parents(self) -> None:
         root = self.version(1, ["ci-" + "a" * 40])

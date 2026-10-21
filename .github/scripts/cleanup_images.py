@@ -186,7 +186,18 @@ def candidates(
         )
     except CycleError as error:
         raise ValueError("The image manifest graph contains a cycle.") from error
-    return [remaining[digest] for digest in reversed(child_first)]
+
+    # CI ancestors retain ownership of untagged children until those children expire.
+    retained = {
+        v["digest"] for v in versions if not v["tags"] and v["digest"] not in expired
+    }
+    for digest in child_first:
+        if graph[digest] & retained:
+            retained.add(digest)
+    retained = reachable(retained)
+    return [
+        remaining[digest] for digest in reversed(child_first) if digest not in retained
+    ]
 
 
 def cleanup(*, apply: bool = False) -> None:
