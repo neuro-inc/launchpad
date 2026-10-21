@@ -48,7 +48,7 @@ Unset these variables if your shell inherited them.
 Start the containers:
 
 ```bash
-docker compose -f scripts/local_development/compose.yaml up -d --wait
+make local-up
 ```
 
 Compose binds PostgreSQL to `127.0.0.1:15432` and Keycloak to `127.0.0.1:18081`.
@@ -59,7 +59,7 @@ Do not expose these services to other computers.
 Start the backend in the same shell:
 
 ```bash
-poetry run python -m scripts.local_development
+make local-backend
 ```
 
 The backend applies database migrations before serving requests on `127.0.0.1:8080`.
@@ -67,28 +67,27 @@ The local launcher enables HTTP Keycloak access and allows the local frontend or
 Production configuration remains separate.
 The launcher does not seed templates or install Apps during startup.
 
-Create `frontend/.env.local` in another terminal:
+Run the setup command from the repository root in another terminal:
 
 ```bash
-(umask 077; {
-  printf '%s\n' \
-    'NEXT_PUBLIC_ENVIRONMENT=local' \
-    'NEXT_PUBLIC_SITE_URL=http://dev.localhost:8080' \
-    'NEXTAUTH_URL=http://dev.localhost:13000'
-  printf 'NEXTAUTH_SECRET=%s\n' "$(openssl rand -hex 32)"
-} > frontend/.env.local)
+make local-setup
 ```
 
-This command replaces an existing local environment file.
-Preserve existing settings before running it.
-Keep the generated session secret unchanged between restarts.
+The command creates `frontend/.env.local` with private file permissions and a random session secret.
+Repeated runs preserve the existing file and session secret.
 Git ignores this file.
+If the file already exists, check that its values match these local settings:
 
-Start the frontend:
+```dotenv
+NEXT_PUBLIC_ENVIRONMENT=local
+NEXT_PUBLIC_SITE_URL=http://dev.localhost:8080
+NEXTAUTH_URL=http://dev.localhost:13000
+```
+
+Start the frontend from the repository root:
 
 ```bash
-cd frontend
-npm run start -- --hostname 127.0.0.1 --port 13000
+make local-frontend
 ```
 
 Open [Launchpad](http://dev.localhost:13000).
@@ -121,7 +120,7 @@ A fresh database has no templates or installed Apps.
 Sign out and confirm that the protected Apps page requests authentication again.
 Backend API documentation is available at [Swagger UI](http://dev-api.localhost:8080/openapi/v1/docs).
 
-Run the repository checks:
+Run the repository checks from the repository root in another terminal:
 
 ```bash
 make lint
@@ -148,7 +147,7 @@ Stop both host processes with `Ctrl+C`.
 Stop the containers from the repository root:
 
 ```bash
-docker compose -f scripts/local_development/compose.yaml down
+make local-down
 ```
 
 To delete local database data and reimport the realm, remove this Compose project's volumes:

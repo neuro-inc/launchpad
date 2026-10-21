@@ -6,7 +6,6 @@ from pathlib import Path
 
 import uvicorn
 from apolo_sdk import Factory
-from fastapi.middleware.cors import CORSMiddleware
 from yarl import URL
 
 from launchpad.app_factory import create_app
@@ -66,14 +65,7 @@ async def create_config() -> Config:
 
 def main() -> None:
     config = asyncio.run(create_config())
-    app = create_app(config)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://dev.localhost:13000"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    app = create_app(config, cors_origins=["http://dev.localhost:13000"])
     uvicorn.run(app, host=config.server.host, port=config.server.port)
 
 

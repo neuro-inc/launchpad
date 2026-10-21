@@ -104,3 +104,19 @@ test-release:
 .PHONY: lint-release
 lint-release:
 	python3 -m mypy --strict --config-file=/dev/null .github/scripts
+
+.PHONY: local-setup local-up local-down local-backend local-frontend
+local-setup:
+	poetry run python -m scripts.local_development.setup
+
+local-up:
+	docker compose -f scripts/local_development/compose.yaml up -d --wait
+
+local-down:
+	docker compose -f scripts/local_development/compose.yaml down
+
+local-backend:
+	poetry run python -m scripts.local_development
+
+local-frontend:
+	cd frontend && npm run start -- --hostname 127.0.0.1 --port 13000
