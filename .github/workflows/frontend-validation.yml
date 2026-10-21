@@ -24,7 +24,7 @@ jobs:
         run: |
           echo "::error::Private frontend dependencies require a maintainer branch in this repository. Create a replacement PR from that branch."
           exit 1
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version-file: frontend/.nvmrc
           cache: npm
