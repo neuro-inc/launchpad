@@ -69,6 +69,12 @@ It rejects PR runs, failed runs, expired artifacts, and ambiguous artifacts.
 The release manifest must identify the selected CI run's source commit.
 The tagged commit, successful CI run, and release manifest must identify the same exact source commit.
 
+Use the Web UI version convention `vYY.M.N`, such as `v26.10.1`.
+`YY` identifies the two-digit year, and `M` identifies the month without a leading zero.
+Set `N` to the highest existing number for that year and month plus one.
+Start at `0` when that month has no version tags.
+For example, `v26.10.1` follows `v26.10.0`.
+
 Complete development acceptance before pushing the version tag:
 
 ```sh
