@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, call, patch
 
 import pytest
 from apolo_app_types import ApoloSecret
@@ -33,7 +33,7 @@ async def test_frontend_output_references_the_previously_persisted_secret(
 ) -> None:
     creator = AsyncMock(return_value=ApoloSecret(key="secret-key"))
     monkeypatch.setattr(
-        "apolo_apps_launchpad.outputs_processor.create_apolo_secret", creator
+        "apolo_app_types.outputs.utils.apolo_secrets.create_apolo_secret", creator
     )
     result = await get_launchpad_outputs(
         helm_values={
@@ -46,11 +46,29 @@ async def test_frontend_output_references_the_previously_persisted_secret(
         result["frontend_session_secret"]["key"]
         == "launchpad-frontend-session-test-app-id"
     )
-    assert {call.kwargs["key"] for call in creator.await_args_list} == {
+    assert sorted(request.kwargs["key"] for request in creator.await_args_list) == [
         "keycloak-admin-pswd",
         "keycloak-db-pswd",
         "launchpad-admin-pswd",
-    }
+    ]
+
+
+async def test_output_secret_failure_uses_the_shared_retry_policy(
+    setup_clients: Client,
+    mock_kubernetes_client: object,
+    app_instance_id: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    creator = AsyncMock(side_effect=RuntimeError("Secret storage is unavailable."))
+    sleeper = AsyncMock()
+    monkeypatch.setattr(
+        "apolo_app_types.outputs.utils.apolo_secrets.create_apolo_secret", creator
+    )
+    with patch("apolo_app_types.outputs.utils.apolo_secrets.asyncio.sleep", sleeper):
+        with pytest.raises(RuntimeError, match="Secret storage is unavailable"):
+            await get_launchpad_outputs(KEYCLOAK_HELM_VALUES, app_instance_id)
+    assert creator.await_count == 5
+    assert sleeper.await_args_list == [call(delay) for delay in (2, 4, 8, 16)]
 
 
 @pytest.mark.asyncio
@@ -58,7 +76,7 @@ async def test_launchpad_output_generation(
     setup_clients, mock_kubernetes_client, app_instance_id, monkeypatch
 ):
     monkeypatch.setattr(
-        "apolo_apps_launchpad.outputs_processor.create_apolo_secret",
+        "apolo_app_types.outputs.utils.apolo_secrets.create_apolo_secret",
         create_apolo_secret,
     )
     """Test launchpad output generation for app_url."""
@@ -114,7 +132,7 @@ async def test_launchpad_output_generation_no_external_url(
         return None
 
     monkeypatch.setattr(
-        "apolo_apps_launchpad.outputs_processor.create_apolo_secret",
+        "apolo_app_types.outputs.utils.apolo_secrets.create_apolo_secret",
         create_apolo_secret,
     )
     monkeypatch.setattr(
@@ -170,7 +188,7 @@ async def test_launchpad_output_generation_no_service(
         return None
 
     monkeypatch.setattr(
-        "apolo_apps_launchpad.outputs_processor.create_apolo_secret",
+        "apolo_app_types.outputs.utils.apolo_secrets.create_apolo_secret",
         create_apolo_secret,
     )
     monkeypatch.setattr(
@@ -219,7 +237,7 @@ async def test_launchpad_output_generation_custom_ports(
         return ("launchpad.custom.domain", 443)
 
     monkeypatch.setattr(
-        "apolo_apps_launchpad.outputs_processor.create_apolo_secret",
+        "apolo_app_types.outputs.utils.apolo_secrets.create_apolo_secret",
         create_apolo_secret,
     )
     monkeypatch.setattr(
