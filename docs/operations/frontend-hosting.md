@@ -93,7 +93,7 @@ Coordinate DNS and TLS changes with the separate cloud-infra migration.
 ## Local checks
 
 Run `make test-hooks`, `make test-release`, and `make lint-release` for processor, chart, and release checks.
-Release checks require Python 3.12, Helm 3.16.3, and mypy 1.18.2.
+Release checks require Python 3.12, Helm 3.16.3, mypy 1.18.2, Bash, and jq.
 From `frontend/`, run `npm ci`, `npm run lint`, and `npm run build` with Node.js 22.
 Set `FONTAWESOME_NPM_AUTH_TOKEN` before dependency installation.
 Verify `/api/health` in the built container with a synthetic session secret.

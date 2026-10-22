@@ -32,6 +32,9 @@ jobs:
       cancel-in-progress: false
     environment: production
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -42,11 +45,64 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Publish the development-tested App combination
+      - name: Restore saved release assets
+        id: restore
+        run: >-
+          python3 .github/scripts/release.py restore "$RUNNER_TEMP/launchpad-release"
+          --release-tag "$RELEASE_TAG"
+      - name: Select successful master CI
+        if: steps.restore.outputs.restored != 'true'
+        id: build
+        shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
           BUILD_RUN_ID: ${{ inputs.build_run_id }}
-          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+          RELEASE_REVISION: ${{ steps.restore.outputs.revision }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            BUILD_RUN_ID=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yaml \
+              --branch master --commit "$RELEASE_REVISION" --status success --limit 20 \
+              --json databaseId,event \
+              --jq '[.[] | select(.event == "push" or .event == "workflow_dispatch")] | first | .databaseId // empty')
+          fi
+          [[ "$BUILD_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo 'Select successful master CI for the tagged commit.' >&2; exit 1; }
+          gh run view "$BUILD_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --json conclusion,workflowName,headBranch,headSha,event | \
+            jq -e --arg revision "$RELEASE_REVISION" \
+              '.conclusion == "success" and .workflowName == "CI" and .headBranch == "master" and
+               .headSha == $revision and (.event == "push" or .event == "workflow_dispatch")'
+          artifact_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/artifacts" \
+            --paginate --jq '.artifacts[] | select(.name == "launchpad-release" and .expired == false) | .id')
+          [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || { echo 'One unexpired App release artifact is required.' >&2; exit 1; }
+          printf 'run_id=%s\nartifact_id=%s\n' "$BUILD_RUN_ID" "$artifact_id" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        if: steps.build.outputs.artifact_id != ''
+        with:
+          artifact-ids: ${{ steps.build.outputs.artifact_id }}
+          run-id: ${{ steps.build.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/launchpad-release
+          merge-multiple: true
+      - name: Verify the combination and stage missing release assets
+        id: assets
+        run: >-
+          python3 .github/scripts/release.py stage "$RUNNER_TEMP/launchpad-release"
+          --release-tag "$RELEASE_TAG"
+      - name: Save the original release assets
+        if: steps.assets.outputs.upload == 'true'
+        env:
+          CREATE_RELEASE: ${{ steps.assets.outputs.create }}
+        run: |
+          if [ "$CREATE_RELEASE" = true ]; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/launchpad-release/upload/"* \
+              --verify-tag --draft --title "$RELEASE_TAG" \
+              --notes 'Publish the tested Launchpad App image and chart combination.'
+          else
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/launchpad-release/upload/"*
+          fi
+      - name: Publish and verify image aliases
         run: >-
           python3 .github/scripts/release.py publish "$RUNNER_TEMP/launchpad-release"
-          --run-id "$BUILD_RUN_ID" --release-tag "$RELEASE_TAG"
+          --release-tag "$RELEASE_TAG"
+      - name: Publish the verified GitHub Release
+        if: steps.assets.outputs.draft == 'true'
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false

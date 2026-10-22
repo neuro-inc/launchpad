@@ -17,14 +17,14 @@ from release import (
     assemble,
     command,
     download_github_release,
-    download_release,
     find_release,
     head,
     load_release,
+    main,
     publish,
     publish_development,
     registry_digest,
-    store_release_assets,
+    stage_release_assets,
     verify_release,
     write_json,
 )
@@ -116,13 +116,6 @@ class ReleaseTests(unittest.TestCase):
 
     def mock_publication(self) -> None:
         self.git("-c", "tag.gpgsign=false", "tag", "v1.2.3")
-        self.run_metadata: dict[str, object] = {
-            "conclusion": "success",
-            "workflowName": "CI",
-            "headBranch": "master",
-            "headSha": self.release["source_revision"],
-            "event": "push",
-        }
         self.registry = {
             image: image.split("@", 1)[1] for image in self.images.values()
         }
@@ -135,21 +128,14 @@ class ReleaseTests(unittest.TestCase):
             self.registry[args[-2]] = self.registry[args[-1]]
             return ""
 
-        def download(directory: Path, run_id: str) -> None:
-            self.assertEqual(run_id, "42")
+        def saved(directory: Path, tag: str) -> bool:
             shutil.copytree(self.base, directory, dirs_exist_ok=True)
+            return True
 
         for mock in (
             patch.dict(os.environ, {"GITHUB_EVENT_NAME": "workflow_dispatch"}),
-            patch(
-                "release.gh",
-                side_effect=lambda *args: self.release["source_revision"]
-                if args[0] == "api"
-                else json.dumps(self.run_metadata),
-            ),
-            patch("release.download_release", side_effect=download),
-            patch("release.download_github_release", return_value=False),
-            patch("release.store_release_assets", return_value=False),
+            patch("release.gh", return_value=self.release["source_revision"]),
+            patch("release.download_github_release", side_effect=saved),
             patch(
                 "release.registry_digest",
                 side_effect=lambda reference, allow_missing=False: self.registry.get(
@@ -182,60 +168,80 @@ class ReleaseTests(unittest.TestCase):
 
     def test_saved_release_supports_retry_after_ci_artifact_expiry(self) -> None:
         self.mock_publication()
+        output = self.root / "publication"
+        outputs = self.root / "outputs"
+        with (
+            patch(
+                "sys.argv",
+                ["release.py", "restore", str(output), "--release-tag", "v1.2.3"],
+            ),
+            patch.dict(os.environ, {"GITHUB_OUTPUT": str(outputs)}),
+            patch("release.gh", side_effect=AssertionError("CI history expired")),
+        ):
+            main()
+            publish(output, "v1.2.3")
+        self.assertEqual(outputs.read_text(), f"revision={head()}\nrestored=true\n")
+        self.assertEqual(len(self.registry_writes), 3)
+
+    def test_missing_durable_assets_prevent_registry_publication(self) -> None:
+        self.mock_publication()
+        with (
+            patch("release.download_github_release", return_value=False),
+            self.assertRaisesRegex(ValueError, "assets are incomplete"),
+        ):
+            publish(self.base, "v1.2.3")
+        self.assertEqual(self.registry_writes, [])
+
+    def test_conflicting_durable_assets_prevent_registry_publication(self) -> None:
+        self.mock_publication()
 
         def saved(directory: Path, tag: str) -> bool:
-            shutil.copytree(self.base, directory)
+            shutil.copytree(self.base, directory, dirs_exist_ok=True)
+            (directory / "release.json").write_text("different")
             return True
 
         with (
             patch("release.download_github_release", side_effect=saved),
-            patch(
-                "release.download_release",
-                side_effect=AssertionError("Expired CI artifact"),
-            ),
-            patch("release.gh", side_effect=AssertionError("CI history expired")),
+            self.assertRaisesRegex(ValueError, "asset conflicts"),
         ):
-            publish(self.root / "publication", "42", "v1.2.3")
-        self.assertEqual(len(self.registry_writes), 3)
-
-    def test_asset_storage_failure_prevents_registry_publication(self) -> None:
-        self.mock_publication()
-        with patch(
-            "release.store_release_assets", side_effect=ValueError("conflicting asset")
-        ):
-            with self.assertRaisesRegex(ValueError, "conflicting asset"):
-                publish(self.root / "publication", "42", "v1.2.3")
+            publish(self.base, "v1.2.3")
         self.assertEqual(self.registry_writes, [])
 
-    def test_new_github_release_stays_draft_until_images_publish(self) -> None:
+    def test_new_release_stages_both_original_assets(self) -> None:
         self.mock_publication()
-        with (
-            patch("release.store_release_assets", return_value=True),
-            patch("release.gh", return_value=json.dumps(self.run_metadata)) as api,
-        ):
-            publish(self.root / "publication", "42", "v1.2.3")
-        self.assertEqual(api.call_args.args[:3], ("release", "edit", "v1.2.3"))
-        self.assertIn("--draft=false", api.call_args.args)
+        with patch("release.find_release", return_value=None):
+            self.assertEqual(
+                stage_release_assets(self.base, "v1.2.3"),
+                {"create": "true", "draft": "true", "upload": "true"},
+            )
+        for name in ("release.json", self.release["chart"]["filename"]):
+            self.assertEqual(
+                (self.base / "upload" / name).read_bytes(),
+                (self.base / name).read_bytes(),
+            )
 
-    def test_durable_assets_are_uploaded_without_clobbering(self) -> None:
+    def test_partial_draft_stages_only_missing_assets(self) -> None:
+        self.mock_publication()
+        existing = {"draft": True, "assets": [{"name": "release.json"}]}
+
+        def download(tag: str, name: str, directory: Path) -> None:
+            shutil.copyfile(self.base / name, directory / name)
+
         with (
-            patch(
-                "release.find_release",
-                side_effect=[None, {"draft": True, "assets": []}],
-            ),
-            patch("release.gh") as api,
+            patch("release.find_release", return_value=existing),
+            patch("release.download_asset", side_effect=download),
         ):
-            self.assertTrue(store_release_assets(self.base, "v1.2.3"))
+            self.assertEqual(
+                stage_release_assets(self.base, "v1.2.3"),
+                {"create": "false", "draft": "true", "upload": "true"},
+            )
         self.assertEqual(
-            api.call_args_list[0].args[:3], ("release", "create", "v1.2.3")
+            [path.name for path in (self.base / "upload").iterdir()],
+            [self.release["chart"]["filename"]],
         )
-        self.assertIn("--verify-tag", api.call_args_list[0].args)
-        self.assertIn("--draft", api.call_args_list[0].args)
-        self.assertEqual(len(api.call_args_list), 3)
-        for call in api.call_args_list:
-            self.assertNotIn("--clobber", call.args)
 
     def test_existing_assets_must_match_before_upload(self) -> None:
+        self.mock_publication()
         existing: dict[str, object] = {
             "draft": True,
             "assets": [{"name": "release.json"}],
@@ -250,10 +256,11 @@ class ReleaseTests(unittest.TestCase):
             patch("release.gh") as api,
         ):
             with self.assertRaisesRegex(ValueError, "conflicts"):
-                store_release_assets(self.base, "v1.2.3")
+                stage_release_assets(self.base, "v1.2.3")
         api.assert_not_called()
 
     def test_published_release_assets_are_verified_without_modification(self) -> None:
+        self.mock_publication()
         existing: dict[str, object] = {
             "draft": False,
             "assets": [
@@ -270,19 +277,23 @@ class ReleaseTests(unittest.TestCase):
             patch("release.download_asset", side_effect=download),
             patch("release.gh") as api,
         ):
-            self.assertFalse(store_release_assets(self.base, "v1.2.3"))
+            self.assertEqual(
+                stage_release_assets(self.base, "v1.2.3"),
+                {"create": "false", "draft": "false", "upload": "false"},
+            )
             output = self.root / "saved"
             self.assertTrue(download_github_release(output, "v1.2.3"))
             self.assertEqual(verify_release(output, head()), self.release)
         api.assert_not_called()
 
     def test_incomplete_published_release_is_rejected(self) -> None:
+        self.mock_publication()
         with (
             patch("release.find_release", return_value={"draft": False, "assets": []}),
             patch("release.gh") as api,
         ):
             with self.assertRaisesRegex(ValueError, "incomplete"):
-                store_release_assets(self.base, "v1.2.3")
+                stage_release_assets(self.base, "v1.2.3")
         api.assert_not_called()
 
     def test_publication_preserves_the_tested_combination_without_building(
@@ -290,7 +301,8 @@ class ReleaseTests(unittest.TestCase):
     ) -> None:
         self.mock_publication()
         output = self.root / "publication"
-        publish(output, "42", "v1.2.3")
+        shutil.copytree(self.base, output)
+        publish(output, "v1.2.3")
         for name in ("release.json", self.release["chart"]["filename"]):
             self.assertEqual(
                 (output / name).read_bytes(), (self.base / name).read_bytes()
@@ -318,7 +330,7 @@ class ReleaseTests(unittest.TestCase):
         self.mock_publication()
         for component, image in self.images.items():
             self.registry[REPOSITORIES[component] + ":v1.2.3"] = image.split("@", 1)[1]
-        publish(self.root / "publication", "42", "v1.2.3")
+        publish(self.base, "v1.2.3")
         self.assertEqual(self.registry_writes, [])
 
     def test_publication_retry_completes_matching_partial_publication(self) -> None:
@@ -326,7 +338,7 @@ class ReleaseTests(unittest.TestCase):
         self.registry[REPOSITORIES["backend"] + ":v1.2.3"] = self.images[
             "backend"
         ].split("@", 1)[1]
-        publish(self.root / "publication", "42", "v1.2.3")
+        publish(self.base, "v1.2.3")
         self.assertEqual(len(self.registry_writes), 2)
         for component, image in self.images.items():
             self.assertEqual(
@@ -338,92 +350,22 @@ class ReleaseTests(unittest.TestCase):
         self.mock_publication()
         self.registry[REPOSITORIES["hook"] + ":v1.2.3"] = "sha256:" + "f" * 64
         with self.assertRaisesRegex(ValueError, "already selects a different image"):
-            publish(self.root / "publication", "42", "v1.2.3")
+            publish(self.base, "v1.2.3")
         self.assertEqual(self.registry_writes, [])
 
     def test_publication_rejects_a_missing_source_before_any_write(self) -> None:
         self.mock_publication()
         del self.registry[self.images["hook"]]
         with self.assertRaisesRegex(ValueError, "tested digest"):
-            publish(self.root / "publication", "42", "v1.2.3")
+            publish(self.base, "v1.2.3")
         self.assertEqual(self.registry_writes, [])
-
-    def test_publication_requires_a_successful_master_ci_source(self) -> None:
-        self.mock_publication()
-        for field, value in (
-            ("conclusion", "failure"),
-            ("headBranch", "feature"),
-            ("event", "pull_request"),
-            ("workflowName", "Release"),
-            ("headSha", "f" * 40),
-        ):
-            with self.subTest(field=field):
-                original = self.run_metadata[field]
-                self.run_metadata[field] = value
-                with self.assertRaises(ValueError):
-                    publish(self.root / "publication", "42", "v1.2.3")
-                self.run_metadata[field] = original
-                self.assertEqual(self.registry_writes, [])
 
     def test_publication_rejects_changed_tag_inputs_before_any_write(self) -> None:
         self.mock_publication()
         self.change("frontend/src/app.ts")
         self.git("-c", "tag.gpgsign=false", "tag", "v1.2.4")
-        with self.assertRaisesRegex(ValueError, "exact tagged commit"):
-            publish(self.root / "publication", "42", "v1.2.4")
-        self.assertEqual(self.registry_writes, [])
-
-    def test_tag_push_selects_the_successful_ci_run_for_its_commit(self) -> None:
-        self.mock_publication()
-        with (
-            patch.dict(
-                os.environ,
-                {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/tags/v1.2.3"},
-            ),
-            patch(
-                "release.gh",
-                side_effect=[
-                    "42",
-                    json.dumps(self.run_metadata),
-                ],
-            ) as api,
-        ):
-            publish(self.root / "publication", "", "v1.2.3")
-        arguments = api.call_args_list[0].args
-        for option, value in (
-            ("--commit", self.release["source_revision"]),
-            ("--branch", "master"),
-            ("--workflow", "ci.yaml"),
-            ("--status", "success"),
-        ):
-            self.assertEqual(arguments[arguments.index(option) + 1], value)
-        self.assertEqual(len(self.registry_writes), 3)
-
-    def test_automatic_publication_requires_available_ci_for_the_exact_commit(
-        self,
-    ) -> None:
-        self.mock_publication()
-        with patch.dict(
-            os.environ,
-            {"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/tags/v1.2.3"},
-        ):
-            with (
-                patch("release.gh", return_value=""),
-                self.assertRaisesRegex(ValueError, "successful master CI"),
-            ):
-                publish(self.root / "publication", "", "v1.2.3")
-            self.run_metadata["headSha"] = "f" * 40
-            with (
-                patch(
-                    "release.gh",
-                    side_effect=[
-                        "42",
-                        json.dumps(self.run_metadata),
-                    ],
-                ),
-                self.assertRaisesRegex(ValueError, "exact tagged commit"),
-            ):
-                publish(self.root / "publication", "", "v1.2.3")
+        with self.assertRaisesRegex(ValueError, "tested source commit"):
+            publish(self.base, "v1.2.4")
         self.assertEqual(self.registry_writes, [])
 
     def test_tag_push_cannot_publish_a_different_tag(self) -> None:
@@ -435,7 +377,7 @@ class ReleaseTests(unittest.TestCase):
             ),
             self.assertRaises(ValueError),
         ):
-            publish(self.root / "publication", "42", "v1.2.3")
+            publish(self.base, "v1.2.3")
         self.assertEqual(self.registry_writes, [])
 
     def test_development_publication_updates_existing_aliases_without_building(
@@ -496,38 +438,22 @@ class ReleaseTests(unittest.TestCase):
         self,
     ) -> None:
         self.mock_publication()
-        for event, ref, run_id, tag in (
-            ("push", "refs/heads/master", "42", "v1.2.3"),
-            ("workflow_dispatch", "refs/heads/feature", "42", "v1.2.3"),
-            ("workflow_dispatch", "refs/tags/v1.2.3", "42", "v1.2.3"),
-            ("workflow_dispatch", "refs/heads/master", "", "v1.2.3"),
-            ("workflow_dispatch", "refs/heads/master", "invalid", "v1.2.3"),
-            ("workflow_dispatch", "refs/heads/master", "42", "release"),
-            ("workflow_dispatch", "refs/heads/master", "42", "v/unsafe"),
+        for event, ref, tag in (
+            ("push", "refs/heads/master", "v1.2.3"),
+            ("workflow_dispatch", "refs/heads/feature", "v1.2.3"),
+            ("workflow_dispatch", "refs/tags/v1.2.3", "v1.2.3"),
+            ("workflow_dispatch", "refs/heads/master", "release"),
+            ("workflow_dispatch", "refs/heads/master", "v/unsafe"),
         ):
-            with self.subTest(event=event, ref=ref, run_id=run_id, tag=tag):
+            with self.subTest(event=event, ref=ref, tag=tag):
                 with (
                     patch.dict(
                         os.environ, {"GITHUB_EVENT_NAME": event, "GITHUB_REF": ref}
                     ),
                     self.assertRaises(ValueError),
                 ):
-                    publish(self.root / "publication", run_id, tag)
+                    publish(self.base, tag)
                 self.assertEqual(self.registry_writes, [])
-
-    def test_publication_rejects_an_unavailable_build_artifact(self) -> None:
-        self.mock_publication()
-        with (
-            patch(
-                "release.download_release",
-                side_effect=ValueError(
-                    "The selected App release artifact is unavailable."
-                ),
-            ),
-            self.assertRaisesRegex(ValueError, "artifact is unavailable"),
-        ):
-            publish(self.root / "publication", "42", "v1.2.3")
-        self.assertEqual(self.registry_writes, [])
 
     def test_publication_detects_an_alias_digest_change(self) -> None:
         self.mock_publication()
@@ -541,19 +467,19 @@ class ReleaseTests(unittest.TestCase):
             patch("release.registry_digest", side_effect=digest),
             self.assertRaisesRegex(ValueError, "alias changed the tested digest"),
         ):
-            publish(self.root / "publication", "42", "v1.2.3")
+            publish(self.base, "v1.2.3")
 
     def test_publication_requires_an_existing_git_tag(self) -> None:
         self.mock_publication()
         with self.assertRaises(subprocess.CalledProcessError):
-            publish(self.root / "publication", "42", "v9.9.9")
+            publish(self.base, "v9.9.9")
         self.assertEqual(self.registry_writes, [])
 
     def test_publication_rejects_chart_tampering_before_any_write(self) -> None:
         self.mock_publication()
         (self.base / self.release["chart"]["filename"]).write_bytes(b"tampered")
         with self.assertRaisesRegex(ValueError, "checksum"):
-            publish(self.root / "publication", "42", "v1.2.3")
+            publish(self.base, "v1.2.3")
         self.assertEqual(self.registry_writes, [])
 
     def test_registry_inspection_distinguishes_missing_tags_from_failures(self) -> None:
@@ -594,48 +520,13 @@ class ReleaseTests(unittest.TestCase):
         ):
             self.assertEqual(registry_digest(reference), expected)
 
-    def test_duplicate_attempt_artifacts_fail_before_download(self) -> None:
-        with patch.dict(os.environ, {"GITHUB_REPOSITORY": "neuro-inc/launchpad"}):
-            with (
-                patch("release.gh", return_value="2") as api,
-                self.assertRaisesRegex(ValueError, "ambiguous release artifacts"),
-            ):
-                download_release(self.root / "download", "42")
-            api.assert_called_once()
-
-    def test_single_replacement_artifact_downloads(self) -> None:
-        with (
-            patch.dict(os.environ, {"GITHUB_REPOSITORY": "neuro-inc/launchpad"}),
-            patch("release.gh", side_effect=["1\n0", ""]) as api,
-        ):
-            download_release(self.root / "download", "42")
-        self.assertEqual(api.call_count, 2)
-        self.assertNotIn("--slurp", api.call_args_list[0].args)
-        self.assertEqual(api.call_args.args[:3], ("run", "download", "42"))
-
-    def test_artifact_counts_cover_every_page_and_reject_invalid_counts(self) -> None:
-        with patch.dict(os.environ, {"GITHUB_REPOSITORY": "neuro-inc/launchpad"}):
-            for counts in ("1\n1", "2\n0", "1\n-1", "invalid", ""):
-                with (
-                    patch("release.gh", return_value=counts) as api,
-                    self.assertRaises(ValueError),
-                ):
-                    download_release(self.root / "download", "42")
-                api.assert_called_once()
-            with (
-                patch("release.gh", return_value="0\n0") as api,
-                self.assertRaisesRegex(ValueError, "artifact is unavailable"),
-            ):
-                download_release(self.root / "download", "42")
-            api.assert_called_once()
-
     def test_publication_requires_the_exact_commit_even_for_documentation(self) -> None:
         self.mock_publication()
         (self.root / "notes.txt").write_text("documentation only\n")
         self.commit()
         self.git("-c", "tag.gpgsign=false", "tag", "v1.2.4")
-        with self.assertRaisesRegex(ValueError, "exact tagged commit"):
-            publish(self.root / "publication", "42", "v1.2.4")
+        with self.assertRaisesRegex(ValueError, "tested source commit"):
+            publish(self.base, "v1.2.4")
         self.assertEqual(self.registry_writes, [])
 
     def test_manifest_requires_all_three_immutable_images_from_the_expected_repositories(
@@ -664,7 +555,7 @@ class ReleaseTests(unittest.TestCase):
             with self.subTest(field=field):
                 write_json(self.base / "release.json", {**self.release, field: value})
                 with self.assertRaises(ValueError):
-                    publish(self.root / "publication", "42", "v1.2.3")
+                    publish(self.base, "v1.2.3")
                 self.assertEqual(self.registry_writes, [])
 
     def test_complete_build_assembly_records_the_chart_and_exact_source(self) -> None:
