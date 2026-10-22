@@ -72,6 +72,7 @@ A retry can remove marked versions without another retention delay, unless publi
 Manual cleanup dispatch defaults to a dry run; review its output before setting `apply` to `true`.
 Registry and metadata errors stop cleanup before deletion begins.
 Publication and cleanup share the queued `launchpad-registry` concurrency group.
+Launchpad collects protected digests from its release manifests before calling the shared `reuse` cleanup action.
 Do not modify registry versions outside that group while cleanup runs.
 Use published versions for installations that must remain supported beyond the CI retention window.
 
