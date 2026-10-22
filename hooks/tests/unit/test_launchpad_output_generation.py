@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from unittest.mock import AsyncMock, call, patch
 
 import pytest
@@ -25,7 +27,7 @@ async def create_apolo_secret(*args, **kwargs):
     return ApoloSecret(key="secret=key")
 
 
-async def test_frontend_output_references_the_previously_persisted_secret(
+async def test_frontend_session_secret_remains_internal(
     setup_clients: Client,
     mock_kubernetes_client: object,
     app_instance_id: str,
@@ -42,10 +44,13 @@ async def test_frontend_output_references_the_previously_persisted_secret(
         },
         app_instance_id=app_instance_id,
     )
-    assert (
-        result["frontend_session_secret"]["key"]
-        == "launchpad-frontend-session-test-app-id"
+    assert "frontend_session_secret" not in result
+    schema_path = (
+        Path(__file__).resolve().parents[3]
+        / ".apolo/src/apolo_apps_launchpad/schemas/LaunchpadAppOutputs.json"
     )
+    schema = json.loads(schema_path.read_text())
+    assert "frontend_session_secret" not in schema["properties"]
     assert sorted(request.kwargs["key"] for request in creator.await_args_list) == [
         "keycloak-admin-pswd",
         "keycloak-db-pswd",

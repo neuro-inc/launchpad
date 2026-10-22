@@ -4,14 +4,10 @@ import typing as t
 from apolo_app_types.clients.kube import get_service_host_port
 from apolo_app_types.outputs.base import BaseAppOutputsProcessor
 from apolo_app_types.outputs.common import INSTANCE_LABEL
-from apolo_app_types.outputs.utils.apolo_secrets import (
-    SECRET_KEY_TEMPLATE,
-    create_apolo_secret_with_retry,
-)
+from apolo_app_types.outputs.utils.apolo_secrets import create_apolo_secret_with_retry
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
 from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
-from apolo_app_types.protocols.common.secrets_ import ApoloSecret
 
 from .consts import APP_SECRET_KEYS
 from .types import (
@@ -139,17 +135,7 @@ async def get_launchpad_outputs(
     print(f"Full middleware name: {middleware_name}")
 
     # -------------- FINAL OUTPUT ----------------
-    frontend = helm_values.get("frontend", {})
     outputs = LaunchpadAppOutputs(
-        frontend_session_secret=(
-            ApoloSecret(
-                key=SECRET_KEY_TEMPLATE.format(
-                    key=APP_SECRET_KEYS["FRONTEND"], app_instance_id=apolo_app_id
-                )
-            )
-            if frontend.get("image", {}).get("digest")
-            else None
-        ),
         app_url=ServiceAPI[WebApp](
             internal_url=internal_web_app_url,
             external_url=external_web_app_url,
