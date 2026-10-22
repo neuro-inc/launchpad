@@ -1,7 +1,9 @@
-from apolo_app_types import ApoloSecret
-import pytest
+from unittest.mock import AsyncMock
 
+import pytest
+from apolo_app_types import ApoloSecret
 from apolo_apps_launchpad.outputs_processor import get_launchpad_outputs
+from apolo_sdk import Client
 
 
 KEYCLOAK_HELM_VALUES = {
@@ -21,6 +23,34 @@ KEYCLOAK_HELM_VALUES = {
 
 async def create_apolo_secret(*args, **kwargs):
     return ApoloSecret(key="secret=key")
+
+
+async def test_frontend_output_references_the_previously_persisted_secret(
+    setup_clients: Client,
+    mock_kubernetes_client: object,
+    app_instance_id: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    creator = AsyncMock(return_value=ApoloSecret(key="secret-key"))
+    monkeypatch.setattr(
+        "apolo_apps_launchpad.outputs_processor.create_apolo_secret", creator
+    )
+    result = await get_launchpad_outputs(
+        helm_values={
+            **KEYCLOAK_HELM_VALUES,
+            "frontend": {"image": {"digest": "sha256:" + "a" * 64}},
+        },
+        app_instance_id=app_instance_id,
+    )
+    assert (
+        result["frontend_session_secret"]["key"]
+        == "launchpad-frontend-session-test-app-id"
+    )
+    assert {call.kwargs["key"] for call in creator.await_args_list} == {
+        "keycloak-admin-pswd",
+        "keycloak-db-pswd",
+        "launchpad-admin-pswd",
+    }
 
 
 @pytest.mark.asyncio

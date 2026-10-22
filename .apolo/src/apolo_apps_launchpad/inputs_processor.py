@@ -17,7 +17,10 @@ from apolo_app_types.helm.apps.common import (
 )
 from apolo_app_types.helm.apps.ingress import _get_ingress_name_template
 from apolo_app_types.helm.utils.dictionaries import get_nested_values
-from apolo_app_types.outputs.utils.apolo_secrets import get_apolo_secret
+from apolo_app_types.outputs.utils.apolo_secrets import (
+    create_apolo_secret_with_retry,
+    get_apolo_secret,
+)
 from apolo_app_types.protocols.common.hugging_face import (
     HuggingFaceCache,
     HuggingFaceModel,
@@ -429,6 +432,11 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 )
             except apolo_sdk.ResourceNotFound:
                 frontend_secret = secrets.token_urlsafe(48)
+                await create_apolo_secret_with_retry(
+                    app_instance_id=app_id,
+                    key=APP_SECRET_KEYS["FRONTEND"],
+                    value=frontend_secret,
+                )
             frontend_values = {
                 "frontend": {
                     "image": {"digest": frontend_digest},

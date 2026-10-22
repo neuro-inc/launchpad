@@ -13,6 +13,7 @@ Retain its deployment records, Netlify credentials, and rollback access througho
 
 Each migrated App owns its frontend Deployment, Service, and session Secret.
 The chart sets `NEXTAUTH_URL` to the App's canonical HTTPS origin.
+Input processing persists the session secret in platform secrets before deployment and reuses it when an installation is retried.
 Upgrades reuse `launchpad-frontend-session`; preserve this secret during rollback to avoid invalidating sessions.
 Apps without `FRONTEND_IMAGE_DIGEST` retain the Netlify compatibility path.
 

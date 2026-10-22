@@ -1,10 +1,13 @@
 """Verify frontend migration values and rendered App ownership."""
 
 import subprocess
+from functools import partial
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 import yaml
+from apolo_app_types.outputs.utils.apolo_secrets import create_apolo_secret_with_retry
 from apolo_app_types.protocols.common import Preset
 from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
 from apolo_apps_launchpad.types import (
@@ -37,6 +40,8 @@ async def test_frontend_reuses_the_persisted_session_secret(
     apolo_client: Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("FRONTEND_IMAGE_DIGEST", "sha256:" + "a" * 64)
+    writer = AsyncMock()
+    monkeypatch.setattr(apolo_client.secrets, "add", writer)
     first = await frontend_values(apolo_client)
     second = await frontend_values(apolo_client)
     assert (
@@ -47,9 +52,50 @@ async def test_frontend_reuses_the_persisted_session_secret(
             "sessionSecret": "launchpad-frontend-session-test-app-value",
         }
     )
+    writer.assert_not_awaited()
 
 
-async def test_frontend_generates_a_secret_when_it_is_absent(
+async def test_frontend_reconfiguration_reuses_the_secret_after_installation_failure(
+    apolo_client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FRONTEND_IMAGE_DIGEST", "sha256:" + "a" * 64)
+    original = apolo_client.secrets.get
+    stored: dict[str, bytes] = {}
+
+    async def get_secret(key: str) -> bytes:
+        if key == "launchpad-frontend-session-test-app":
+            if key not in stored:
+                raise ResourceNotFound("The frontend secret does not exist.")
+            return stored[key]
+        return await original(key)
+
+    async def add_secret(key: str, value: bytes) -> None:
+        stored[key] = value
+
+    writer = AsyncMock(side_effect=add_secret)
+    generator = Mock(return_value="test-session-" * 6)
+    monkeypatch.setattr(apolo_client.secrets, "get", get_secret)
+    monkeypatch.setattr(apolo_client.secrets, "add", writer)
+    monkeypatch.setattr(
+        "apolo_apps_launchpad.inputs_processor.secrets.token_urlsafe", generator
+    )
+    first = await frontend_values(apolo_client)
+    frontend = first["frontend"]
+    assert isinstance(frontend, dict)
+    secret = frontend["sessionSecret"]
+    assert isinstance(secret, str)
+    assert stored["launchpad-frontend-session-test-app"] == secret.encode()
+
+    # The deployment fails before output processing can run.
+    second = await frontend_values(apolo_client)
+    assert first["frontend"] == second["frontend"]
+    writer.assert_awaited_once_with(
+        key="launchpad-frontend-session-test-app", value=secret.encode()
+    )
+    generator.assert_called_once_with(48)
+
+
+async def test_frontend_stops_when_the_session_secret_cannot_be_persisted(
     apolo_client: Client, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("FRONTEND_IMAGE_DIGEST", "sha256:" + "a" * 64)
@@ -60,13 +106,16 @@ async def test_frontend_generates_a_secret_when_it_is_absent(
             raise ResourceNotFound("The frontend secret does not exist.")
         return await original(key)
 
+    writer = AsyncMock(side_effect=RuntimeError("Secret storage is unavailable."))
+    monkeypatch.setattr(
+        "apolo_apps_launchpad.inputs_processor.create_apolo_secret_with_retry",
+        partial(create_apolo_secret_with_retry, base_delay_seconds=0),
+    )
     monkeypatch.setattr(apolo_client.secrets, "get", get_secret)
-    values = await frontend_values(apolo_client)
-    frontend = values["frontend"]
-    assert isinstance(frontend, dict)
-    secret = frontend["sessionSecret"]
-    assert isinstance(secret, str)
-    assert len(secret) >= 32
+    monkeypatch.setattr(apolo_client.secrets, "add", writer)
+    with pytest.raises(RuntimeError, match="Secret storage is unavailable"):
+        await frontend_values(apolo_client)
+    assert writer.await_count == 5
 
 
 async def test_frontend_rejects_a_mutable_image(
