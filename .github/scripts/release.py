@@ -8,6 +8,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TypedDict
 
@@ -171,7 +172,7 @@ def download_github_release(directory: Path, tag: str) -> bool:
     return True
 
 
-def stage_release_assets(directory: Path, tag: str) -> dict[str, str]:
+def stage_release_assets(directory: Path, tag: str) -> dict[str, bool]:
     release = verify_release(directory, release_revision(tag))
     existing = find_release(tag)
     draft = existing.get("draft") if existing else True
@@ -192,9 +193,9 @@ def stage_release_assets(directory: Path, tag: str) -> dict[str, str]:
                 raise ValueError("The published GitHub Release is incomplete.")
             shutil.copyfile(directory / name, upload / name)
     return {
-        "create": str(existing is None).lower(),
-        "draft": str(draft).lower(),
-        "upload": str(any(upload.iterdir())).lower(),
+        "create": existing is None,
+        "draft": draft,
+        "upload": any(upload.iterdir()),
     }
 
 
@@ -346,18 +347,18 @@ def main() -> None:
     elif args.operation == "publish":
         publish(args.directory, args.release_tag)
     else:
-        outputs = (
+        outputs: Mapping[str, str | bool] = (
             {
                 "revision": release_revision(args.release_tag),
-                "restored": str(
-                    download_github_release(args.directory, args.release_tag)
-                ).lower(),
+                "restored": download_github_release(args.directory, args.release_tag),
             }
             if args.operation == "restore"
             else stage_release_assets(args.directory, args.release_tag)
         )
         with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
             for name, value in outputs.items():
+                if isinstance(value, bool):
+                    value = str(value).lower()
                 output.write(f"{name}={value}\n")
 
 

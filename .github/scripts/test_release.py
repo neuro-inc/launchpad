@@ -90,6 +90,11 @@ class ReleaseTests(unittest.TestCase):
             },
         }
         write_json(self.base / "release.json", self.release)
+        github = patch(
+            "release.gh", side_effect=AssertionError("Unexpected GitHub call")
+        )
+        github.start()
+        self.addCleanup(github.stop)
 
     def git(self, *args: str) -> str:
         return subprocess.check_output(
@@ -114,8 +119,13 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_release(self.base)
 
-    def mock_publication(self) -> None:
+    def release_context(self) -> None:
         self.git("-c", "tag.gpgsign=false", "tag", "v1.2.3")
+        environment = patch.dict(os.environ, {"GITHUB_EVENT_NAME": "workflow_dispatch"})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def mock_registry(self) -> None:
         self.registry = {
             image: image.split("@", 1)[1] for image in self.images.values()
         }
@@ -128,14 +138,7 @@ class ReleaseTests(unittest.TestCase):
             self.registry[args[-2]] = self.registry[args[-1]]
             return ""
 
-        def saved(directory: Path, tag: str) -> bool:
-            shutil.copytree(self.base, directory, dirs_exist_ok=True)
-            return True
-
         for mock in (
-            patch.dict(os.environ, {"GITHUB_EVENT_NAME": "workflow_dispatch"}),
-            patch("release.gh", return_value=self.release["source_revision"]),
-            patch("release.download_github_release", side_effect=saved),
             patch(
                 "release.registry_digest",
                 side_effect=lambda reference, allow_missing=False: self.registry.get(
@@ -146,6 +149,33 @@ class ReleaseTests(unittest.TestCase):
         ):
             mock.start()
             self.addCleanup(mock.stop)
+
+    def mock_saved_release(self) -> None:
+        def saved(directory: Path, tag: str) -> bool:
+            shutil.copytree(self.base, directory, dirs_exist_ok=True)
+            return True
+
+        download = patch("release.download_github_release", side_effect=saved)
+        download.start()
+        self.addCleanup(download.stop)
+
+    def mock_master_revision(self, revision: str) -> None:
+        responses = {
+            (
+                "api",
+                "repos/neuro-inc/launchpad/git/ref/heads/master",
+                "--jq",
+                ".object.sha",
+            ): revision
+        }
+        github = patch("release.gh", side_effect=lambda *args: responses[args])
+        github.start()
+        self.addCleanup(github.stop)
+
+    def mock_publication(self) -> None:
+        self.release_context()
+        self.mock_registry()
+        self.mock_saved_release()
 
     def test_release_lookup_includes_paginated_drafts(self) -> None:
         draft = {"tag_name": "v1.2.3", "draft": True, "assets": []}
@@ -208,11 +238,11 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(self.registry_writes, [])
 
     def test_new_release_stages_both_original_assets(self) -> None:
-        self.mock_publication()
+        self.release_context()
         with patch("release.find_release", return_value=None):
             self.assertEqual(
                 stage_release_assets(self.base, "v1.2.3"),
-                {"create": "true", "draft": "true", "upload": "true"},
+                {"create": True, "draft": True, "upload": True},
             )
         for name in ("release.json", self.release["chart"]["filename"]):
             self.assertEqual(
@@ -220,8 +250,32 @@ class ReleaseTests(unittest.TestCase):
                 (self.base / name).read_bytes(),
             )
 
+    def test_stage_cli_serializes_boolean_outputs(self) -> None:
+        outputs = self.root / "outputs"
+        with (
+            patch(
+                "sys.argv",
+                ["release.py", "stage", str(self.base), "--release-tag", "v1.2.3"],
+            ),
+            patch.dict(os.environ, {"GITHUB_OUTPUT": str(outputs)}),
+            patch(
+                "release.stage_release_assets",
+                return_value={"create": False, "draft": True, "upload": False},
+            ),
+        ):
+            main()
+        self.assertEqual(
+            outputs.read_text(), "create=false\ndraft=true\nupload=false\n"
+        )
+
+    def test_github_fixture_rejects_unexpected_queries(self) -> None:
+        self.mock_master_revision(self.release["source_revision"])
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": "unexpected/repository"}):
+            with self.assertRaises(KeyError):
+                publish_development(self.base)
+
     def test_partial_draft_stages_only_missing_assets(self) -> None:
-        self.mock_publication()
+        self.release_context()
         existing = {"draft": True, "assets": [{"name": "release.json"}]}
 
         def download(tag: str, name: str, directory: Path) -> None:
@@ -233,7 +287,7 @@ class ReleaseTests(unittest.TestCase):
         ):
             self.assertEqual(
                 stage_release_assets(self.base, "v1.2.3"),
-                {"create": "false", "draft": "true", "upload": "true"},
+                {"create": False, "draft": True, "upload": True},
             )
         self.assertEqual(
             [path.name for path in (self.base / "upload").iterdir()],
@@ -241,7 +295,7 @@ class ReleaseTests(unittest.TestCase):
         )
 
     def test_existing_assets_must_match_before_upload(self) -> None:
-        self.mock_publication()
+        self.release_context()
         existing: dict[str, object] = {
             "draft": True,
             "assets": [{"name": "release.json"}],
@@ -260,7 +314,7 @@ class ReleaseTests(unittest.TestCase):
         api.assert_not_called()
 
     def test_published_release_assets_are_verified_without_modification(self) -> None:
-        self.mock_publication()
+        self.release_context()
         existing: dict[str, object] = {
             "draft": False,
             "assets": [
@@ -279,7 +333,7 @@ class ReleaseTests(unittest.TestCase):
         ):
             self.assertEqual(
                 stage_release_assets(self.base, "v1.2.3"),
-                {"create": "false", "draft": "false", "upload": "false"},
+                {"create": False, "draft": False, "upload": False},
             )
             output = self.root / "saved"
             self.assertTrue(download_github_release(output, "v1.2.3"))
@@ -287,7 +341,7 @@ class ReleaseTests(unittest.TestCase):
         api.assert_not_called()
 
     def test_incomplete_published_release_is_rejected(self) -> None:
-        self.mock_publication()
+        self.release_context()
         with (
             patch("release.find_release", return_value={"draft": False, "assets": []}),
             patch("release.gh") as api,
@@ -383,7 +437,8 @@ class ReleaseTests(unittest.TestCase):
     def test_development_publication_updates_existing_aliases_without_building(
         self,
     ) -> None:
-        self.mock_publication()
+        self.mock_registry()
+        self.mock_master_revision(self.release["source_revision"])
         for repository in REPOSITORIES.values():
             self.registry[repository + ":master"] = "sha256:" + "f" * 64
         publish_development(self.base)
@@ -399,7 +454,8 @@ class ReleaseTests(unittest.TestCase):
     def test_development_publication_rejects_other_refs_and_unverified_sources(
         self,
     ) -> None:
-        self.mock_publication()
+        self.mock_registry()
+        self.mock_master_revision(self.release["source_revision"])
         for event, ref in (
             ("pull_request", "refs/heads/master"),
             ("push", "refs/heads/feature"),
@@ -416,18 +472,16 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(self.registry_writes, [])
 
     def test_development_publication_rejects_a_superseded_master_run(self) -> None:
-        self.mock_publication()
-        with (
-            patch("release.gh", return_value="f" * 40),
-            self.assertRaisesRegex(ValueError, "no longer matches master"),
-        ):
+        self.mock_registry()
+        self.mock_master_revision("f" * 40)
+        with self.assertRaisesRegex(ValueError, "no longer matches master"):
             publish_development(self.base)
         self.assertEqual(self.registry_writes, [])
 
     def test_development_publication_requires_its_original_current_combination(
         self,
     ) -> None:
-        self.mock_publication()
+        self.mock_registry()
         (self.root / "notes.txt").write_text("documentation only\n")
         self.commit()
         with self.assertRaisesRegex(ValueError, "tested source commit"):
