@@ -99,6 +99,7 @@ def config(postgres_container: PostgresContainer, setup_database: str) -> Config
     )
 
     mock_cfg = MagicMock(spec=Config)
+    mock_cfg.cors_origins = None
     mock_cfg.keycloak = kc_config
     mock_cfg.apolo = apolo_config
     mock_cfg.apps = mock_apps_config

@@ -60,12 +60,13 @@ async def create_config() -> Config:
             branding=BrandingConfig(),
             apps=None,
             server=ServerConfig(host="127.0.0.1", port=8080),
+            cors_origins=["http://dev.localhost:13000"],
         )
 
 
 def main() -> None:
     config = asyncio.run(create_config())
-    app = create_app(config, cors_origins=["http://dev.localhost:13000"])
+    app = create_app(config)
     uvicorn.run(app, host=config.server.host, port=config.server.port)
 
 

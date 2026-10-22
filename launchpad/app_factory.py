@@ -19,7 +19,7 @@ class AppConfig(TypedDict):
     redirect_slashes: bool
 
 
-def create_app(config: Config, *, cors_origins: list[str] | None = None) -> Launchpad:
+def create_app(config: Config) -> Launchpad:
     # keep db up to date by running migrations
     sync_db(dsn=config.postgres.dsn)
 
@@ -37,8 +37,8 @@ def create_app(config: Config, *, cors_origins: list[str] | None = None) -> Laun
     # Configure CORS to allow frontend to access the API
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins
-        if cors_origins is not None
+        allow_origins=config.cors_origins
+        if config.cors_origins is not None
         else [
             f"https://{config.apolo.self_domain}",
             f"https://{config.apolo.self_domain}/",

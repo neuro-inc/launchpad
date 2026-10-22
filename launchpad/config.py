@@ -85,6 +85,7 @@ class Config:
     instance_id: UUID | None = None
     skip_seed_templates: bool = False
     auth_bypass_path_prefixes: list[str] | None = None
+    cors_origins: list[str] | None = None
 
 
 class EnvironConfigFactory:

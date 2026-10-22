@@ -1,5 +1,6 @@
 import os
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -76,6 +77,7 @@ def test_local_configuration(local_config: Config) -> None:
     assert config.auth_bypass_path_prefixes is None
     assert config.server.host == "127.0.0.1"
     assert config.keycloak.url == URL("http://localhost:18081")
+    assert config.cors_origins == ["http://dev.localhost:13000"]
 
 
 async def test_profile_output_excludes_credentials(
@@ -178,7 +180,7 @@ def test_factory_default_and_empty_cors(
     local_config: Config, cors_origins: list[str] | None
 ) -> None:
     with patch("launchpad.app_factory.sync_db"):
-        app = create_app(local_config, cors_origins=cors_origins)
+        app = create_app(replace(local_config, cors_origins=cors_origins))
     client = TestClient(app)
     try:
         response = client.options(
