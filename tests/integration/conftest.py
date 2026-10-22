@@ -3,7 +3,7 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Generator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -29,7 +29,6 @@ from launchpad.config import (
     Config,
     KeycloakConfig,
     PostgresConfig,
-    ServerConfig,
 )
 from launchpad.db.base import Base
 
@@ -79,37 +78,27 @@ def config(postgres_container: PostgresContainer, setup_database: str) -> Config
         project_name="test-project",
         apps_api_url="http://mock-apps-api.com",
         token="mock-token",
-        self_domain="http://mock-self.com",
-        base_domain="http://mock-base.com",
-        web_app_domain="http://mock-web.com",
+        self_domain="mock-self.com",
+        base_domain="mock-base.com",
+        web_app_domain="mock-web.com",
         auth_middleware_name="test-middleware",
     )
-    mock_apps_config = AppsConfig(vllm={}, postgres={}, embeddings={})
 
-    # Use the real PostgreSQL connection string with asyncpg driver
     pg_dsn = postgres_container.get_connection_url(driver=None).replace(
         "postgresql://", "postgresql+asyncpg://"
     )
-    mock_pg_config = PostgresConfig(dsn=pg_dsn)
-    mock_server_config = ServerConfig()
-    mock_branding_config = BrandingConfig(
-        title="Test Title",
-        background="12345",
-        branding_dir=Path(__file__).parent.parent / "assets",
+    return Config(
+        keycloak=kc_config,
+        apolo=apolo_config,
+        apps=AppsConfig(vllm={}, postgres={}, embeddings={}),
+        postgres=PostgresConfig(dsn=pg_dsn),
+        branding=BrandingConfig(
+            title="Test Title",
+            background="12345",
+            branding_dir=Path(__file__).parent.parent / "assets",
+        ),
+        instance_id=uuid4(),
     )
-
-    mock_cfg = MagicMock(spec=Config)
-    mock_cfg.cors_origins = None
-    mock_cfg.keycloak = kc_config
-    mock_cfg.apolo = apolo_config
-    mock_cfg.apps = mock_apps_config
-    mock_cfg.postgres = mock_pg_config
-    mock_cfg.server = mock_server_config
-    mock_cfg.skip_seed_templates = False
-    mock_cfg.branding = mock_branding_config
-    # Set a mock instance_id for output processing tests
-    mock_cfg.instance_id = uuid4()
-    return mock_cfg
 
 
 @pytest.fixture
