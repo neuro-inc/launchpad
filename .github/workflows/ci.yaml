@@ -1,14 +1,15 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
-    tags: ["v*"]
   pull_request:
     branches: [master]
 
-env:
-  IMAGE_NAME: "launchpad"
+concurrency:
+  group: launchpad-ci-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
 
@@ -47,7 +48,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+          key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
 
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
@@ -55,25 +56,6 @@ jobs:
 
       - name: Install project
         run: poetry install --no-interaction
-
-      - name: Load cached hooks venv
-        id: cached-hooks-dependencies
-        uses: actions/cache@v6
-        with:
-          path: hooks/.venv
-          key: hooks-venv-${{ runner.os }}-${{ hashFiles('hooks/poetry.lock') }}
-
-      - name: Install hooks dependencies
-        if: steps.cached-hooks-dependencies.outputs.cache-hit != 'true'
-        run: |
-          cd hooks
-          poetry config virtualenvs.in-project true
-          poetry install --no-interaction --no-root
-
-      - name: Install hooks project
-        run: |
-          cd hooks
-          poetry install --no-interaction
 
       - name: Run format checks
         run: make format
@@ -92,9 +74,6 @@ jobs:
           # Configure testcontainers for CI environment
           TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
           TESTCONTAINERS_RYUK_DISABLED: false
-
-      - name: Run hooks tests
-        run: make test-hooks
 
       - name: Upload unit test coverage
         uses: codecov/codecov-action@v7
@@ -116,21 +95,11 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
-      - name: Upload hooks test coverage
-        uses: codecov/codecov-action@v7
-        if: always()
-        with:
-          files: hooks/.coverage.hooks.xml
-          flags: hooks
-          name: hooks-tests
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
   approve:
     name: Approve bot PR
     runs-on: ubuntu-latest
-    if: endsWith(github.actor, '[bot]')
-    needs: [test, frontend-test]
+    if: github.event_name == 'pull_request' && endsWith(github.actor, '[bot]')
+    needs: [test, hook-test, frontend-test, release-test]
     permissions:
       contents: write
       pull-requests: write
@@ -149,82 +118,199 @@ jobs:
         PR_URL: ${{ github.event.pull_request.html_url }}
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  release-app-image:
-    name: Release image
+  release-test:
+    name: Release validation
     runs-on: ubuntu-latest
-    needs: test
     permissions:
-      actions: write  # for artifact removal
-      # contents: write  # for release creation
-      packages: write  # for publishing on ghcr.io
-    if: github.event_name == 'push' && (github.ref_type == 'tag' || github.ref_name == 'master')
+      contents: read
     steps:
-      - name: Checkout commit
-        uses: actions/checkout@v7
-
-      - name: Purge old artifacts
-        uses: kolpav/purge-artifacts-action@v1
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          token: ${{ github.token }}
-          expire-in: 30mins
-
-      - name: Login to ghcr.io
-        uses: docker/login-action@v4.3.0
+          python-version: '3.12'
+      - run: python3 -m pip install mypy==1.18.2
+      - uses: azure/setup-helm@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
+          version: v3.16.3
+      - name: Verify release checks in a tag dispatch context
+        run: GITHUB_REF_TYPE=tag GITHUB_REF_NAME=v0.0.0 GITHUB_EVENT_NAME=workflow_dispatch make test-release
+      - run: make lint-release
 
-      - name: Build image
-        run: |
-          make build-image
-
-      - name: Push image
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            export IMAGE_TAG=master
-          else
-            export IMAGE_TAG=${GITHUB_REF#refs/tags/}
-          fi
-          make push-image
-
-  release-pr-image:
-    name: Release PR image
+  hook-test:
+    name: Hook checks
     runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+    permissions:
+      contents: read
     steps:
-      - name: Checkout commit
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - uses: actions/cache@v6
+        id: dependencies
+        with:
+          path: hooks/.venv
+          key: hooks-venv-${{ runner.os }}-${{ hashFiles('hooks/poetry.lock') }}
+      - name: Install hook dependencies
+        if: steps.dependencies.outputs.cache-hit != 'true'
+        run: cd hooks && poetry install --no-interaction --no-root
+      - name: Install hook project
+        run: cd hooks && poetry install --no-interaction
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+      - run: make test-hooks
+      - uses: codecov/codecov-action@v7
+        if: always()
+        with:
+          files: hooks/.coverage.hooks.xml
+          flags: hooks
+          name: hooks-tests
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
-      - name: Login to ghcr.io
-        uses: docker/login-action@v4.3.0
+  release-combination:
+    name: Record the tested App release combination
+    concurrency:
+      group: launchpad-registry
+      queue: max
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    needs: [test, hook-test, frontend-test, release-test]
+    if: >-
+      ${{ !cancelled() && (github.event_name == 'push' ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master') ||
+          (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' &&
+           github.event.pull_request.head.repo.full_name == github.repository)) }}
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      backend_ref: ghcr.io/neuro-inc/launchpad@${{ steps.backend.outputs.digest }}
+    steps:
+      - name: Require every check to succeed
+        env:
+          REQUIRED_JOBS: ${{ toJSON(needs) }}
+        run: jq -e 'all(.[]; .result == "success")' <<< "$REQUIRED_JOBS"
+      - name: Require the frontend registry credential
+        env:
+          FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
+        run: test -n "$FONTAWESOME_NPM_AUTH_TOKEN"
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4.3.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-
-      - name: Build image
+      - name: Select staging image tag
+        id: metadata
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
         run: |
-          make build-image
+          python3 - <<'PYTHON'
+          import os
+          import re
+          from pathlib import Path
+          tag = "ci-" + os.environ["GITHUB_SHA"]
+          if os.environ["GITHUB_EVENT_NAME"] == "pull_request":
+              tag = re.sub(r"[^a-z0-9_.-]", "-", os.environ["PR_BRANCH"].lower())
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a") as stream:
+              stream.write(f"tag={tag}\n")
+          PYTHON
+      - name: Build backend
+        id: backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          tags: |
+            ghcr.io/neuro-inc/launchpad:${{ steps.metadata.outputs.tag }}
+            ghcr.io/neuro-inc/launchpad:ci-${{ github.sha }}
+          push: true
+          pull: true
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=launchpad-backend
+          cache-to: type=gha,scope=launchpad-backend,mode=max
+      - name: Build frontend
+        id: frontend
+        uses: docker/build-push-action@v6
+        env:
+          FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          tags: ghcr.io/neuro-inc/launchpad-web-ui:ci-${{ github.sha }}
+          push: true
+          pull: true
+          build-args: COMMIT_SHA=${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          secret-files: npmrc=frontend/.npmrc
+          secret-envs: npm_token=FONTAWESOME_NPM_AUTH_TOKEN
+          cache-from: type=gha,scope=launchpad-frontend
+          cache-to: type=gha,scope=launchpad-frontend,mode=max
+      - name: Build hook with the selected runtime images
+        id: hook
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: hooks/hooks.Dockerfile
+          tags: |
+            ghcr.io/neuro-inc/launchpad-hook:${{ steps.metadata.outputs.tag }}
+            ghcr.io/neuro-inc/launchpad-hook:ci-${{ github.sha }}
+          push: true
+          pull: true
+          build-args: |
+            APP_IMAGE_DIGEST=${{ steps.backend.outputs.digest }}
+            FRONTEND_IMAGE_DIGEST=${{ steps.frontend.outputs.digest }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=launchpad-hook
+          cache-to: type=gha,scope=launchpad-hook,mode=max
+      - name: Verify and assemble the release
+        env:
+          BACKEND_REF: ghcr.io/neuro-inc/launchpad@${{ steps.backend.outputs.digest }}
+          FRONTEND_REF: ghcr.io/neuro-inc/launchpad-web-ui@${{ steps.frontend.outputs.digest }}
+          HOOK_REF: ghcr.io/neuro-inc/launchpad-hook@${{ steps.hook.outputs.digest }}
+        run: python3 .github/scripts/release.py assemble "$RUNNER_TEMP/launchpad-release"
+      - name: Publish the verified development combination
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/release.py publish-development "$RUNNER_TEMP/launchpad-release"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launchpad-release
+          path: ${{ runner.temp }}/launchpad-release/
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 90
 
-      - name: Push PR image
-        run: |
-          BRANCH_NAME=${{ github.head_ref }}
-          # Convert to lowercase, replace anything not a-z0-9_.- with '-'
-          export IMAGE_TAG=$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
-          make push-image
-
+  pr-image-comment:
+    name: Record the PR backend image
+    needs: release-combination
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
       - name: Comment on PR
+        env:
+          IMAGE_REF: ${{ needs.release-combination.outputs.backend_ref }}
         uses: actions/github-script@v9
         with:
           script: |
-            const branchName = '${{ github.head_ref }}';
-            const imageTag = branchName.toLowerCase().replace(/[^a-z0-9_.-]/g, '-');
-            const commentBody = `🐳 Docker image for this PR has been built and pushed:\n\n\`ghcr.io/neuro-inc/${{ env.IMAGE_NAME }}:${imageTag}\``;
+            const commentBody = `🐳 Docker image for this PR has been built and pushed:\n\n\`${process.env.IMAGE_REF}\``;
 
             // Get all comments on the PR
-            const { data: comments } = await github.rest.issues.listComments({
+            const comments = await github.paginate(github.rest.issues.listComments, {
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -236,8 +322,14 @@ jobs:
               comment.body.includes('Docker image for this PR has been built')
             );
 
-            // Only create comment if it doesn't exist
-            if (!botComment) {
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                comment_id: botComment.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody
+              });
+            } else {
               await github.rest.issues.createComment({
                 issue_number: context.issue.number,
                 owner: context.repo.owner,
@@ -245,58 +337,3 @@ jobs:
                 body: commentBody
               });
             }
-
-  release-hook-image:
-    name: Release hook image
-    runs-on: ubuntu-latest
-    needs: test
-    if: (
-        (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
-        (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/master'))
-      )
-    steps:
-      - name: Checkout commit
-        uses: actions/checkout@v7
-      - name: Purge old artifacts
-        uses: kolpav/purge-artifacts-action@v1
-        with:
-          token: ${{ github.token }}
-          expire-in: 30mins
-      - name: Set APP_IMAGE_TAG
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BRANCH_NAME=${{ github.head_ref }}
-            export APP_IMAGE_TAG=$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
-          elif [ "${{ github.ref }}" = "refs/heads/master" ]; then
-            export APP_IMAGE_TAG=master
-          else
-            export APP_IMAGE_TAG=${GITHUB_REF#refs/tags/}
-          fi
-          echo "APP_IMAGE_TAG=${APP_IMAGE_TAG}" >> $GITHUB_ENV
-      - name: Login to ghcr.io
-        uses: docker/login-action@v4.3.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Build image
-        run: |
-          export APP_IMAGE_TAG=${{ env.APP_IMAGE_TAG }}
-          make build-hook-image
-      - name: Release branch image
-        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
-        run: |
-          BRANCH_NAME=${{ github.head_ref }}
-          # Convert to lowercase, replace anything not a-z0-9_.- with '-'
-          export IMAGE_TAG=$(echo "${BRANCH_NAME}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g')
-          make push-hook-image
-      - name: Release development image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        run: |
-          export IMAGE_TAG=master
-          make push-hook-image
-      - name: Release prod image
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        run: |
-          export IMAGE_TAG=${GITHUB_REF#refs/tags/}
-          make push-hook-image

@@ -24,7 +24,7 @@ spec:
         - name: "ghcr"
       containers:
         - name: launchpad
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          image: {{ include "launchpad.image" . | quote }}
           imagePullPolicy: Always
           command:
             - "python"

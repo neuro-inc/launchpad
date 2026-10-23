@@ -6,6 +6,15 @@ metadata:
     {{- include "launchpad.labels" . | nindent 4 }}
     service: client
 spec:
+  {{- if .Values.frontend.image.digest }}
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: {{ include "launchpad.name" . }}-client
+  ports:
+    - port: 80
+      targetPort: http
+      name: http
+  {{- else }}
   ports:
     - protocol: TCP
       port: 443
@@ -14,3 +23,4 @@ spec:
   type: ExternalName
   sessionAffinity: None
   externalName: {{ .Values.netlifyDomain }}
+  {{- end }}

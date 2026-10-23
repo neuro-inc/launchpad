@@ -22,7 +22,7 @@ spec:
         - name: "ghcr"
       containers:
       - name: cleanup
-        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        image: {{ include "launchpad.image" . | quote }}
         command: ["python3", "/app/scripts/cleanup-apps.py"]
         env:
         - name: APOLO_PASSED_CONFIG

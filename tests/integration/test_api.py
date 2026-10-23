@@ -77,9 +77,11 @@ def test_branding_css_endpoint_is_public(app_client: TestClient) -> None:
     assert response.text == "body { color: #123456; }\n"
 
 
-def test_cors_middleware(app_client: TestClient, config: Config) -> None:
-    """Test that CORS middleware is configured correctly"""
-    frontend_origin = f"https://{config.apolo.self_domain}"
+@pytest.mark.parametrize(
+    "frontend_origin", ["https://mock-self.com", "https://mock-web.com"]
+)
+def test_cors_middleware(app_client: TestClient, frontend_origin: str) -> None:
+    """Verify CORS responses for the configured HTTPS origins."""
 
     # Test preflight OPTIONS request
     response = app_client.options(

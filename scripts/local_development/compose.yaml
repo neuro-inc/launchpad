@@ -1,0 +1,47 @@
+name: launchpad-local
+
+services:
+  postgres:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_USER: launchpad
+      POSTGRES_PASSWORD: local-development
+      POSTGRES_DB: launchpad
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U launchpad -d launchpad"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.0
+    command: [start-dev, --import-realm]
+    environment:
+      KC_HOSTNAME: http://localhost:18081
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: local-development
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "127.0.0.1:18081:8080"
+    volumes:
+      - keycloak:/opt/keycloak/data
+      - ./realm.json:/opt/keycloak/data/import/launchpad-realm.json:ro
+    mem_limit: 1g
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -ec
+        - "exec 3<>/dev/tcp/localhost/9000; printf 'GET /health/ready HTTP/1.0\r\n\r\n' >&3; grep -q '200 OK' <&3"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  postgres:
+  keycloak:
