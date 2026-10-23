@@ -345,34 +345,27 @@ trio = ["trio (>=0.32.0)"]
 
 [[package]]
 name = "apolo-app-types"
-version = "0.0.0"
+version = "26.8.1"
 description = "Apolo Platform App Types."
 optional = false
-python-versions = ">=3.10,<4.0"
+python-versions = "<4.0,>=3.10.0"
 groups = ["main"]
-files = []
-develop = false
+files = [
+    {file = "apolo_app_types-26.8.1-py3-none-any.whl", hash = "sha256:cc9099c2d80e932805b304db6e1834b1f255f26e8b2b9479673db081221b6267"},
+    {file = "apolo_app_types-26.8.1.tar.gz", hash = "sha256:f6f293925f95c3920b090b078c8b88184fe8ba587d12777008fcd8e72dd66bfd"},
+]
 
 [package.dependencies]
-apolo-sdk = "^26.3.0"
-click = "^8.3.2"
-httpx = "^0.28.0"
-jsonref = "^1.1.0"
-kubernetes = ">=35,<37"
-pydantic = "^2.12.5"
-pyyaml = "^6.0.3"
-tenacity = "^9.1.2"
-types-PyYAML = "^6.0.12.20260408"
-yarl = "^1.23.0"
-
-[package.extras]
-fixtures = []
-
-[package.source]
-type = "git"
-url = "https://github.com/neuro-inc/app-types.git"
-reference = "19950ac53206bd4a7a24e7c99637cef07d45936c"
-resolved_reference = "19950ac53206bd4a7a24e7c99637cef07d45936c"
+apolo-sdk = ">=26.3.0,<27.0.0"
+click = ">=8.3.2,<9.0.0"
+httpx = ">=0.28.0,<0.29.0"
+jsonref = ">=1.1.0,<2.0.0"
+kubernetes = ">=35,<36"
+pydantic = ">=2.12.5,<3.0.0"
+pyyaml = ">=6.0.3,<7.0.0"
+tenacity = ">=9.1.2,<10.0.0"
+types-PyYAML = ">=6.0.12.20260408,<7.0.0.0"
+yarl = ">=1.23.0,<2.0.0"
 
 [[package]]
 name = "apolo-sdk"
@@ -3000,4 +2993,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "7a472c1f790c88c877d9c7a8763edc3764884840330af23624b2ed1350d70199"
+content-hash = "34d856b148301905db333deab2a40570a26ddce1070fa0d24eb565f0b6d000d9"
