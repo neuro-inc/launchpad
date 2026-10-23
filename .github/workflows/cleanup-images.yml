@@ -30,7 +30,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 .github/scripts/protected_images.py "$RUNNER_TEMP/launchpad-protected-digests.json"
-      - uses: neuro-inc/reuse/.github/actions/cleanup-ghcr-images@266b7b63221b2d58fe3b40c787e0c6c45cd303f4
+      - uses: neuro-inc/reuse/.github/actions/cleanup-ghcr-images@fbc2ea6652ec4cd7d5ea7a880fce91c344e94bbc
         with:
           protected-digests-file: ${{ runner.temp }}/launchpad-protected-digests.json
           temporary-tag-pattern: 'ci-[0-9a-f]{40}'
