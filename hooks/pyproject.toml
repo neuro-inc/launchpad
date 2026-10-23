@@ -37,7 +37,7 @@ pyyaml = "^6.0.2"
 yarl = "^1.18.3"
 pre-commit = "^4.2.0"
 multidict = "^6.6.4"
-apolo-app-types = "v26.8.1"
+apolo-app-types = {git = "https://github.com/neuro-inc/app-types.git", rev = "19950ac53206bd4a7a24e7c99637cef07d45936c"}
 apolo-sdk = "v26.3.0"
 backoff = "^2.2.1"
 
