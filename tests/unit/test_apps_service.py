@@ -435,7 +435,7 @@ async def test_stored_static_alias_cannot_override_current_binding(
     mock_apps_api_client: AsyncMock,
 ) -> None:
     mock_apps_api_client.is_static_hostname.return_value = True
-    mock_apps_api_client.get_id_by_static_hostname.return_value = None
+    mock_apps_api_client.get_id_by_hostname.return_value = None
     with patch(
         "launchpad.apps.service.select_app_by_any_url",
         new=AsyncMock(return_value=MagicMock(spec=InstalledApp)),
@@ -454,7 +454,7 @@ async def test_stored_static_hostname_resolves_to_current_app(
     previous, current = MagicMock(spec=InstalledApp), MagicMock(spec=InstalledApp)
     previous.app_id, current.app_id = uuid.uuid4(), uuid.uuid4()
     mock_apps_api_client.is_static_hostname.return_value = True
-    mock_apps_api_client.get_id_by_static_hostname.return_value = current.app_id
+    mock_apps_api_client.get_id_by_hostname.return_value = current.app_id
     with (
         patch(
             "launchpad.apps.service.select_app_by_any_url",
@@ -475,3 +475,49 @@ async def test_stored_static_hostname_resolves_to_current_app(
     )
     assert by_id.await_args is not None
     assert by_id.await_args.kwargs["id"] == current.app_id
+
+
+async def test_generated_app_in_static_namespace_does_not_require_binding(
+    app_service: AppService, app_id: UUID
+) -> None:
+    hostname = f"custom-deployment--{app_id.hex}.apps.dev.apolo.us"
+    installed = MagicMock(spec=InstalledApp)
+    installed.app_id = app_id
+    client = AppsApiClient(
+        http=AsyncMock(),
+        base_url="https://api.example.com",
+        token="test-token",
+        cluster="default",
+        org_name="test-org",
+        project_name="test-project",
+    )
+    app_service._apps_api_client = client
+    with (
+        patch(
+            "launchpad.apps.service.select_app_by_any_url",
+            new=AsyncMock(return_value=installed),
+        ),
+        patch(
+            "launchpad.apps.service.select_app", new=AsyncMock(return_value=installed)
+        ) as by_id,
+        patch.object(
+            client,
+            "_request",
+            new=AsyncMock(
+                side_effect=[
+                    {"hostname_domain": "apps.dev.apolo.us"},
+                    {"items": [{"id": str(app_id)}]},
+                    AppsApiNotFound(),
+                ]
+            ),
+        ) as request,
+    ):
+        assert await app_service.resolve_app_for_authorization(hostname) is installed
+    assert request.await_count == 2
+    request.assert_awaited_with(
+        method="GET",
+        url="https://api.example.com/v2/instances",
+        params={"hostname": hostname},
+    )
+    assert by_id.await_args is not None
+    assert by_id.await_args.kwargs["id"] == app_id
