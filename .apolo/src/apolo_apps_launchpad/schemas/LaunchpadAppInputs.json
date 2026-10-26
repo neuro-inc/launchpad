@@ -808,6 +808,19 @@
         }
       ],
       "default": null
+    },
+    "procore_automatic_linking": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Leave unset to preserve existing Procore settings. Enable to link matching existing accounts without another ownership check, including accounts with administrator roles. Disable to restore the realm default login flow for this managed binding. Configure a trusted Procore identity provider before enabling this option.",
+      "title": "Procore automatic account linking"
     }
   },
   "required": [

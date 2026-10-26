@@ -489,6 +489,17 @@ class LaunchpadAppInputs(AppInputs):
     launchpad_web_app_config: LaunchpadWebAppConfig
     apps_config: AppsConfig
     branding: LauchpadBrandingConfig | None = None
+    procore_automatic_linking: bool | None = Field(
+        default=None,
+        title="Procore automatic account linking",
+        description=(
+            "Leave unset to preserve existing Procore settings. "
+            "Enable to link matching existing accounts without another ownership check, "
+            "including accounts with administrator roles. "
+            "Disable to restore the realm default login flow for this managed binding. "
+            "Configure a trusted Procore identity provider before enabling this option."
+        ),
+    )
 
 
 class LaunchpadAppOutputs(AppOutputs):

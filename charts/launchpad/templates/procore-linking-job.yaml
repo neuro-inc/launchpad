@@ -1,0 +1,92 @@
+{{- if ne .Values.procoreAutomaticLinking nil }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "launchpad.name" . }}-procore-linking
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  flow.json: |-
+    {{- .Files.Get "files/procore-auto-link.json" | nindent 4 }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "launchpad.name" . }}-procore-linking
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  activeDeadlineSeconds: 180
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "launchpad.apoloPodLabels" . | nindent 8 }}
+        application: launchpad
+        service: procore-linking
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      imagePullSecrets:
+        - name: ghcr
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: procore-linking
+          image: {{ include "launchpad.image" . | quote }}
+          command: ["python", "-m", "scripts.keycloak.procore_linking"]
+          args:
+            - --server
+            - {{ printf "http://%s:%v" .Values.keycloak.fullnameOverride (.Values.keycloak.service.ports.http | default 80) | quote }}
+            - --realm
+            - {{ .Values.keycloak.defaultRealm | quote }}
+            - --username
+            - {{ .Values.keycloak.auth.adminUser | quote }}
+            - --password-file
+            - /run/keycloak/admin-password
+            - --flow-file
+            - /run/procore/flow.json
+            - {{ ternary "--enable" "--disable" .Values.procoreAutomaticLinking }}
+            - --apply
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: keycloak-admin
+              mountPath: /run/keycloak
+              readOnly: true
+            - name: procore-flow
+              mountPath: /run/procore
+              readOnly: true
+      volumes:
+        - name: keycloak-admin
+          secret:
+            secretName: {{ .Values.keycloak.auth.existingSecret | default .Values.keycloak.fullnameOverride }}
+            defaultMode: 0440
+            items:
+              - key: {{ .Values.keycloak.auth.passwordSecretKey | default "admin-password" }}
+                path: admin-password
+        - name: procore-flow
+          configMap:
+            name: {{ include "launchpad.name" . }}-procore-linking
+{{- end }}

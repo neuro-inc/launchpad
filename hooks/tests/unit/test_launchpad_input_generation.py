@@ -786,6 +786,7 @@ async def test_launchpad_values_generation__min(apolo_client):
         "affinity": expected_affinity,
         "podLabels": expected_pod_labels,
         "apolo_app_id": APP_ID,
+        "procoreAutomaticLinking": None,
         "authResponseHeaders": [
             "X-Auth-Request-Email",
             "X-Auth-Request-Preferred-Username",
@@ -995,6 +996,7 @@ async def test_launchpad_values_generation__brand(apolo_client):
             ),
         },
         "apolo_app_id": APP_ID,
+        "procoreAutomaticLinking": None,
         "authResponseHeaders": [
             "X-Auth-Request-Email",
             "X-Auth-Request-Preferred-Username",

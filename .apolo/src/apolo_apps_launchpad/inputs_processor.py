@@ -547,6 +547,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             "image": backend_image,
             "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": kc_realm_import_config_map_name,
+            "procoreAutomaticLinking": input_.procore_automatic_linking,
             "postgresql": {
                 "fullnameOverride": f"launchpad-{app_id}-db",
                 "auth": {

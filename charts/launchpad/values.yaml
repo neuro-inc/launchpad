@@ -142,6 +142,9 @@ postgresql:
                   values:
                     - "true"
 
+# Unset preserves existing provider settings. False restores the managed binding.
+procoreAutomaticLinking: null
+
 keycloak:
   global:
     security:
