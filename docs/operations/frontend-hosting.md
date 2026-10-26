@@ -88,6 +88,8 @@ Use published versions for installations that must remain supported beyond the C
 8. Upgrade production Apps explicitly through the normal App workflow.
 
 Restore the previous verified App version for an ordinary rollback.
+The Console revision rollback restores inputs only; it does not restore the App template version.
+Verify the template version and deployed images after recovery.
 Use the previous frontend-free hook version when restoring Netlify routing.
 Keep Netlify credentials until all App migrations and rollback periods have completed.
 Coordinate DNS and TLS changes with the separate cloud-infra migration.
