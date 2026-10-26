@@ -97,7 +97,7 @@ class AppsApiClient:
             url=f"{self.v2_url}/instances/{app_id}",
         )
 
-    async def get_id_by_static_hostname(self, hostname: str) -> UUID | None:
+    async def get_id_by_hostname(self, hostname: str) -> UUID | None:
         hostname = canonical_hostname(hostname)
         try:
             payload = await self._request(
@@ -108,7 +108,18 @@ class AppsApiClient:
             page = _AppIdentityPage.model_validate(payload)
             if len(page.items) != 1:
                 raise AppsApiError("Expected exactly one App for hostname")
-            app_id = page.items[0].id
+            return page.items[0].id
+        except NotFound:
+            return None
+        except ValidationError as e:
+            raise AppsApiError("Invalid hostname lookup response") from e
+
+    async def get_id_by_static_hostname(self, hostname: str) -> UUID | None:
+        hostname = canonical_hostname(hostname)
+        app_id = await self.get_id_by_hostname(hostname)
+        if app_id is None:
+            return None
+        try:
             binding_payload = await self._request(
                 method="GET", url=f"{self.v2_url}/instances/{app_id}/static-hostname"
             )
@@ -126,7 +137,7 @@ class AppsApiClient:
             return None
         return app_id
 
-    async def is_static_hostname(self, hostname: str) -> bool:
+    async def is_in_static_hostname_namespace(self, hostname: str) -> bool:
         hostname = canonical_hostname(hostname)
         try:
             payload = await self._request(
