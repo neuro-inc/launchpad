@@ -18,6 +18,7 @@ test('the container accepts large authentication headers and rejects oversized h
   `);
   const dockerfile = await readFile(new URL('../Dockerfile', import.meta.url), 'utf8');
   const command = JSON.parse(dockerfile.match(/^CMD (.+)$/m)[1]);
+  assert.equal(command[0], 'node');
   const child = spawn(process.execPath, command.slice(1), {
     cwd: directory,
     env: { ...process.env, NEXTAUTH_SECRET: 'test-session-secret'.repeat(2) },
