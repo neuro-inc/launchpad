@@ -69,12 +69,15 @@ sequenceDiagram
     App-->>Browser: App response through Traefik
 ```
 
-Static binding resolution uses two requests: resolve the instance by hostname,
-then verify its exact active static-hostname binding. Locally registered hosts
-also require a hostname-configuration lookup to distinguish static aliases from
-ordinary App URLs. A 404 from that configuration view means static hostnames are
-unconfigured; other failures deny authorization with 503. Cookie-domain coverage
-determines token transport and does not control binding validation.
+Locally registered URLs in the configured static-hostname domain use authoritative Apps API resolution on each request.
+The API resolves unreserved generated hostnames and enforces current static bindings for reserved labels.
+A missing static binding therefore does not reject a generated App URL.
+Unregistered URLs require an exact active static binding before Launchpad accepts the resolved App.
+
+Locally registered URLs outside that domain use Launchpad's stored URLs.
+A 404 from the hostname-configuration view means static hostnames are unconfigured.
+Other configuration failures deny authorization with 503.
+Cookie-domain coverage determines token transport and does not control binding validation.
 
 Hostnames are normalized consistently across registry, OAuth, local App, and
 session lookups: case and trailing DNS dots are normalized, and the default HTTPS

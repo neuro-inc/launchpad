@@ -504,7 +504,9 @@ async def test_static_hostname_namespace(
         "_request",
         new=AsyncMock(return_value={"hostname_domain": "apps.apolo.us"}),
     ):
-        assert await apps_api_client.is_static_hostname(hostname) is expected
+        assert (
+            await apps_api_client.is_in_static_hostname_namespace(hostname) is expected
+        )
 
 
 @pytest.mark.parametrize("binding_response", [{}, ServerError()])
@@ -532,7 +534,7 @@ async def test_unconfigured_static_hostname_namespace_is_false(
     with patch.object(
         apps_api_client, "_request", new=AsyncMock(side_effect=NotFound())
     ):
-        assert not await apps_api_client.is_static_hostname(
+        assert not await apps_api_client.is_in_static_hostname_namespace(
             "registered.external.example"
         )
 
@@ -547,4 +549,6 @@ async def test_static_hostname_configuration_failure_is_not_disabled(
         ),
         pytest.raises(AppsApiError),
     ):
-        await apps_api_client.is_static_hostname("registered.external.example")
+        await apps_api_client.is_in_static_hostname_namespace(
+            "registered.external.example"
+        )

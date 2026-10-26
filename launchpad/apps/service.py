@@ -121,14 +121,15 @@ class AppService:
         hostname = canonical_authority(hostname)
         async with self._db() as db:
             installed_app = await select_app_by_any_url(db, f"https://{hostname}")
-        if (
-            installed_app is not None
-            and not await self._apps_api_client.is_static_hostname(hostname)
-        ):
-            return installed_app
-
         # Resolve each request against current bindings; never persist transferable aliases.
-        app_id = await self._apps_api_client.get_id_by_static_hostname(hostname)
+        if installed_app is not None:
+            if not await self._apps_api_client.is_in_static_hostname_namespace(
+                hostname
+            ):
+                return installed_app
+            app_id = await self._apps_api_client.get_id_by_hostname(hostname)
+        else:
+            app_id = await self._apps_api_client.get_id_by_static_hostname(hostname)
         if app_id is None:
             return None
         async with self._db() as db:

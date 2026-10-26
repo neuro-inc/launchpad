@@ -25,6 +25,26 @@ def mock_apps_api_client() -> AsyncMock:
 
 
 @pytest.fixture
+def hostname_apps_api_client() -> AppsApiClient:
+    return AppsApiClient(
+        http=AsyncMock(),
+        base_url="https://api.example.com",
+        token="test-token",
+        cluster="default",
+        org_name="test-org",
+        project_name="test-project",
+    )
+
+
+@pytest.fixture
+def hostname_app_service(
+    mock_launchpad_app: MagicMock, hostname_apps_api_client: AppsApiClient
+) -> AppService:
+    mock_launchpad_app.apps_api_client = hostname_apps_api_client
+    return AppService(app=mock_launchpad_app)
+
+
+@pytest.fixture
 def mock_db_session_maker() -> MagicMock:
     # This fixture provides an AsyncMock for AsyncSession, but AppService expects app.db to be async_sessionmaker
     # So, we need to mock app.db to return an AsyncMock context manager when called.
@@ -366,7 +386,7 @@ async def test_resolve_generated_hostname_uses_local_urls(
     expected_url: str,
 ) -> None:
     installed = MagicMock(spec=InstalledApp)
-    mock_apps_api_client.is_static_hostname.return_value = False
+    mock_apps_api_client.is_in_static_hostname_namespace.return_value = False
     with patch(
         "launchpad.apps.service.select_app_by_any_url",
         new=AsyncMock(return_value=installed),
@@ -416,7 +436,7 @@ async def test_registered_external_hostname_remains_authorized(
     mock_apps_api_client: AsyncMock,
 ) -> None:
     installed = MagicMock(spec=InstalledApp)
-    mock_apps_api_client.is_static_hostname.return_value = False
+    mock_apps_api_client.is_in_static_hostname_namespace.return_value = False
     with patch(
         "launchpad.apps.service.select_app_by_any_url",
         new=AsyncMock(return_value=installed),
@@ -434,8 +454,8 @@ async def test_stored_static_alias_cannot_override_current_binding(
     app_service: AppService,
     mock_apps_api_client: AsyncMock,
 ) -> None:
-    mock_apps_api_client.is_static_hostname.return_value = True
-    mock_apps_api_client.get_id_by_static_hostname.return_value = None
+    mock_apps_api_client.is_in_static_hostname_namespace.return_value = True
+    mock_apps_api_client.get_id_by_hostname.return_value = None
     with patch(
         "launchpad.apps.service.select_app_by_any_url",
         new=AsyncMock(return_value=MagicMock(spec=InstalledApp)),
@@ -453,8 +473,8 @@ async def test_stored_static_hostname_resolves_to_current_app(
 ) -> None:
     previous, current = MagicMock(spec=InstalledApp), MagicMock(spec=InstalledApp)
     previous.app_id, current.app_id = uuid.uuid4(), uuid.uuid4()
-    mock_apps_api_client.is_static_hostname.return_value = True
-    mock_apps_api_client.get_id_by_static_hostname.return_value = current.app_id
+    mock_apps_api_client.is_in_static_hostname_namespace.return_value = True
+    mock_apps_api_client.get_id_by_hostname.return_value = current.app_id
     with (
         patch(
             "launchpad.apps.service.select_app_by_any_url",
@@ -470,8 +490,133 @@ async def test_stored_static_hostname_resolves_to_current_app(
             )
             is current
         )
-    mock_apps_api_client.is_static_hostname.assert_awaited_once_with(
+    mock_apps_api_client.is_in_static_hostname_namespace.assert_awaited_once_with(
         "silverfin-dev.apps.apolo.us"
     )
     assert by_id.await_args is not None
     assert by_id.await_args.kwargs["id"] == current.app_id
+
+
+async def test_generated_app_in_static_namespace_does_not_require_binding(
+    hostname_app_service: AppService,
+    hostname_apps_api_client: AppsApiClient,
+    app_id: UUID,
+) -> None:
+    hostname = f"custom-deployment--{app_id.hex}.apps.dev.apolo.us"
+    installed = MagicMock(spec=InstalledApp)
+    installed.app_id = app_id
+    with (
+        patch(
+            "launchpad.apps.service.select_app_by_any_url",
+            new=AsyncMock(return_value=installed),
+        ),
+        patch(
+            "launchpad.apps.service.select_app", new=AsyncMock(return_value=installed)
+        ) as by_id,
+        patch.object(
+            hostname_apps_api_client,
+            "_request",
+            new=AsyncMock(
+                side_effect=[
+                    {"hostname_domain": "apps.dev.apolo.us"},
+                    {"items": [{"id": str(app_id)}]},
+                    AppsApiNotFound(),
+                ]
+            ),
+        ) as request,
+    ):
+        assert (
+            await hostname_app_service.resolve_app_for_authorization(hostname)
+            is installed
+        )
+    assert request.await_count == 2
+    request.assert_awaited_with(
+        method="GET",
+        url="https://api.example.com/v2/instances",
+        params={"hostname": hostname},
+    )
+    assert by_id.await_args is not None
+    assert by_id.await_args.kwargs["id"] == app_id
+
+
+@pytest.mark.parametrize("domain", ["apps.dev.apolo.us", "attacker.example"])
+async def test_unregistered_uuid_hostname_requires_active_static_binding(
+    hostname_app_service: AppService,
+    hostname_apps_api_client: AppsApiClient,
+    app_id: UUID,
+    domain: str,
+) -> None:
+    hostname = f"custom-deployment--{app_id.hex}.{domain}"
+    with (
+        patch(
+            "launchpad.apps.service.select_app_by_any_url",
+            new=AsyncMock(return_value=None),
+        ),
+        patch("launchpad.apps.service.select_app", new=AsyncMock()) as by_id,
+        patch.object(
+            hostname_apps_api_client,
+            "_request",
+            new=AsyncMock(
+                side_effect=[{"items": [{"id": str(app_id)}]}, AppsApiNotFound()]
+            ),
+        ) as request,
+    ):
+        assert (
+            await hostname_app_service.resolve_app_for_authorization(hostname) is None
+        )
+    by_id.assert_not_awaited()
+    assert request.await_count == 2
+    request.assert_any_await(
+        method="GET",
+        url="https://api.example.com/v2/instances",
+        params={"hostname": hostname},
+    )
+    request.assert_awaited_with(
+        method="GET",
+        url=f"https://api.example.com/v2/instances/{app_id}/static-hostname",
+    )
+
+
+async def test_local_removal_during_hostname_lookup_denies_access(
+    hostname_app_service: AppService,
+    hostname_apps_api_client: AppsApiClient,
+    app_id: UUID,
+) -> None:
+    hostname = f"custom-deployment--{app_id.hex}.apps.dev.apolo.us"
+    installed = MagicMock(spec=InstalledApp)
+    installed.app_id = app_id
+    membership = {app_id: installed}
+
+    async def respond(
+        *, method: str, url: str, params: dict[str, str] | None = None
+    ) -> dict[str, object]:
+        assert method == "GET"
+        if url == "https://api.example.com/v2/hostnames/configuration":
+            return {"hostname_domain": "apps.dev.apolo.us"}
+        assert url == "https://api.example.com/v2/instances"
+        assert params == {"hostname": hostname}
+        membership.clear()
+        return {"items": [{"id": str(app_id)}]}
+
+    async def find_app(db: AsyncSession, *, id: UUID) -> InstalledApp | None:
+        return membership.get(id)
+
+    with (
+        patch(
+            "launchpad.apps.service.select_app_by_any_url",
+            new=AsyncMock(return_value=installed),
+        ),
+        patch(
+            "launchpad.apps.service.select_app", new=AsyncMock(side_effect=find_app)
+        ) as by_id,
+        patch.object(
+            hostname_apps_api_client, "_request", new=AsyncMock(side_effect=respond)
+        ),
+    ):
+        assert (
+            await hostname_app_service.resolve_app_for_authorization(hostname) is None
+        )
+    assert not membership
+    by_id.assert_awaited_once()
+    assert by_id.await_args is not None
+    assert by_id.await_args.kwargs["id"] == app_id
