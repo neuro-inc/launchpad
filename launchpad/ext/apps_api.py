@@ -137,7 +137,7 @@ class AppsApiClient:
             return None
         return app_id
 
-    async def is_static_hostname(self, hostname: str) -> bool:
+    async def is_in_static_hostname_namespace(self, hostname: str) -> bool:
         hostname = canonical_hostname(hostname)
         try:
             payload = await self._request(

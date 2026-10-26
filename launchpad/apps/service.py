@@ -123,7 +123,9 @@ class AppService:
             installed_app = await select_app_by_any_url(db, f"https://{hostname}")
         # Resolve each request against current bindings; never persist transferable aliases.
         if installed_app is not None:
-            if not await self._apps_api_client.is_static_hostname(hostname):
+            if not await self._apps_api_client.is_in_static_hostname_namespace(
+                hostname
+            ):
                 return installed_app
             app_id = await self._apps_api_client.get_id_by_hostname(hostname)
         else:
