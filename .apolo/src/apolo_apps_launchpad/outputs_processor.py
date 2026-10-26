@@ -1,16 +1,13 @@
-import logging
 import os
 import typing as t
 
-import backoff
 from apolo_app_types.clients.kube import get_service_host_port
 from apolo_app_types.outputs.base import BaseAppOutputsProcessor
 from apolo_app_types.outputs.common import INSTANCE_LABEL
-from apolo_app_types.outputs.utils.apolo_secrets import create_apolo_secret
+from apolo_app_types.outputs.utils.apolo_secrets import create_apolo_secret_with_retry
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
 from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
-from apolo_app_types.protocols.common.secrets_ import ApoloSecret
 
 from .consts import APP_SECRET_KEYS
 from .types import (
@@ -19,35 +16,6 @@ from .types import (
     LaunchpadAppOutputs,
     LaunchpadDefaultAdminUser,
 )
-
-
-# Configure logging
-logger = logging.getLogger(__name__)
-
-
-@backoff.on_exception(
-    backoff.expo,
-    Exception,
-    max_tries=5,
-    base=2,
-    factor=2,
-    logger=logger,
-)
-async def create_apolo_secret_with_retry(
-    app_instance_id: str, key: str, value: str
-) -> ApoloSecret:
-    """
-    Attempt to create an Apolo secret with retry logic using exponential backoff.
-    Retries up to 5 times with delays: 2s, 4s, 8s, 16s, 32s.
-    Returns the secret reference on success.
-    Raises exception if all retries fail.
-    """
-    logger.info(f'Creating secret "{key}-{app_instance_id}"')
-    result = await create_apolo_secret(
-        app_instance_id=app_instance_id, key=key, value=value
-    )
-    logger.info(f'Successfully created secret "{key}-{app_instance_id}"')
-    return result
 
 
 def get_launchpad_name(apolo_app_id: str) -> str:

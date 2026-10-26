@@ -4,7 +4,8 @@ A Next.js 16 web application for cloud-native application management. Provides a
 
 Run the commands in this guide from `frontend/`.
 The repository root contains the Python backend, App processors, and Helm chart.
-Existing Netlify deployments continue to use `launchpad-web-ui` until a separate hosting migration changes their source.
+Existing Netlify deployments remain available during migration.
+See [frontend hosting](../docs/operations/frontend-hosting.md) for container publication, App ownership, migration, and rollback.
 
 ## Tech Stack
 
@@ -23,6 +24,9 @@ Existing Netlify deployments continue to use `launchpad-web-ui` until a separate
 - **Apolo Platform** access with Launchpad installed
 
 ## Local Development Setup
+
+To run PostgreSQL, Keycloak, the backend, and the frontend locally, follow the [full-stack development guide](../docs/engineering/local-development.md).
+The instructions below connect a local frontend to a deployed Launchpad backend.
 
 ### 1. Deploy Launchpad Backend
 

@@ -1,4 +1,5 @@
 APP_SECRET_KEYS = {
+    "FRONTEND": "launchpad-frontend-session",
     "LAUNCHPAD": "launchpad-admin-pswd",
     "KEYCLOAK": "keycloak-admin-pswd",
     "KEYCLOAK_DB": "keycloak-db-pswd",

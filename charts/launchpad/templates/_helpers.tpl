@@ -72,3 +72,14 @@ platform.apolo.us/component: app
 {{- define "launchpad.admin-secret" -}}
 {{- printf "%s-admin-secret" (include "launchpad.name" .) }}
 {{- end }}
+
+{{- define "launchpad.image" -}}
+{{- with .Values.image.digest -}}
+{{- if not (regexMatch "^sha256:[0-9a-f]{64}$" .) -}}
+{{- fail "image.digest must be an immutable SHA-256 image digest." -}}
+{{- end -}}
+{{- printf "%s@%s" $.Values.image.repository . -}}
+{{- else -}}
+{{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
+{{- end -}}
+{{- end -}}
