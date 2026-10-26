@@ -33,6 +33,8 @@ jobs:
         run: npm ci
         env:
           FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
+      - name: Test the frontend container launcher
+        run: node --test deploy/*.test.mjs
       - name: Run frontend linting
         run: npm run lint
         env:

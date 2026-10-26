@@ -20,4 +20,5 @@ COPY --from=build --chown=node:node /app/public ./public
 COPY --chown=node:node deploy/start.mjs ./start.mjs
 USER node
 EXPOSE 3000
-CMD ["node", "start.mjs"]
+# Shared-domain authentication cookies can exceed Node's default 16 KiB header limit.
+CMD ["node", "--max-http-header-size=65536", "start.mjs"]
