@@ -74,7 +74,7 @@ jobs:
             --paginate --jq '.artifacts[] | select(.name == "launchpad-release" and .expired == false) | .id')
           [[ "$artifact_id" =~ ^[1-9][0-9]*$ ]] || { echo 'One unexpired App release artifact is required.' >&2; exit 1; }
           printf 'run_id=%s\nartifact_id=%s\n' "$BUILD_RUN_ID" "$artifact_id" >> "$GITHUB_OUTPUT"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: steps.build.outputs.artifact_id != ''
         with:
           artifact-ids: ${{ steps.build.outputs.artifact_id }}
