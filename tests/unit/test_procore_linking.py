@@ -630,57 +630,54 @@ def test_provider_presets_match_the_procore_contract(
 
 
 @pytest.mark.parametrize(
-    "mode, expected",
-    [("--enable", True), ("--disable", False), (None, None), ("--default-group", None)],
+    "mode, group_path, expected_enabled",
+    [
+        ("--enable", None, True),
+        ("--disable", None, False),
+        (None, None, None),
+        (None, "/reviewers", None),
+    ],
 )
-def test_cli_passes_the_three_state_linking_mode(
+def test_cli_passes_linking_mode_and_default_group(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     mode: str | None,
-    expected: bool | None,
+    group_path: str | None,
+    expected_enabled: bool | None,
 ) -> None:
     password = tmp_path / "password"
     password.write_text("synthetic-password")
-    provider = tmp_path / "provider.json"
-    provider.write_text('{"clientId":"test-client"}')
-    secret = tmp_path / "secret"
-    secret.write_text("synthetic-secret")
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "migration",
-            "--server",
-            "https://keycloak.test",
-            "--password-file",
-            str(password),
-            "--flow-file",
-            str(
-                Path(__file__).parents[2]
-                / "charts/launchpad/files/procore-auto-link.json"
-            ),
-            *(
-                ["--default-group", "/reviewers"]
-                if mode == "--default-group"
-                else [
-                    "--provider-file",
-                    str(provider),
-                    "--client-secret-file",
-                    str(secret),
-                    *([mode] if mode else []),
-                ]
-            ),
-        ],
-    )
+    args = [
+        "migration",
+        "--server",
+        "https://keycloak.test",
+        "--password-file",
+        str(password),
+        "--flow-file",
+        str(
+            Path(__file__).parents[2] / "charts/launchpad/files/procore-auto-link.json"
+        ),
+    ]
+    if group_path is not None:
+        args.extend(["--default-group", group_path])
+    else:
+        provider = tmp_path / "provider.json"
+        provider.write_text('{"clientId":"test-client"}')
+        secret = tmp_path / "secret"
+        secret.write_text("synthetic-secret")
+        args.extend(
+            ["--provider-file", str(provider), "--client-secret-file", str(secret)]
+        )
+    if mode is not None:
+        args.append(mode)
+    monkeypatch.setattr(sys, "argv", args)
     admin = Mock(spec=KeycloakAdmin)
     monkeypatch.setattr(procore_linking, "KeycloakAdmin", Mock(return_value=admin))
     migration = Mock()
     monkeypatch.setattr(procore_linking, "reconcile", migration)
     assert procore_linking.main() == 0
-    assert migration.call_args.kwargs["enabled"] is expected
-    assert migration.call_args.kwargs["default_group"] == (
-        "/reviewers" if mode == "--default-group" else None
-    )
+    assert migration.call_args.kwargs["enabled"] is expected_enabled
+    assert migration.call_args.kwargs["default_group"] == group_path
     assert migration.call_args.kwargs["apply"] is False
 
 

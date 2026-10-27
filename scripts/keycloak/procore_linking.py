@@ -329,7 +329,7 @@ def reconcile_linking_flow(
 
 def prepare_default_group_mapper(
     admin: KeycloakAdmin, group_path: str | None, *, provider_exists: bool
-) -> dict[str, object] | None:
+) -> GroupMapper | None:
     if group_path is None:
         return None
     if not group_path.startswith("/") or group_path.endswith("/") or "//" in group_path:
@@ -381,20 +381,20 @@ def prepare_default_group_mapper(
         identityProviderAlias="procore",
         identityProviderMapper=GROUP_MAPPER_TYPE,
         config={"group": group_path, "syncMode": "IMPORT"},
-    ).model_dump()
+    )
 
 
 def write_default_group_mapper(admin: KeycloakAdmin, group_path: str | None) -> None:
     mapper = prepare_default_group_mapper(admin, group_path, provider_exists=True)
     if mapper is None:
         return
-    admin.add_mapper_to_idp("procore", mapper)
+    admin.add_mapper_to_idp("procore", mapper.model_dump())
     verified = [
         GroupMapper.model_validate(value)
         for value in admin.get_idp_mappers("procore")
         if value.get("name") == GROUP_MAPPER_NAME
     ]
-    if len(verified) != 1 or verified[0].model_dump() != mapper:
+    if len(verified) != 1 or verified[0] != mapper:
         raise MigrationConflict(
             "The Procore default-group mapper could not be verified."
         )

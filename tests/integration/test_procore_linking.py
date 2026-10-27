@@ -292,6 +292,18 @@ def test_default_group_mapper_restoration_preserves_accounts_and_permissions(
     assert mappers[0]["config"] == {"group": group_path, "syncMode": "IMPORT"}
     reconcile(admin, definition, enabled=None, default_group=group_path, apply=True)
     assert admin.get_idp_mappers("procore") == mappers
+    response = admin.connection.raw_delete(
+        f"admin/realms/{realm_name}/identity-provider/instances/procore/mappers/{mappers[0]['id']}"
+    )
+    assert response.status_code == 204
+    assert admin.get_idp_mappers("procore") == []
+    reconcile(admin, definition, enabled=None, default_group=group_path, apply=True)
+    restored = admin.get_idp_mappers("procore")
+    assert len(restored) == 1
+    assert restored[0]["id"] != mappers[0]["id"]
+    assert {key: value for key, value in restored[0].items() if key != "id"} == {
+        key: value for key, value in mappers[0].items() if key != "id"
+    }
     assert admin.get_idp("procore") == provider
     assert account_snapshot(admin, user_id, client_id) == before
     assert admin.get_user_social_logins(user_id) == links
