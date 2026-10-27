@@ -1,6 +1,7 @@
 import copy
 import sys
 from pathlib import Path
+from typing import Literal
 from unittest.mock import Mock
 
 import pytest
@@ -15,6 +16,36 @@ from scripts.keycloak.procore_linking import (
     MigrationConflict,
     reconcile,
 )
+
+
+PROCORE_CONFIGURATIONS = {
+    "production": {
+        "clientId": "test-client",
+        "authorizationUrl": "https://login.procore.com/oauth/authorize",
+        "tokenUrl": "https://login.procore.com/oauth/token",
+        "userInfoUrl": "https://api.procore.com/rest/v1.0/me",
+        "userIDClaim": "id",
+        "userNameClaim": "login",
+        "emailClaim": "login",
+        "clientAuthMethod": "client_secret_post",
+        "syncMode": "LEGACY",
+        "fullNameClaim": "name",
+        "clientSecret": "test",
+    },
+    "sandbox": {
+        "clientId": "test-client",
+        "authorizationUrl": "https://login-sandbox.procore.com/oauth/authorize",
+        "tokenUrl": "https://login-sandbox.procore.com/oauth/token",
+        "userInfoUrl": "https://sandbox.procore.com/rest/v1.0/me",
+        "userIDClaim": "id",
+        "userNameClaim": "login",
+        "emailClaim": "login",
+        "clientAuthMethod": "client_secret_post",
+        "syncMode": "LEGACY",
+        "fullNameClaim": "name",
+        "clientSecret": "test",
+    },
+}
 
 
 @pytest.fixture
@@ -435,9 +466,7 @@ def test_creates_the_provider_before_binding_without_touching_users(
     )
     assert admin.provider["providerId"] == "oauth2"
     assert admin.provider["firstBrokerLoginFlowAlias"] == FLOW_ALIAS
-    assert admin.provider["config"]["userIDClaim"] == "id"
-    assert admin.provider["config"]["emailClaim"] == "login"
-    assert admin.provider["config"]["clientSecret"] == "test"
+    assert admin.provider["config"] == PROCORE_CONFIGURATIONS["production"]
     assert set(writes(admin)) <= {
         "create_authentication_flow",
         "create_authentication_flow_execution",
@@ -450,8 +479,18 @@ def managed_provider(
     admin: Mock, settings: procore_linking.ProcoreProviderSettings
 ) -> None:
     admin.provider.clear()
+    configuration = copy.deepcopy(PROCORE_CONFIGURATIONS[settings.environment])
+    configuration["clientId"] = settings.clientId
     admin.provider.update(
-        procore_linking.provider_configuration(None, settings, "test")
+        {
+            "alias": "procore",
+            "providerId": "oauth2",
+            "displayName": "Procore",
+            "storeToken": False,
+            "enabled": settings.enabled,
+            "trustEmail": settings.trustEmail,
+            "config": configuration,
+        }
     )
 
 
@@ -577,3 +616,14 @@ def test_provider_settings_cannot_enable_linking_without_explicit_trust(
             client_secret="test",
         )
     assert writes(admin) == []
+
+
+@pytest.mark.parametrize("environment", ["production", "sandbox"])
+def test_provider_presets_match_the_procore_contract(
+    environment: Literal["production", "sandbox"],
+) -> None:
+    settings = procore_linking.ProcoreProviderSettings(
+        clientId="test-client", environment=environment
+    )
+    provider = procore_linking.provider_configuration(None, settings, "test")
+    assert provider["config"] == PROCORE_CONFIGURATIONS[environment]

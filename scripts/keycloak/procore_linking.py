@@ -14,6 +14,7 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 
 FLOW_ALIAS = "procore-auto-link"
 PROVIDERS = ("idp-create-user-if-unique", "idp-auto-link")
+PROVIDER_CONFIG_ADAPTER = TypeAdapter(dict[str, str])
 
 
 class MigrationConflict(RuntimeError):
@@ -50,7 +51,7 @@ def provider_configuration(
         "userNameClaim": "login",
         "emailClaim": "login",
     }
-    configuration = TypeAdapter(dict[str, str]).validate_python(
+    configuration = PROVIDER_CONFIG_ADAPTER.validate_python(
         (current or {}).get("config", {})
     )
     if current:
@@ -214,12 +215,8 @@ def write_procore_provider(
     binding_matches = updated_binding == expected_binding or (
         not desired.get("firstBrokerLoginFlowAlias") and not updated_binding
     )
-    desired_config = TypeAdapter(dict[str, str]).validate_python(
-        desired.get("config", {})
-    )
-    updated_config = TypeAdapter(dict[str, str]).validate_python(
-        updated.get("config", {})
-    )
+    desired_config = PROVIDER_CONFIG_ADAPTER.validate_python(desired.get("config", {}))
+    updated_config = PROVIDER_CONFIG_ADAPTER.validate_python(updated.get("config", {}))
     expected_secret = desired_config.pop("clientSecret", None)
     observed_secret = updated_config.pop("clientSecret", None)
     secret_matches = expected_secret is None or observed_secret in (
@@ -248,6 +245,77 @@ def write_procore_provider(
         and secret_matches
     ):
         raise MigrationConflict("The updated Procore provider could not be verified.")
+
+
+def reconcile_linking_flow(
+    admin: KeycloakAdmin,
+    definition: FlowDefinition,
+    *,
+    enabled: bool | None,
+    apply: bool,
+) -> None:
+    flows = [
+        FlowState.model_validate(value) for value in admin.get_authentication_flows()
+    ]
+    existing = next((flow for flow in flows if flow.alias == FLOW_ALIAS), None)
+    executions: list[ExecutionState] = []
+    if existing:
+        if (
+            existing.builtIn
+            or not existing.topLevel
+            or existing.providerId != "basic-flow"
+        ):
+            raise MigrationConflict(
+                "The existing Procore flow has an incompatible type."
+            )
+        executions = flow_executions(admin)
+        validate_executions(admin, executions)
+    elif not enabled:
+        raise MigrationConflict(
+            "The bound Procore flow is missing; review it manually."
+        )
+
+    needs_repair = len(executions) != len(PROVIDERS) or any(
+        step.requirement != "ALTERNATIVE" for step in executions
+    )
+    if existing and needs_repair and existing.description != definition.description:
+        raise MigrationConflict("An incomplete custom Procore flow cannot be adopted.")
+    if enabled is None and needs_repair:
+        raise MigrationConflict(
+            "Select automatic linking explicitly before repairing its flow."
+        )
+    if enabled and needs_repair:
+        validate_exclusive_flow(admin)
+
+    if not apply:
+        return
+    if enabled and needs_repair:
+        if not existing:
+            admin.create_authentication_flow(
+                definition.model_dump(exclude={"authenticationExecutions"})
+            )
+        for step in definition.authenticationExecutions[len(executions) :]:
+            admin.create_authentication_flow_execution(
+                payload={"provider": step.authenticator}, flow_alias=FLOW_ALIAS
+            )
+        executions = flow_executions(admin)
+        validate_executions(admin, executions)
+        if len(executions) != len(PROVIDERS):
+            raise MigrationConflict("The Procore flow is incomplete.")
+        for execution in executions:
+            if execution.requirement != "ALTERNATIVE":
+                admin.update_authentication_flow_executions(
+                    payload={"id": execution.id, "requirement": "ALTERNATIVE"},
+                    flow_alias=FLOW_ALIAS,
+                )
+        verified = flow_executions(admin)
+        validate_executions(admin, verified)
+        if len(verified) != len(PROVIDERS) or any(
+            step.requirement != "ALTERNATIVE" for step in verified
+        ):
+            raise MigrationConflict(
+                "The Procore flow requirements could not be verified."
+            )
 
 
 def reconcile(
@@ -302,73 +370,9 @@ def reconcile(
             "Procore must be enabled and explicitly trust its email claims."
         )
 
-    flows = [
-        FlowState.model_validate(value) for value in admin.get_authentication_flows()
-    ]
-    existing = next((flow for flow in flows if flow.alias == FLOW_ALIAS), None)
-    executions: list[ExecutionState] = []
-    if existing:
-        if (
-            existing.builtIn
-            or not existing.topLevel
-            or existing.providerId != "basic-flow"
-        ):
-            raise MigrationConflict(
-                "The existing Procore flow has an incompatible type."
-            )
-        executions = flow_executions(admin)
-        validate_executions(admin, executions)
-        if (
-            len(executions) != len(PROVIDERS)
-            or any(step.requirement != "ALTERNATIVE" for step in executions)
-        ) and existing.description != definition.description:
-            raise MigrationConflict(
-                "An incomplete custom Procore flow cannot be adopted."
-            )
-    elif not enabled:
-        raise MigrationConflict(
-            "The bound Procore flow is missing; review it manually."
-        )
-
-    needs_repair = len(executions) != len(PROVIDERS) or any(
-        step.requirement != "ALTERNATIVE" for step in executions
-    )
-    if enabled is None and needs_repair:
-        raise MigrationConflict(
-            "Select automatic linking explicitly before repairing its flow."
-        )
-    if enabled and needs_repair:
-        validate_exclusive_flow(admin)
-
+    reconcile_linking_flow(admin, definition, enabled=enabled, apply=apply)
     if not apply:
         return
-    if enabled and needs_repair:
-        if not existing:
-            admin.create_authentication_flow(
-                definition.model_dump(exclude={"authenticationExecutions"})
-            )
-        for step in definition.authenticationExecutions[len(executions) :]:
-            admin.create_authentication_flow_execution(
-                payload={"provider": step.authenticator}, flow_alias=FLOW_ALIAS
-            )
-        executions = flow_executions(admin)
-        validate_executions(admin, executions)
-        if len(executions) != len(PROVIDERS):
-            raise MigrationConflict("The Procore flow is incomplete.")
-        for execution in executions:
-            if execution.requirement != "ALTERNATIVE":
-                admin.update_authentication_flow_executions(
-                    payload={"id": execution.id, "requirement": "ALTERNATIVE"},
-                    flow_alias=FLOW_ALIAS,
-                )
-        verified = flow_executions(admin)
-        validate_executions(admin, verified)
-        if len(verified) != len(PROVIDERS) or any(
-            step.requirement != "ALTERNATIVE" for step in verified
-        ):
-            raise MigrationConflict(
-                "The Procore flow requirements could not be verified."
-            )
 
     if enabled is not None:
         provider["firstBrokerLoginFlowAlias"] = FLOW_ALIAS if enabled else ""
