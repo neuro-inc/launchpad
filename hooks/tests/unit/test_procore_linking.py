@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from apolo_app_types import ApoloSecret
 from apolo_app_types.protocols.common import Preset
 from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
 from apolo_apps_launchpad.types import (
@@ -13,6 +14,7 @@ from apolo_apps_launchpad.types import (
     LaunchpadAppInputs,
     LaunchpadWebAppConfig,
     NoQuickStartConfig,
+    ProcoreIdentityProviderConfig,
 )
 from apolo_sdk import Client
 
@@ -107,3 +109,126 @@ def test_procore_chart_is_opt_in_and_mounts_only_keycloak_credentials(
         if item["kind"] == "ConfigMap" and "flow.json" in item.get("data", {})
     )
     assert json.loads(flow_config["data"]["flow.json"]) == definition
+
+
+async def test_provider_credentials_remain_a_namespaced_secret_reference(
+    apolo_client: Client,
+) -> None:
+    inputs = LaunchpadAppInputs(
+        launchpad_web_app_config=LaunchpadWebAppConfig(preset=Preset(name="cpu-small")),
+        apps_config=AppsConfig(
+            quick_start_config=NoQuickStartConfig(no_quickstart=True)
+        ),
+        procore_identity_provider=ProcoreIdentityProviderConfig(
+            client_id="test-client",
+            client_secret=ApoloSecret(key="PROCORE_CLIENT_SECRET"),
+            environment="sandbox",
+            trust_email=True,
+        ),
+    )
+    values = await LaunchpadInputsProcessor(client=apolo_client).gen_extra_values(
+        input_=inputs,
+        app_name="test",
+        namespace="platform",
+        app_secrets_name="project-test-secrets",
+        app_id="test-app",
+    )
+    assert values["procoreProvider"] == {
+        "clientId": "test-client",
+        "environment": "sandbox",
+        "enabled": True,
+        "trustEmail": True,
+        "clientSecret": {
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": "project-test-secrets",
+                    "key": "PROCORE_CLIENT_SECRET",
+                }
+            }
+        },
+    }
+
+
+@pytest.mark.parametrize("linking", [None, True, False])
+def test_provider_job_mounts_just_the_required_secret_key(
+    tmp_path: Path, linking: bool | None
+) -> None:
+    root = Path(__file__).resolve().parents[3]
+    values = tmp_path / "values.yaml"
+    provider = {
+        "clientId": "test-client",
+        "environment": "sandbox",
+        "enabled": True,
+        "trustEmail": False,
+        "clientSecret": {
+            "valueFrom": {
+                "secretKeyRef": {
+                    "name": "project-test-secrets",
+                    "key": "PROCORE_CLIENT_SECRET",
+                }
+            }
+        },
+    }
+    values.write_text(
+        yaml.safe_dump(
+            {
+                "apolo_app_id": "test-app",
+                "LAUNCHPAD_ADMIN_PASSWORD": "test-admin",
+                "dbPassword": "test-db",
+                "authResponseHeaders": ["X-Auth-Request-Email"],
+                "procoreProvider": provider,
+                "procoreAutomaticLinking": linking,
+            }
+        )
+    )
+    resources = [
+        item
+        for item in yaml.safe_load_all(
+            subprocess.check_output(
+                [
+                    "helm",
+                    "template",
+                    "test",
+                    str(root / "charts/launchpad"),
+                    "-f",
+                    str(values),
+                ],
+                text=True,
+            )
+        )
+        if item
+    ]
+    job = next(
+        item
+        for item in resources
+        if item["kind"] == "Job"
+        and item["metadata"]["name"].endswith("-procore-linking")
+    )
+    pod = job["spec"]["template"]["spec"]
+    (container,) = pod["containers"]
+    assert ("--enable" in container["args"]) is (linking is True)
+    assert ("--disable" in container["args"]) is (linking is False)
+    assert "--provider-file" in container["args"]
+    assert "env" not in container
+    secret = next(
+        volume["secret"]
+        for volume in pod["volumes"]
+        if volume["name"] == "procore-client"
+    )
+    assert secret == {
+        "secretName": "project-test-secrets",
+        "defaultMode": 0o440,
+        "items": [{"key": "PROCORE_CLIENT_SECRET", "path": "client-secret"}],
+    }
+    config = next(
+        item
+        for item in resources
+        if item["kind"] == "ConfigMap" and "provider.json" in item.get("data", {})
+    )
+    projected = json.loads(config["data"]["provider.json"])
+    assert projected == {
+        key: value for key, value in provider.items() if key != "clientSecret"
+    }
+    for item in resources:
+        if item["kind"] in ("Deployment", "StatefulSet"):
+            assert "procore-client" not in json.dumps(item)

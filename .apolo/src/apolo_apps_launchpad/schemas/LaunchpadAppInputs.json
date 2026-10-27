@@ -753,6 +753,51 @@
       "x-title": "Resource Preset",
       "x-type": "Preset"
     },
+    "ProcoreIdentityProviderConfig": {
+      "properties": {
+        "client_id": {
+          "minLength": 1,
+          "title": "Client ID",
+          "type": "string"
+        },
+        "client_secret": {
+          "$ref": "#/$defs/ApoloSecret",
+          "title": "Client secret"
+        },
+        "environment": {
+          "default": "production",
+          "enum": [
+            "production",
+            "sandbox"
+          ],
+          "title": "Procore environment",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enable Procore sign-in",
+          "type": "boolean"
+        },
+        "trust_email": {
+          "default": false,
+          "description": "Enable only when you trust Procore's email claims. Automatic account linking requires this setting.",
+          "title": "Trust Procore email claims",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "client_id",
+        "client_secret"
+      ],
+      "title": "ProcoreIdentityProviderConfig",
+      "type": "object",
+      "x-description": "",
+      "x-is-advanced-field": false,
+      "x-is-configurable": true,
+      "x-meta-type": "inline",
+      "x-title": "",
+      "x-type": "ProcoreIdentityProviderConfig"
+    },
     "TextEmbeddingsConfig": {
       "properties": {
         "preset": {
@@ -808,6 +853,19 @@
         }
       ],
       "default": null
+    },
+    "procore_identity_provider": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProcoreIdentityProviderConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Leave unset to preserve manual provider settings. Supply credentials to manage Procore sign-in through this App.",
+      "title": "Configure Procore identity provider"
     },
     "procore_automatic_linking": {
       "anyOf": [

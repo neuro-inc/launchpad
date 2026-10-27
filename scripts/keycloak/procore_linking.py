@@ -1,4 +1,4 @@
-"""Reconcile only the dedicated Procore account-linking flow and binding."""
+"""Configure the Procore identity provider and its account-linking flow."""
 
 import argparse
 import json
@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 from keycloak import KeycloakAdmin
 from keycloak.exceptions import KeycloakError, KeycloakGetError
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 
 FLOW_ALIAS = "procore-auto-link"
@@ -18,6 +18,83 @@ PROVIDERS = ("idp-create-user-if-unique", "idp-auto-link")
 
 class MigrationConflict(RuntimeError):
     """Reject changes to configuration outside the migration's ownership."""
+
+
+class ProcoreProviderSettings(BaseModel):
+    clientId: str
+    environment: Literal["production", "sandbox"] = "production"
+    enabled: bool = True
+    trustEmail: bool = False
+
+
+def provider_configuration(
+    current: dict[str, object] | None,
+    settings: ProcoreProviderSettings,
+    client_secret: str,
+) -> dict[str, object]:
+    if not settings.clientId.strip() or not client_secret:
+        raise MigrationConflict(
+            "The Procore client ID and client secret must not be empty."
+        )
+    login_host, api_host = (
+        ("login.procore.com", "api.procore.com")
+        if settings.environment == "production"
+        else ("login-sandbox.procore.com", "sandbox.procore.com")
+    )
+    identity = {
+        "clientId": settings.clientId,
+        "authorizationUrl": f"https://{login_host}/oauth/authorize",
+        "tokenUrl": f"https://{login_host}/oauth/token",
+        "userInfoUrl": f"https://{api_host}/rest/v1.0/me",
+        "userIDClaim": "id",
+        "userNameClaim": "login",
+        "emailClaim": "login",
+    }
+    configuration = TypeAdapter(dict[str, str]).validate_python(
+        (current or {}).get("config", {})
+    )
+    if current:
+        if current.get("providerId") != "oauth2":
+            raise MigrationConflict(
+                "The existing Procore provider has an incompatible type."
+            )
+        for key, expected in identity.items():
+            observed = configuration.get(key, "")
+            if key.endswith("Url"):
+                observed, expected = observed.rstrip("/"), expected.rstrip("/")
+            if observed != expected:
+                raise MigrationConflict(
+                    "The existing Procore identity source differs; review it manually."
+                )
+    else:
+        configuration = {
+            "clientAuthMethod": "client_secret_post",
+            "syncMode": "LEGACY",
+            "fullNameClaim": "name",
+        }
+    return {
+        **(
+            current
+            or {
+                "alias": "procore",
+                "providerId": "oauth2",
+                "displayName": "Procore",
+                "storeToken": False,
+            }
+        ),
+        "enabled": settings.enabled,
+        "trustEmail": settings.trustEmail,
+        "config": {**configuration, **identity, "clientSecret": client_secret},
+    }
+
+
+def get_procore_provider(admin: KeycloakAdmin) -> dict[str, object] | None:
+    try:
+        return admin.get_idp("procore")
+    except KeycloakGetError as error:
+        if error.response_code == 404:
+            return None
+        raise
 
 
 class ExecutionDefinition(BaseModel):
@@ -111,40 +188,65 @@ def validate_exclusive_flow(admin: KeycloakAdmin) -> None:
             )
 
 
-def set_procore_binding(
-    admin: KeycloakAdmin, provider: dict[str, object], *, enabled: bool
+def write_procore_provider(
+    admin: KeycloakAdmin,
+    current: dict[str, object] | None,
+    desired: dict[str, object],
 ) -> None:
-    binding = provider.get("firstBrokerLoginFlowAlias") or ""
-    target = FLOW_ALIAS if enabled else ""
-    if binding == target:
+    if current == desired:
         return
-    if admin.get_idp("procore") != provider:
+    if get_procore_provider(admin) != current:
         raise MigrationConflict(
             "The Procore provider changed during migration; retry after review."
         )
-    expected_binding = FLOW_ALIAS
-    if not enabled:
+    expected_binding = desired.get("firstBrokerLoginFlowAlias") or ""
+    if not expected_binding:
         realm_name = admin.connection.realm_name
         if not realm_name:
             raise MigrationConflict("The migration realm is missing.")
         expected_binding = admin.get_realm(realm_name)["firstBrokerLoginFlow"]
-    admin.update_idp("procore", {**provider, "firstBrokerLoginFlowAlias": target})
+    if current is None:
+        admin.create_idp(desired)
+    else:
+        admin.update_idp("procore", desired)
     updated = admin.get_idp("procore")
     updated_binding = updated.get("firstBrokerLoginFlowAlias") or ""
+    binding_matches = updated_binding == expected_binding or (
+        not desired.get("firstBrokerLoginFlowAlias") and not updated_binding
+    )
+    desired_config = TypeAdapter(dict[str, str]).validate_python(
+        desired.get("config", {})
+    )
+    updated_config = TypeAdapter(dict[str, str]).validate_python(
+        updated.get("config", {})
+    )
+    expected_secret = desired_config.pop("clientSecret", None)
+    observed_secret = updated_config.pop("clientSecret", None)
+    secret_matches = expected_secret is None or observed_secret in (
+        expected_secret,
+        "**********",
+    )
     expected = {
         key: value
-        for key, value in provider.items()
-        if key != "firstBrokerLoginFlowAlias"
+        for key, value in desired.items()
+        if key not in ("firstBrokerLoginFlowAlias", "config")
     }
-    updated_configuration = {
+    observed = {
         key: value
         for key, value in updated.items()
-        if key != "firstBrokerLoginFlowAlias"
+        if key not in ("firstBrokerLoginFlowAlias", "config")
     }
-    binding_matches = updated_binding == expected_binding or (
-        not enabled and not updated_binding
+    fields_match = (
+        observed == expected
+        if current is not None
+        else all(observed.get(key) == value for key, value in expected.items())
     )
-    if updated_configuration != expected or not binding_matches:
+    if not (
+        fields_match
+        and desired_config == updated_config
+        and binding_matches
+        and secret_matches
+    ):
         raise MigrationConflict("The updated Procore provider could not be verified.")
 
 
@@ -152,30 +254,46 @@ def reconcile(
     admin: KeycloakAdmin,
     definition: FlowDefinition,
     *,
-    enabled: bool,
+    enabled: bool | None,
     apply: bool = False,
+    settings: ProcoreProviderSettings | None = None,
+    client_secret: str | None = None,
 ) -> None:
     if (
         tuple(step.authenticator for step in definition.authenticationExecutions)
         != PROVIDERS
     ):
         raise MigrationConflict("The migration definition has unexpected executions.")
-    try:
-        provider = admin.get_idp("procore")
-    except KeycloakGetError as error:
-        if error.response_code == 404:
-            if not enabled:
-                return
-            raise MigrationConflict(
-                "Configure the Procore provider before enabling linking."
-            ) from None
-        raise
+    current_provider = get_procore_provider(admin)
+    if settings is not None:
+        if client_secret is None:
+            raise MigrationConflict("The Procore client secret file is required.")
+        provider = provider_configuration(current_provider, settings, client_secret)
+    elif current_provider is not None:
+        provider = current_provider.copy()
+    else:
+        if not enabled:
+            return
+        raise MigrationConflict(
+            "Configure the Procore provider before enabling linking."
+        )
     binding = provider.get("firstBrokerLoginFlowAlias") or ""
-    if binding not in ("", "first broker login", FLOW_ALIAS):
+    if enabled is not None and binding not in ("", "first broker login", FLOW_ALIAS):
         raise MigrationConflict(
             "Procore uses a custom first-login flow; review it manually."
         )
+    if (
+        binding == FLOW_ALIAS
+        and provider.get("enabled") is True
+        and provider.get("trustEmail") is not True
+        and enabled is not False
+    ):
+        raise MigrationConflict(
+            "Disable automatic linking before removing trust in Procore email claims."
+        )
     if not enabled and binding != FLOW_ALIAS:
+        if apply:
+            write_procore_provider(admin, current_provider, provider)
         return
     if enabled and (
         provider.get("trustEmail") is not True or provider.get("enabled") is not True
@@ -215,6 +333,10 @@ def reconcile(
     needs_repair = len(executions) != len(PROVIDERS) or any(
         step.requirement != "ALTERNATIVE" for step in executions
     )
+    if enabled is None and needs_repair:
+        raise MigrationConflict(
+            "Select automatic linking explicitly before repairing its flow."
+        )
     if enabled and needs_repair:
         validate_exclusive_flow(admin)
 
@@ -248,7 +370,9 @@ def reconcile(
                 "The Procore flow requirements could not be verified."
             )
 
-    set_procore_binding(admin, provider, enabled=enabled)
+    if enabled is not None:
+        provider["firstBrokerLoginFlowAlias"] = FLOW_ALIAS if enabled else ""
+    write_procore_provider(admin, current_provider, provider)
 
 
 def main() -> int:
@@ -258,11 +382,17 @@ def main() -> int:
     parser.add_argument("--username", default="admin")
     parser.add_argument("--password-file", required=True)
     parser.add_argument("--flow-file", required=True, type=Path)
-    mode = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument("--provider-file", type=Path)
+    parser.add_argument("--client-secret-file", type=Path)
+    mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--enable", action="store_true")
     mode.add_argument("--disable", action="store_true")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
+    if bool(args.provider_file) != bool(args.client_secret_file):
+        parser.error("Supply both provider and client-secret files.")
+    if not (args.enable or args.disable or args.provider_file):
+        parser.error("Select a linking mode or supply provider configuration.")
     server = urlsplit(args.server)
     if (
         server.scheme not in ("http", "https")
@@ -277,6 +407,16 @@ def main() -> int:
         )
     try:
         definition = FlowDefinition.model_validate_json(args.flow_file.read_text())
+        settings = (
+            ProcoreProviderSettings.model_validate_json(args.provider_file.read_text())
+            if args.provider_file
+            else None
+        )
+        client_secret = (
+            args.client_secret_file.read_text().rstrip("\r\n")
+            if args.client_secret_file
+            else None
+        )
         admin = KeycloakAdmin(
             server_url=args.server.rstrip("/") + "/",
             realm_name=args.realm,
@@ -287,7 +427,15 @@ def main() -> int:
             timeout=20,
             max_retries=0,
         )
-        reconcile(admin, definition, enabled=args.enable, apply=args.apply)
+        enabled = args.enable if args.enable or args.disable else None
+        reconcile(
+            admin,
+            definition,
+            enabled=enabled,
+            apply=args.apply,
+            settings=settings,
+            client_secret=client_secret,
+        )
     except MigrationConflict as error:
         print(str(error), file=sys.stderr)
         return 1
@@ -298,7 +446,7 @@ def main() -> int:
         print("The migration inputs could not be read or validated.", file=sys.stderr)
         return 1
     print(
-        "Procore linking migration completed."
+        "Procore configuration completed."
         if args.apply
         else "Procore linking preflight passed; no changes were applied."
     )

@@ -1,4 +1,4 @@
-{{- if ne .Values.procoreAutomaticLinking nil }}
+{{- if or .Values.procoreProvider (ne .Values.procoreAutomaticLinking nil) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,6 +8,9 @@ metadata:
 data:
   flow.json: |-
     {{- .Files.Get "files/procore-auto-link.json" | nindent 4 }}
+  {{- with .Values.procoreProvider }}
+  provider.json: {{ omit . "clientSecret" | toJson | quote }}
+  {{- end }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -58,7 +61,15 @@ spec:
             - /run/keycloak/admin-password
             - --flow-file
             - /run/procore/flow.json
+            {{- if ne .Values.procoreAutomaticLinking nil }}
             - {{ ternary "--enable" "--disable" .Values.procoreAutomaticLinking }}
+            {{- end }}
+            {{- with .Values.procoreProvider }}
+            - --provider-file
+            - /run/procore/provider.json
+            - --client-secret-file
+            - /run/procore-client/client-secret
+            {{- end }}
             - --apply
           resources:
             requests:
@@ -78,6 +89,11 @@ spec:
             - name: procore-flow
               mountPath: /run/procore
               readOnly: true
+            {{- with .Values.procoreProvider }}
+            - name: procore-client
+              mountPath: /run/procore-client
+              readOnly: true
+            {{- end }}
       volumes:
         - name: keycloak-admin
           secret:
@@ -89,4 +105,13 @@ spec:
         - name: procore-flow
           configMap:
             name: {{ include "launchpad.name" . }}-procore-linking
+        {{- with .Values.procoreProvider }}
+        - name: procore-client
+          secret:
+            secretName: {{ .clientSecret.valueFrom.secretKeyRef.name | quote }}
+            defaultMode: 0440
+            items:
+              - key: {{ .clientSecret.valueFrom.secretKeyRef.key | quote }}
+                path: client-secret
+        {{- end }}
 {{- end }}

@@ -1,4 +1,5 @@
 import copy
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -186,8 +187,12 @@ def test_refuses_custom_flow_executions(
     assert writes(admin) == []
 
 
+@pytest.mark.parametrize("with_provider", [False, True])
 def test_cli_does_not_log_provider_error_bodies(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    with_provider: bool,
 ) -> None:
     password = tmp_path / "password"
     password.write_text("synthetic-password")
@@ -206,6 +211,25 @@ def test_cli_does_not_log_provider_error_bodies(
             "--apply",
         ],
     )
+    if with_provider:
+        configuration = tmp_path / "provider.json"
+        configuration.write_text(
+            procore_linking.ProcoreProviderSettings(
+                clientId="test-client"
+            ).model_dump_json()
+        )
+        secret = tmp_path / "client-secret"
+        secret.write_text("synthetic-procore-secret")
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                *sys.argv,
+                "--provider-file",
+                str(configuration),
+                "--client-secret-file",
+                str(secret),
+            ],
+        )
     constructor = Mock(
         side_effect=KeycloakGetError(
             "synthetic-password", response_code=401, response_body=b"synthetic-token"
@@ -217,6 +241,7 @@ def test_cli_does_not_log_provider_error_bodies(
     assert "401" in output.err
     assert "synthetic-password" not in output.err + output.out
     assert "synthetic-token" not in output.err + output.out
+    assert "synthetic-procore-secret" not in output.err + output.out
 
 
 @pytest.mark.parametrize("requirement", ["ALTERNATIVE", "DISABLED"])
@@ -373,4 +398,182 @@ def test_unchanged_flow_is_validated_once(
     reconcile(admin, definition, enabled=True, apply=True)
     admin.get_authentication_flow_executions.assert_called_once_with(FLOW_ALIAS)
     assert admin.get_authentication_flow_execution.call_count == len(PROVIDERS)
+    assert writes(admin) == []
+
+
+@pytest.fixture
+def provider_settings() -> procore_linking.ProcoreProviderSettings:
+    return procore_linking.ProcoreProviderSettings(
+        clientId="test-client", trustEmail=True
+    )
+
+
+def test_creates_the_provider_before_binding_without_touching_users(
+    admin: Mock,
+    definition: FlowDefinition,
+    provider_settings: procore_linking.ProcoreProviderSettings,
+) -> None:
+    admin.provider.clear()
+
+    def get_provider(alias: str) -> dict[str, object]:
+        assert alias == "procore"
+        if not admin.provider:
+            raise KeycloakGetError(response_code=404)
+        return copy.deepcopy(admin.provider)
+
+    admin.get_idp.side_effect = get_provider
+    admin.create_idp.side_effect = lambda payload: admin.provider.update(
+        copy.deepcopy(payload)
+    )
+    reconcile(
+        admin,
+        definition,
+        enabled=True,
+        apply=True,
+        settings=provider_settings,
+        client_secret="test",
+    )
+    assert admin.provider["providerId"] == "oauth2"
+    assert admin.provider["firstBrokerLoginFlowAlias"] == FLOW_ALIAS
+    assert admin.provider["config"]["userIDClaim"] == "id"
+    assert admin.provider["config"]["emailClaim"] == "login"
+    assert admin.provider["config"]["clientSecret"] == "test"
+    assert set(writes(admin)) <= {
+        "create_authentication_flow",
+        "create_authentication_flow_execution",
+        "update_authentication_flow_executions",
+        "create_idp",
+    }
+
+
+def managed_provider(
+    admin: Mock, settings: procore_linking.ProcoreProviderSettings
+) -> None:
+    admin.provider.clear()
+    admin.provider.update(
+        procore_linking.provider_configuration(None, settings, "test")
+    )
+
+
+def test_provider_configuration_preserves_custom_binding_and_extra_settings(
+    admin: Mock,
+    definition: FlowDefinition,
+    provider_settings: procore_linking.ProcoreProviderSettings,
+) -> None:
+    managed_provider(admin, provider_settings)
+    admin.provider["firstBrokerLoginFlowAlias"] = "manual-first-login"
+    admin.provider["postBrokerLoginFlowAlias"] = "manual-post-login"
+    admin.provider["config"].update({"syncMode": "FORCE", "custom": "preserved"})
+    expected = copy.deepcopy(admin.provider)
+    expected["config"]["clientSecret"] = "rotated-test"
+    reconcile(
+        admin,
+        definition,
+        enabled=None,
+        apply=True,
+        settings=provider_settings,
+        client_secret="rotated-test",
+    )
+    assert admin.provider == expected
+    assert writes(admin) == ["update_idp"]
+    admin.get_authentication_flows.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "change", ["clientId", "environment", "userIDClaim", "providerId"]
+)
+def test_refuses_to_switch_an_existing_identity_source(
+    admin: Mock,
+    definition: FlowDefinition,
+    provider_settings: procore_linking.ProcoreProviderSettings,
+    change: str,
+) -> None:
+    managed_provider(admin, provider_settings)
+    if change == "clientId":
+        provider_settings = provider_settings.model_copy(
+            update={"clientId": "other-client"}
+        )
+    elif change == "environment":
+        provider_settings = provider_settings.model_copy(
+            update={"environment": "sandbox"}
+        )
+    elif change == "userIDClaim":
+        admin.provider["config"]["userIDClaim"] = "other-subject"
+    else:
+        admin.provider["providerId"] = "oidc"
+    with pytest.raises(MigrationConflict, match="identity source|incompatible type"):
+        reconcile(
+            admin,
+            definition,
+            enabled=True,
+            apply=True,
+            settings=provider_settings,
+            client_secret="test",
+        )
+    assert writes(admin) == []
+
+
+def test_provider_dry_run_and_unchanged_configuration_do_not_write(
+    admin: Mock,
+    definition: FlowDefinition,
+    provider_settings: procore_linking.ProcoreProviderSettings,
+) -> None:
+    managed_provider(admin, provider_settings)
+    reconcile(
+        admin,
+        definition,
+        enabled=True,
+        settings=provider_settings,
+        client_secret="test",
+    )
+    assert writes(admin) == []
+    reconcile(
+        admin,
+        definition,
+        enabled=None,
+        apply=True,
+        settings=provider_settings,
+        client_secret="test",
+    )
+    assert writes(admin) == []
+
+
+@pytest.mark.parametrize("enabled", [None, True])
+def test_refuses_to_remove_email_trust_from_an_active_linking_policy(
+    admin: Mock,
+    definition: FlowDefinition,
+    provider_settings: procore_linking.ProcoreProviderSettings,
+    enabled: bool | None,
+) -> None:
+    managed_provider(admin, provider_settings)
+    admin.provider["firstBrokerLoginFlowAlias"] = FLOW_ALIAS
+    settings = provider_settings.model_copy(update={"trustEmail": False})
+    with pytest.raises(MigrationConflict, match="removing trust"):
+        reconcile(
+            admin,
+            definition,
+            enabled=enabled,
+            apply=True,
+            settings=settings,
+            client_secret="test",
+        )
+    assert writes(admin) == []
+
+
+def test_provider_settings_cannot_enable_linking_without_explicit_trust(
+    admin: Mock,
+    definition: FlowDefinition,
+    provider_settings: procore_linking.ProcoreProviderSettings,
+) -> None:
+    managed_provider(admin, provider_settings)
+    settings = provider_settings.model_copy(update={"trustEmail": False})
+    with pytest.raises(MigrationConflict, match="trust its email"):
+        reconcile(
+            admin,
+            definition,
+            enabled=True,
+            apply=True,
+            settings=settings,
+            client_secret="test",
+        )
     assert writes(admin) == []

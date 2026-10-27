@@ -485,10 +485,29 @@ class LauchpadBrandingConfig(AbstractAppFieldType):
     )
 
 
+class ProcoreIdentityProviderConfig(AbstractAppFieldType):
+    client_id: str = Field(min_length=1, title="Client ID")
+    client_secret: ApoloSecret = Field(title="Client secret")
+    environment: Literal["production", "sandbox"] = Field(
+        default="production", title="Procore environment"
+    )
+    enabled: bool = Field(default=True, title="Enable Procore sign-in")
+    trust_email: bool = Field(
+        default=False,
+        title="Trust Procore email claims",
+        description="Enable only when you trust Procore's email claims. Automatic account linking requires this setting.",
+    )
+
+
 class LaunchpadAppInputs(AppInputs):
     launchpad_web_app_config: LaunchpadWebAppConfig
     apps_config: AppsConfig
     branding: LauchpadBrandingConfig | None = None
+    procore_identity_provider: ProcoreIdentityProviderConfig | None = Field(
+        default=None,
+        title="Configure Procore identity provider",
+        description="Leave unset to preserve manual provider settings. Supply credentials to manage Procore sign-in through this App.",
+    )
     procore_automatic_linking: (
         Annotated[bool, Field(title="Enable automatic linking")] | None
     ) = Field(

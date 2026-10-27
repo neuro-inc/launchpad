@@ -25,6 +25,7 @@ from apolo_app_types.protocols.common.hugging_face import (
     HuggingFaceCache,
     HuggingFaceModel,
 )
+from apolo_app_types.protocols.common.secrets_ import serialize_optional_secret
 from apolo_app_types.protocols.common.storage import (
     ApoloFilesMount,
     ApoloFilesPath,
@@ -539,6 +540,17 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         cluster_config = self.client.config.clusters[self.client.cluster_name]
         if cluster_config.apps.launchpad_use_subdomain:
             values["clientSubdomain"] = True
+
+        if provider := input_.procore_identity_provider:
+            values["procoreProvider"] = {
+                "clientId": provider.client_id,
+                "environment": provider.environment,
+                "enabled": provider.enabled,
+                "trustEmail": provider.trust_email,
+                "clientSecret": serialize_optional_secret(
+                    provider.client_secret, app_secrets_name
+                ),
+            }
 
         return {
             **values,
