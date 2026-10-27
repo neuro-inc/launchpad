@@ -1804,6 +1804,7 @@ data:
       ],
       "defaultLocale": "en",
       "authenticationFlows": [
+        {{ .Files.Get "files/procore-auto-link.json" | fromJson | toJson }},
         {
           "id": "7b023d61-77e5-4801-9246-1a6451395c82",
           "alias": "Account verification options",

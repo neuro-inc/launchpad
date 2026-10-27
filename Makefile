@@ -29,7 +29,7 @@ endif
 
 .PHONY: lint
 lint: format
-	poetry run mypy launchpad tests scripts/local_development
+	poetry run mypy launchpad tests scripts/local_development scripts/keycloak
 
 
 .PHONY: test-unit
