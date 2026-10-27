@@ -111,6 +111,43 @@ def validate_exclusive_flow(admin: KeycloakAdmin) -> None:
             )
 
 
+def set_procore_binding(
+    admin: KeycloakAdmin, provider: dict[str, object], *, enabled: bool
+) -> None:
+    binding = provider.get("firstBrokerLoginFlowAlias") or ""
+    target = FLOW_ALIAS if enabled else ""
+    if binding == target:
+        return
+    if admin.get_idp("procore") != provider:
+        raise MigrationConflict(
+            "The Procore provider changed during migration; retry after review."
+        )
+    expected_binding = FLOW_ALIAS
+    if not enabled:
+        realm_name = admin.connection.realm_name
+        if not realm_name:
+            raise MigrationConflict("The migration realm is missing.")
+        expected_binding = admin.get_realm(realm_name)["firstBrokerLoginFlow"]
+    admin.update_idp("procore", {**provider, "firstBrokerLoginFlowAlias": target})
+    updated = admin.get_idp("procore")
+    updated_binding = updated.get("firstBrokerLoginFlowAlias") or ""
+    expected = {
+        key: value
+        for key, value in provider.items()
+        if key != "firstBrokerLoginFlowAlias"
+    }
+    updated_configuration = {
+        key: value
+        for key, value in updated.items()
+        if key != "firstBrokerLoginFlowAlias"
+    }
+    binding_matches = updated_binding == expected_binding or (
+        not enabled and not updated_binding
+    )
+    if updated_configuration != expected or not binding_matches:
+        raise MigrationConflict("The updated Procore provider could not be verified.")
+
+
 def reconcile(
     admin: KeycloakAdmin,
     definition: FlowDefinition,
@@ -183,7 +220,7 @@ def reconcile(
 
     if not apply:
         return
-    if enabled:
+    if enabled and needs_repair:
         if not existing:
             admin.create_authentication_flow(
                 definition.model_dump(exclude={"authenticationExecutions"})
@@ -211,37 +248,7 @@ def reconcile(
                 "The Procore flow requirements could not be verified."
             )
 
-    target = FLOW_ALIAS if enabled else ""
-    if binding == target:
-        return
-    if admin.get_idp("procore") != provider:
-        raise MigrationConflict(
-            "The Procore provider changed during migration; retry after review."
-        )
-    expected_binding = FLOW_ALIAS
-    if not enabled:
-        realm_name = admin.connection.realm_name
-        if not realm_name:
-            raise MigrationConflict("The migration realm is missing.")
-        expected_binding = admin.get_realm(realm_name)["firstBrokerLoginFlow"]
-    admin.update_idp("procore", {**provider, "firstBrokerLoginFlowAlias": target})
-    updated = admin.get_idp("procore")
-    updated_binding = updated.get("firstBrokerLoginFlowAlias") or ""
-    expected = {
-        key: value
-        for key, value in provider.items()
-        if key != "firstBrokerLoginFlowAlias"
-    }
-    updated_configuration = {
-        key: value
-        for key, value in updated.items()
-        if key != "firstBrokerLoginFlowAlias"
-    }
-    binding_matches = updated_binding == expected_binding or (
-        not enabled and not updated_binding
-    )
-    if updated_configuration != expected or not binding_matches:
-        raise MigrationConflict("The updated Procore provider could not be verified.")
+    set_procore_binding(admin, provider, enabled=enabled)
 
 
 def main() -> int:

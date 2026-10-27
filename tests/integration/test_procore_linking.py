@@ -31,6 +31,18 @@ def keycloak_admin() -> Iterator[KeycloakAdmin]:
         yield admin
 
 
+def account_snapshot(
+    admin: KeycloakAdmin, user_id: str, client_id: str
+) -> dict[str, object]:
+    return {
+        "user": admin.get_user(user_id),
+        "direct_roles": admin.get_realm_roles_of_user(user_id),
+        "groups": admin.get_user_groups(user_id),
+        "inherited_roles": admin.get_composite_realm_roles_of_user(user_id),
+        "client_roles": admin.get_client_roles_of_user(user_id, client_id),
+    }
+
+
 def test_migration_preserves_existing_accounts_roles_groups_and_provider_settings(
     keycloak_admin: KeycloakAdmin,
 ) -> None:
@@ -80,14 +92,7 @@ def test_migration_preserves_existing_accounts_roles_groups_and_provider_setting
         )
         user_ids.append(user_id)
     before = {
-        user_id: (
-            admin.get_user(user_id),
-            admin.get_realm_roles_of_user(user_id),
-            admin.get_user_groups(user_id),
-            admin.get_composite_realm_roles_of_user(user_id),
-            admin.get_client_roles_of_user(user_id, client_id),
-        )
-        for user_id in user_ids
+        user_id: account_snapshot(admin, user_id, client_id) for user_id in user_ids
     }
     provider = admin.get_idp("procore")
     unrelated = admin.get_idp("unrelated")
@@ -101,26 +106,14 @@ def test_migration_preserves_existing_accounts_roles_groups_and_provider_setting
             "firstBrokerLoginFlowAlias": FLOW_ALIAS,
         }
         for user_id in user_ids:
-            assert (
-                admin.get_user(user_id),
-                admin.get_realm_roles_of_user(user_id),
-                admin.get_user_groups(user_id),
-                admin.get_composite_realm_roles_of_user(user_id),
-                admin.get_client_roles_of_user(user_id, client_id),
-            ) == before[user_id]
+            assert account_snapshot(admin, user_id, client_id) == before[user_id]
         assert admin.get_idp("unrelated") == unrelated
         assert admin.get_realm("launchpad") == realm
     reconcile(admin, definition, enabled=False, apply=True)
     assert admin.get_idp("procore") == provider
     assert len(admin.get_users()) == len(user_ids)
     for user_id in user_ids:
-        assert (
-            admin.get_user(user_id),
-            admin.get_realm_roles_of_user(user_id),
-            admin.get_user_groups(user_id),
-            admin.get_composite_realm_roles_of_user(user_id),
-            admin.get_client_roles_of_user(user_id, client_id),
-        ) == before[user_id]
+        assert account_snapshot(admin, user_id, client_id) == before[user_id]
 
     # Fresh realms import the same inactive definition before provider configuration.
     admin.change_current_realm("master")

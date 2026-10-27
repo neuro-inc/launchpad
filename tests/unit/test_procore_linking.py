@@ -363,3 +363,14 @@ def test_complete_shared_flow_can_be_adopted_without_repair(
     ]
     reconcile(admin, definition, enabled=True, apply=True)
     assert writes(admin) == ["update_idp"]
+
+
+def test_unchanged_flow_is_validated_once(
+    admin: Mock, definition: FlowDefinition
+) -> None:
+    reconcile(admin, definition, enabled=True, apply=True)
+    admin.reset_mock()
+    reconcile(admin, definition, enabled=True, apply=True)
+    admin.get_authentication_flow_executions.assert_called_once_with(FLOW_ALIAS)
+    assert admin.get_authentication_flow_execution.call_count == len(PROVIDERS)
+    assert writes(admin) == []
