@@ -1,5 +1,5 @@
 import enum
-from typing import Literal
+from typing import Annotated, Literal
 
 from apolo_app_types import AppInputs, AppOutputs, HuggingFaceModel, HuggingFaceToken
 from apolo_app_types.protocols.apps import AppInstance
@@ -489,7 +489,9 @@ class LaunchpadAppInputs(AppInputs):
     launchpad_web_app_config: LaunchpadWebAppConfig
     apps_config: AppsConfig
     branding: LauchpadBrandingConfig | None = None
-    procore_automatic_linking: bool | None = Field(
+    procore_automatic_linking: (
+        Annotated[bool, Field(title="Enable automatic linking")] | None
+    ) = Field(
         default=None,
         title="Procore automatic account linking",
         description=(

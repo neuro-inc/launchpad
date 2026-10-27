@@ -812,6 +812,7 @@
     "procore_automatic_linking": {
       "anyOf": [
         {
+          "title": "Enable automatic linking",
           "type": "boolean"
         },
         {
