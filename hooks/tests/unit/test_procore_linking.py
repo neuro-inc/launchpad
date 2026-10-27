@@ -15,6 +15,7 @@ from apolo_apps_launchpad.types import (
     LaunchpadWebAppConfig,
     NoQuickStartConfig,
     ProcoreIdentityProviderConfig,
+    ProcoreSettings,
 )
 from apolo_sdk import Client
 
@@ -31,7 +32,7 @@ async def test_procore_input_preserves_the_three_states(
             apps_config=AppsConfig(
                 quick_start_config=NoQuickStartConfig(no_quickstart=True)
             ),
-            procore_automatic_linking=enabled,
+            procore_settings=ProcoreSettings(automatic_linking=enabled),
         ),
         app_name="test",
         namespace="platform",
@@ -39,6 +40,7 @@ async def test_procore_input_preserves_the_three_states(
         app_id="test-app",
     )
     assert values["procoreAutomaticLinking"] is enabled
+    assert "procoreProvider" not in values
 
 
 @pytest.mark.parametrize("enabled", [None, True, False])
@@ -119,11 +121,13 @@ async def test_provider_credentials_remain_a_namespaced_secret_reference(
         apps_config=AppsConfig(
             quick_start_config=NoQuickStartConfig(no_quickstart=True)
         ),
-        procore_identity_provider=ProcoreIdentityProviderConfig(
-            client_id="test-client",
-            client_secret=ApoloSecret(key="PROCORE_CLIENT_SECRET"),
-            environment="sandbox",
-            trust_email=True,
+        procore_settings=ProcoreSettings(
+            identity_provider=ProcoreIdentityProviderConfig(
+                client_id="test-client",
+                client_secret=ApoloSecret(key="PROCORE_CLIENT_SECRET"),
+                environment="sandbox",
+                trust_email=True,
+            )
         ),
     )
     values = await LaunchpadInputsProcessor(client=apolo_client).gen_extra_values(

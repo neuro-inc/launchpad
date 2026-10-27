@@ -12,7 +12,12 @@ Other identity providers and the realm's default first-login flow remain unchang
 
 ## Configuration and migration
 
-The App input `procore_automatic_linking` has three states:
+The **Procore settings** group keeps provider configuration and automatic linking independent.
+For earlier configurations, move `procore_identity_provider` to `procore_settings.identity_provider`.
+Move `procore_automatic_linking` to `procore_settings.automatic_linking` before submitting the configuration.
+The Console does not migrate these fields automatically.
+
+The App input `procore_settings.automatic_linking` has three states:
 
 | Value | Behavior |
 | --- | --- |
@@ -37,14 +42,15 @@ Sandbox uses `login-sandbox.procore.com` and `sandbox.procore.com`.
 This example configures a sandbox provider and enables automatic linking:
 
 ```yaml
-procore_identity_provider:
-  client_id: YOUR_PROCORE_CLIENT_ID
-  client_secret:
-    key: PROCORE_CLIENT_SECRET
-  environment: sandbox
-  enabled: true
-  trust_email: true
-procore_automatic_linking: true
+procore_settings:
+  identity_provider:
+    client_id: YOUR_PROCORE_CLIENT_ID
+    client_secret:
+      key: PROCORE_CLIENT_SECRET
+    environment: sandbox
+    enabled: true
+    trust_email: true
+  automatic_linking: true
 ```
 
 Create the referenced secret in the same Apolo project before applying the configuration.
@@ -52,10 +58,10 @@ The processor and Helm values contain only its reference.
 Only the configuration Job mounts the selected secret key.
 Automatic linking requires both an enabled provider and explicit trust in Procore email claims.
 
-Leave `procore_identity_provider` unset to preserve a manually configured provider.
+Leave `procore_settings.identity_provider` unset to preserve a manually configured provider.
 Removing this input does not delete the provider, revoke credentials, or remove existing identity links.
 To disable Procore sign-in, set its `enabled` field to `false`.
-Also set `procore_automatic_linking` to `false` or leave it unset.
+Also set `procore_settings.automatic_linking` to `false` or leave it unset.
 The App rejects automatic linking when the provider is disabled.
 Update the referenced project secret and reconfigure the App to rotate the credential.
 For existing providers, the App rejects changes to the client ID, environment endpoints, and ID, username, or email mappings.
@@ -106,7 +112,7 @@ Verify the existing account's identity link, ID, roles, and groups.
 Verify that another provider still uses its previous login flow.
 The automated tests do not use the external Procore service.
 
-To restore the realm's default login policy, set `procore_automatic_linking: false` and reconfigure the App.
+To restore the realm's default login policy, set `procore_settings.automatic_linking: false` and reconfigure the App.
 Leaving the input unset preserves the current binding; it does not disable an already active policy.
 Rollback preserves existing identity links and the inactive flow.
 Review an incorrectly linked identity separately before revoking it.

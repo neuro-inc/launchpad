@@ -541,7 +541,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         if cluster_config.apps.launchpad_use_subdomain:
             values["clientSubdomain"] = True
 
-        if provider := input_.procore_identity_provider:
+        if provider := input_.procore_settings.identity_provider:
             values["procoreProvider"] = {
                 "clientId": provider.client_id,
                 "environment": provider.environment,
@@ -559,7 +559,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
             "image": backend_image,
             "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": kc_realm_import_config_map_name,
-            "procoreAutomaticLinking": input_.procore_automatic_linking,
+            "procoreAutomaticLinking": input_.procore_settings.automatic_linking,
             "postgresql": {
                 "fullnameOverride": f"launchpad-{app_id}-db",
                 "auth": {

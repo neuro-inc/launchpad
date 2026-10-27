@@ -486,6 +486,13 @@ class LauchpadBrandingConfig(AbstractAppFieldType):
 
 
 class ProcoreIdentityProviderConfig(AbstractAppFieldType):
+    model_config = ConfigDict(
+        json_schema_extra=SchemaExtraMetadata(
+            title="Identity provider",
+            description="",
+        ).as_json_schema_extra(),
+    )
+
     client_id: str = Field(min_length=1, title="Client ID")
     client_secret: ApoloSecret = Field(title="Client secret")
     environment: Literal["production", "sandbox"] = Field(
@@ -499,20 +506,24 @@ class ProcoreIdentityProviderConfig(AbstractAppFieldType):
     )
 
 
-class LaunchpadAppInputs(AppInputs):
-    launchpad_web_app_config: LaunchpadWebAppConfig
-    apps_config: AppsConfig
-    branding: LauchpadBrandingConfig | None = None
-    procore_identity_provider: ProcoreIdentityProviderConfig | None = Field(
+class ProcoreSettings(AbstractAppFieldType):
+    model_config = ConfigDict(
+        json_schema_extra=SchemaExtraMetadata(
+            title="Procore settings",
+            description="",
+        ).as_json_schema_extra(),
+    )
+
+    identity_provider: ProcoreIdentityProviderConfig | None = Field(
         default=None,
         title="Configure Procore identity provider",
         description="Leave unset to preserve manual provider settings. Supply credentials to manage Procore sign-in through this App.",
     )
-    procore_automatic_linking: (
+    automatic_linking: (
         Annotated[bool, Field(title="Enable automatic linking")] | None
     ) = Field(
         default=None,
-        title="Procore automatic account linking",
+        title="Automatic account linking",
         description=(
             "Leave unset to preserve existing Procore settings. "
             "Enable to link matching existing accounts without another ownership check, "
@@ -520,6 +531,15 @@ class LaunchpadAppInputs(AppInputs):
             "Disable to restore the realm default login flow for this managed binding. "
             "Configure a trusted Procore identity provider before enabling this option."
         ),
+    )
+
+
+class LaunchpadAppInputs(AppInputs):
+    launchpad_web_app_config: LaunchpadWebAppConfig
+    apps_config: AppsConfig
+    branding: LauchpadBrandingConfig | None = None
+    procore_settings: ProcoreSettings = Field(
+        default_factory=ProcoreSettings, title="Procore settings"
     )
 
 

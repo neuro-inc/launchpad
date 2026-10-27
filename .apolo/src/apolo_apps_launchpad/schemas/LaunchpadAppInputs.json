@@ -795,8 +795,47 @@
       "x-is-advanced-field": false,
       "x-is-configurable": true,
       "x-meta-type": "inline",
-      "x-title": "",
+      "x-title": "Identity provider",
       "x-type": "ProcoreIdentityProviderConfig"
+    },
+    "ProcoreSettings": {
+      "properties": {
+        "identity_provider": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProcoreIdentityProviderConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Leave unset to preserve manual provider settings. Supply credentials to manage Procore sign-in through this App.",
+          "title": "Configure Procore identity provider"
+        },
+        "automatic_linking": {
+          "anyOf": [
+            {
+              "title": "Enable automatic linking",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Leave unset to preserve existing Procore settings. Enable to link matching existing accounts without another ownership check, including accounts with administrator roles. Disable to restore the realm default login flow for this managed binding. Configure a trusted Procore identity provider before enabling this option.",
+          "title": "Automatic account linking"
+        }
+      },
+      "title": "ProcoreSettings",
+      "type": "object",
+      "x-description": "",
+      "x-is-advanced-field": false,
+      "x-is-configurable": true,
+      "x-meta-type": "inline",
+      "x-title": "Procore settings",
+      "x-type": "ProcoreSettings"
     },
     "TextEmbeddingsConfig": {
       "properties": {
@@ -854,32 +893,9 @@
       ],
       "default": null
     },
-    "procore_identity_provider": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/ProcoreIdentityProviderConfig"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "Leave unset to preserve manual provider settings. Supply credentials to manage Procore sign-in through this App.",
-      "title": "Configure Procore identity provider"
-    },
-    "procore_automatic_linking": {
-      "anyOf": [
-        {
-          "title": "Enable automatic linking",
-          "type": "boolean"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "description": "Leave unset to preserve existing Procore settings. Enable to link matching existing accounts without another ownership check, including accounts with administrator roles. Disable to restore the realm default login flow for this managed binding. Configure a trusted Procore identity provider before enabling this option.",
-      "title": "Procore automatic account linking"
+    "procore_settings": {
+      "$ref": "#/$defs/ProcoreSettings",
+      "title": "Procore settings"
     }
   },
   "required": [
