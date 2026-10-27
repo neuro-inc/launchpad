@@ -389,13 +389,13 @@ def main() -> int:
     parser.add_argument("--provider-file", type=Path)
     parser.add_argument("--client-secret-file", type=Path)
     mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--enable", action="store_true")
-    mode.add_argument("--disable", action="store_true")
+    mode.add_argument("--enable", dest="enabled", action="store_const", const=True)
+    mode.add_argument("--disable", dest="enabled", action="store_const", const=False)
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     if bool(args.provider_file) != bool(args.client_secret_file):
         parser.error("Supply both provider and client-secret files.")
-    if not (args.enable or args.disable or args.provider_file):
+    if args.enabled is None and not args.provider_file:
         parser.error("Select a linking mode or supply provider configuration.")
     server = urlsplit(args.server)
     if (
@@ -431,11 +431,10 @@ def main() -> int:
             timeout=20,
             max_retries=0,
         )
-        enabled = args.enable if args.enable or args.disable else None
         reconcile(
             admin,
             definition,
-            enabled=enabled,
+            enabled=args.enabled,
             apply=args.apply,
             settings=settings,
             client_secret=client_secret,

@@ -3,6 +3,7 @@
 import json
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -18,6 +19,29 @@ from apolo_apps_launchpad.types import (
     ProcoreSettings,
 )
 from apolo_sdk import Client
+
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def render_chart(tmp_path: Path, overrides: dict[str, object]) -> list[dict[str, Any]]:
+    values = tmp_path / "values.yaml"
+    values.write_text(
+        yaml.safe_dump(
+            {
+                "apolo_app_id": "test-app",
+                "LAUNCHPAD_ADMIN_PASSWORD": "test-admin",
+                "dbPassword": "test-db",
+                "authResponseHeaders": ["X-Auth-Request-Email"],
+                **overrides,
+            }
+        )
+    )
+    rendered = subprocess.check_output(
+        ["helm", "template", "test", str(ROOT / "charts/launchpad"), "-f", str(values)],
+        text=True,
+    )
+    return [item for item in yaml.safe_load_all(rendered) if item]
 
 
 @pytest.mark.parametrize("enabled", [None, True, False])
@@ -47,27 +71,15 @@ async def test_procore_input_preserves_the_three_states(
 def test_procore_chart_is_opt_in_and_mounts_only_keycloak_credentials(
     tmp_path: Path, enabled: bool | None
 ) -> None:
-    root = Path(__file__).resolve().parents[3]
-    values = tmp_path / "values.yaml"
-    values.write_text(
-        yaml.safe_dump(
-            {
-                "apolo_app_id": "test-app",
-                "LAUNCHPAD_ADMIN_PASSWORD": "test-admin",
-                "dbPassword": "test-db",
-                "authResponseHeaders": ["X-Auth-Request-Email"],
-                "procoreAutomaticLinking": enabled,
-                "image": {"digest": "sha256:" + "a" * 64},
-            }
-        )
+    resources = render_chart(
+        tmp_path,
+        {
+            "procoreAutomaticLinking": enabled,
+            "image": {"digest": "sha256:" + "a" * 64},
+        },
     )
-    rendered = subprocess.check_output(
-        ["helm", "template", "test", str(root / "charts/launchpad"), "-f", str(values)],
-        text=True,
-    )
-    resources = [item for item in yaml.safe_load_all(rendered) if item]
     definition = json.loads(
-        (root / "charts/launchpad/files/procore-auto-link.json").read_text()
+        (ROOT / "charts/launchpad/files/procore-auto-link.json").read_text()
     )
     realm_config = next(
         item
@@ -157,8 +169,6 @@ async def test_provider_credentials_remain_a_namespaced_secret_reference(
 def test_provider_job_mounts_just_the_required_secret_key(
     tmp_path: Path, linking: bool | None
 ) -> None:
-    root = Path(__file__).resolve().parents[3]
-    values = tmp_path / "values.yaml"
     provider = {
         "clientId": "test-client",
         "environment": "sandbox",
@@ -173,35 +183,13 @@ def test_provider_job_mounts_just_the_required_secret_key(
             }
         },
     }
-    values.write_text(
-        yaml.safe_dump(
-            {
-                "apolo_app_id": "test-app",
-                "LAUNCHPAD_ADMIN_PASSWORD": "test-admin",
-                "dbPassword": "test-db",
-                "authResponseHeaders": ["X-Auth-Request-Email"],
-                "procoreProvider": provider,
-                "procoreAutomaticLinking": linking,
-            }
-        )
+    resources = render_chart(
+        tmp_path,
+        {
+            "procoreProvider": provider,
+            "procoreAutomaticLinking": linking,
+        },
     )
-    resources = [
-        item
-        for item in yaml.safe_load_all(
-            subprocess.check_output(
-                [
-                    "helm",
-                    "template",
-                    "test",
-                    str(root / "charts/launchpad"),
-                    "-f",
-                    str(values),
-                ],
-                text=True,
-            )
-        )
-        if item
-    ]
     job = next(
         item
         for item in resources

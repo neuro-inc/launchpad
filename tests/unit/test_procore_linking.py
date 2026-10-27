@@ -627,3 +627,48 @@ def test_provider_presets_match_the_procore_contract(
     )
     provider = procore_linking.provider_configuration(None, settings, "test")
     assert provider["config"] == PROCORE_CONFIGURATIONS[environment]
+
+
+@pytest.mark.parametrize(
+    "mode, expected", [("--enable", True), ("--disable", False), (None, None)]
+)
+def test_cli_passes_the_three_state_linking_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str | None,
+    expected: bool | None,
+) -> None:
+    password = tmp_path / "password"
+    password.write_text("synthetic-password")
+    provider = tmp_path / "provider.json"
+    provider.write_text('{"clientId":"test-client"}')
+    secret = tmp_path / "secret"
+    secret.write_text("synthetic-secret")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "migration",
+            "--server",
+            "https://keycloak.test",
+            "--password-file",
+            str(password),
+            "--flow-file",
+            str(
+                Path(__file__).parents[2]
+                / "charts/launchpad/files/procore-auto-link.json"
+            ),
+            "--provider-file",
+            str(provider),
+            "--client-secret-file",
+            str(secret),
+            *([mode] if mode else []),
+        ],
+    )
+    admin = Mock(spec=KeycloakAdmin)
+    monkeypatch.setattr(procore_linking, "KeycloakAdmin", Mock(return_value=admin))
+    migration = Mock()
+    monkeypatch.setattr(procore_linking, "reconcile", migration)
+    assert procore_linking.main() == 0
+    assert migration.call_args.kwargs["enabled"] is expected
+    assert migration.call_args.kwargs["apply"] is False
