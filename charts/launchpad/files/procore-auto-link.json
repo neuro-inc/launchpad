@@ -1,0 +1,21 @@
+{
+  "alias": "procore-auto-link",
+  "description": "Create new Procore users or link matching existing accounts without additional ownership verification.",
+  "providerId": "basic-flow",
+  "topLevel": true,
+  "builtIn": false,
+  "authenticationExecutions": [
+    {
+      "authenticator": "idp-create-user-if-unique",
+      "authenticatorFlow": false,
+      "requirement": "ALTERNATIVE",
+      "priority": 10
+    },
+    {
+      "authenticator": "idp-auto-link",
+      "authenticatorFlow": false,
+      "requirement": "ALTERNATIVE",
+      "priority": 20
+    }
+  ]
+}
