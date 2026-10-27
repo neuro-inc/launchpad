@@ -228,7 +228,7 @@ jobs:
           PYTHON
       - name: Build backend
         id: backend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
@@ -242,7 +242,7 @@ jobs:
           cache-to: type=gha,scope=launchpad-backend,mode=max
       - name: Build frontend
         id: frontend
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         env:
           FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
         with:
@@ -259,7 +259,7 @@ jobs:
           cache-to: type=gha,scope=launchpad-frontend,mode=max
       - name: Build hook with the selected runtime images
         id: hook
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: hooks/hooks.Dockerfile
