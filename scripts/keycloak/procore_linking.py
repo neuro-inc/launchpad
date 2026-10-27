@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from keycloak import KeycloakAdmin
 from keycloak.exceptions import KeycloakError, KeycloakGetError
@@ -14,6 +14,8 @@ from pydantic import BaseModel, TypeAdapter, ValidationError
 
 FLOW_ALIAS = "procore-auto-link"
 PROVIDERS = ("idp-create-user-if-unique", "idp-auto-link")
+GROUP_MAPPER_NAME = "default group"
+GROUP_MAPPER_TYPE = "oidc-hardcoded-group-idp-mapper"
 PROVIDER_CONFIG_ADAPTER = TypeAdapter(dict[str, str])
 
 
@@ -138,6 +140,13 @@ class ProviderBindings(BaseModel):
     alias: str
     firstBrokerLoginFlowAlias: str | None = None
     postBrokerLoginFlowAlias: str | None = None
+
+
+class GroupMapper(BaseModel):
+    name: str
+    identityProviderAlias: str
+    identityProviderMapper: str
+    config: dict[str, str]
 
 
 def flow_executions(admin: KeycloakAdmin) -> list[ExecutionState]:
@@ -318,6 +327,79 @@ def reconcile_linking_flow(
             )
 
 
+def prepare_default_group_mapper(
+    admin: KeycloakAdmin, group_path: str | None, *, provider_exists: bool
+) -> dict[str, object] | None:
+    if group_path is None:
+        return None
+    if not group_path.startswith("/") or group_path.endswith("/") or "//" in group_path:
+        raise MigrationConflict("The Procore group must be an absolute group path.")
+    try:
+        group = admin.get_group_by_path(quote(group_path, safe="/"))
+    except KeycloakGetError as error:
+        if error.response_code != 404:
+            raise
+        raise MigrationConflict(
+            "The configured Procore group does not exist."
+        ) from None
+    if not group or group.get("path") != group_path:
+        raise MigrationConflict("The configured Procore group does not exist.")
+    mappers = (
+        [
+            GroupMapper.model_validate(value)
+            for value in admin.get_idp_mappers("procore")
+        ]
+        if provider_exists
+        else []
+    )
+    matching = [
+        mapper
+        for mapper in mappers
+        if mapper.name == GROUP_MAPPER_NAME
+        or (
+            mapper.identityProviderMapper == GROUP_MAPPER_TYPE
+            and mapper.config.get("group") == group_path
+        )
+    ]
+    if len(matching) > 1:
+        raise MigrationConflict(
+            "Multiple Procore default-group mappers require manual review."
+        )
+    if matching:
+        mapper = matching[0]
+        if (
+            mapper.identityProviderAlias != "procore"
+            or mapper.identityProviderMapper != GROUP_MAPPER_TYPE
+            or mapper.config.get("group") != group_path
+        ):
+            raise MigrationConflict(
+                "The existing Procore default-group mapper differs; review it manually."
+            )
+        return None
+    return GroupMapper(
+        name=GROUP_MAPPER_NAME,
+        identityProviderAlias="procore",
+        identityProviderMapper=GROUP_MAPPER_TYPE,
+        config={"group": group_path, "syncMode": "IMPORT"},
+    ).model_dump()
+
+
+def write_default_group_mapper(admin: KeycloakAdmin, group_path: str | None) -> None:
+    mapper = prepare_default_group_mapper(admin, group_path, provider_exists=True)
+    if mapper is None:
+        return
+    admin.add_mapper_to_idp("procore", mapper)
+    verified = [
+        GroupMapper.model_validate(value)
+        for value in admin.get_idp_mappers("procore")
+        if value.get("name") == GROUP_MAPPER_NAME
+    ]
+    if len(verified) != 1 or verified[0].model_dump() != mapper:
+        raise MigrationConflict(
+            "The Procore default-group mapper could not be verified."
+        )
+
+
 def reconcile(
     admin: KeycloakAdmin,
     definition: FlowDefinition,
@@ -326,6 +408,7 @@ def reconcile(
     apply: bool = False,
     settings: ProcoreProviderSettings | None = None,
     client_secret: str | None = None,
+    default_group: str | None = None,
 ) -> None:
     if (
         tuple(step.authenticator for step in definition.authenticationExecutions)
@@ -340,11 +423,14 @@ def reconcile(
     elif current_provider is not None:
         provider = current_provider.copy()
     else:
-        if not enabled:
+        if not enabled and default_group is None:
             return
         raise MigrationConflict(
-            "Configure the Procore provider before enabling linking."
+            "Configure the Procore provider before managing linking or group mapping."
         )
+    prepare_default_group_mapper(
+        admin, default_group, provider_exists=current_provider is not None
+    )
     binding = provider.get("firstBrokerLoginFlowAlias") or ""
     if enabled is not None and binding not in ("", "first broker login", FLOW_ALIAS):
         raise MigrationConflict(
@@ -362,6 +448,7 @@ def reconcile(
     if not enabled and binding != FLOW_ALIAS:
         if apply:
             write_procore_provider(admin, current_provider, provider)
+            write_default_group_mapper(admin, default_group)
         return
     if enabled and (
         provider.get("trustEmail") is not True or provider.get("enabled") is not True
@@ -377,6 +464,7 @@ def reconcile(
     if enabled is not None:
         provider["firstBrokerLoginFlowAlias"] = FLOW_ALIAS if enabled else ""
     write_procore_provider(admin, current_provider, provider)
+    write_default_group_mapper(admin, default_group)
 
 
 def main() -> int:
@@ -388,6 +476,7 @@ def main() -> int:
     parser.add_argument("--flow-file", required=True, type=Path)
     parser.add_argument("--provider-file", type=Path)
     parser.add_argument("--client-secret-file", type=Path)
+    parser.add_argument("--default-group")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--enable", dest="enabled", action="store_const", const=True)
     mode.add_argument("--disable", dest="enabled", action="store_const", const=False)
@@ -395,8 +484,10 @@ def main() -> int:
     args = parser.parse_args()
     if bool(args.provider_file) != bool(args.client_secret_file):
         parser.error("Supply both provider and client-secret files.")
-    if args.enabled is None and not args.provider_file:
-        parser.error("Select a linking mode or supply provider configuration.")
+    if args.enabled is None and not args.provider_file and args.default_group is None:
+        parser.error(
+            "Select a linking mode, a default group, or provider configuration."
+        )
     server = urlsplit(args.server)
     if (
         server.scheme not in ("http", "https")
@@ -438,6 +529,7 @@ def main() -> int:
             apply=args.apply,
             settings=settings,
             client_secret=client_secret,
+            default_group=args.default_group,
         )
     except MigrationConflict as error:
         print(str(error), file=sys.stderr)

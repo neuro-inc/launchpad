@@ -50,8 +50,19 @@ procore_settings:
     environment: sandbox
     enabled: true
     trust_email: true
+  default_group: /reviewers
   automatic_linking: true
 ```
+
+The optional `procore_settings.default_group` creates or adopts a hardcoded Procore group mapper.
+The group must already exist in the realm, for example `/reviewers`.
+Restore or provision its roles and permissions separately before configuring the mapper.
+Leaving this input unset preserves existing mappers.
+New mappers use `IMPORT` synchronization to assign the group only when Keycloak creates a user.
+A matching mapper keeps its existing name, synchronization mode, and extra options.
+A conflicting `default group` mapper or duplicate matching mappers stop the migration before configuration writes.
+The migration does not create groups or change existing users, memberships, roles, or identity links.
+Inputs recreate the mapper after recovery; they do not replace a Keycloak database backup.
 
 Create the referenced secret in the same Apolo project before applying the configuration.
 The processor and Helm values contain only its reference.

@@ -1,4 +1,4 @@
-{{- if or .Values.procoreProvider (ne .Values.procoreAutomaticLinking nil) }}
+{{- if or .Values.procoreProvider (ne .Values.procoreAutomaticLinking nil) .Values.procoreDefaultGroup }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -69,6 +69,10 @@ spec:
             - /run/procore/provider.json
             - --client-secret-file
             - /run/procore-client/client-secret
+            {{- end }}
+            {{- with .Values.procoreDefaultGroup }}
+            - --default-group
+            - {{ . | quote }}
             {{- end }}
             - --apply
           resources:

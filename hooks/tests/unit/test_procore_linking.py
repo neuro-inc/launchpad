@@ -224,3 +224,48 @@ def test_provider_job_mounts_just_the_required_secret_key(
     for item in resources:
         if item["kind"] in ("Deployment", "StatefulSet"):
             assert "procore-client" not in json.dumps(item)
+
+
+async def test_default_group_reaches_the_configuration_job(
+    apolo_client: Client, tmp_path: Path
+) -> None:
+    inputs = LaunchpadAppInputs(
+        launchpad_web_app_config=LaunchpadWebAppConfig(preset=Preset(name="cpu-small")),
+        apps_config=AppsConfig(
+            quick_start_config=NoQuickStartConfig(no_quickstart=True)
+        ),
+        procore_settings=ProcoreSettings(default_group="/reviewers"),
+    )
+    values = await LaunchpadInputsProcessor(client=apolo_client).gen_extra_values(
+        input_=inputs,
+        app_name="test",
+        namespace="platform",
+        app_secrets_name="test-secrets",
+        app_id="test-app",
+    )
+    assert values["procoreDefaultGroup"] == "/reviewers"
+    resources = render_chart(
+        tmp_path, {"procoreDefaultGroup": values["procoreDefaultGroup"]}
+    )
+    job = next(
+        r
+        for r in resources
+        if r["kind"] == "Job" and r["metadata"]["name"].endswith("-procore-linking")
+    )
+    pod = job["spec"]["template"]["spec"]
+    args = pod["containers"][0]["args"]
+    assert args[args.index("--default-group") + 1] == "/reviewers"
+    assert (
+        "--enable" not in args
+        and "--disable" not in args
+        and "--provider-file" not in args
+    )
+    assert {v["name"] for v in pod["volumes"]} == {"keycloak-admin", "procore-flow"}
+
+
+@pytest.mark.parametrize(
+    "path", ["reviewers", "/", "/reviewers/", "/team//reviewers", ""]
+)
+def test_default_group_requires_an_absolute_nonempty_path(path: str) -> None:
+    with pytest.raises(ValueError):
+        ProcoreSettings(default_group=path)

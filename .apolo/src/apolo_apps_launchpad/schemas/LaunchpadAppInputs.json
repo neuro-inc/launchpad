@@ -813,6 +813,20 @@
           "description": "Leave unset to preserve manual provider settings. Supply credentials to manage Procore sign-in through this App.",
           "title": "Configure Procore identity provider"
         },
+        "default_group": {
+          "anyOf": [
+            {
+              "pattern": "^/[^/]+(?:/[^/]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Assign new Procore users to this existing group path, for example /reviewers. Leave unset to preserve existing mappers. This setting does not create groups or change existing memberships.",
+          "title": "Default Procore group"
+        },
         "automatic_linking": {
           "anyOf": [
             {

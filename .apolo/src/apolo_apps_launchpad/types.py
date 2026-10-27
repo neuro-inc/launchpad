@@ -519,6 +519,11 @@ class ProcoreSettings(AbstractAppFieldType):
         title="Configure Procore identity provider",
         description="Leave unset to preserve manual provider settings. Supply credentials to manage Procore sign-in through this App.",
     )
+    default_group: Annotated[str, Field(pattern=r"^/[^/]+(?:/[^/]+)*$")] | None = Field(
+        default=None,
+        title="Default Procore group",
+        description="Assign new Procore users to this existing group path, for example /reviewers. Leave unset to preserve existing mappers. This setting does not create groups or change existing memberships.",
+    )
     automatic_linking: (
         Annotated[bool, Field(title="Enable automatic linking")] | None
     ) = Field(

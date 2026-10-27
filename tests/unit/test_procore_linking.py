@@ -630,7 +630,8 @@ def test_provider_presets_match_the_procore_contract(
 
 
 @pytest.mark.parametrize(
-    "mode, expected", [("--enable", True), ("--disable", False), (None, None)]
+    "mode, expected",
+    [("--enable", True), ("--disable", False), (None, None), ("--default-group", None)],
 )
 def test_cli_passes_the_three_state_linking_mode(
     tmp_path: Path,
@@ -658,11 +659,17 @@ def test_cli_passes_the_three_state_linking_mode(
                 Path(__file__).parents[2]
                 / "charts/launchpad/files/procore-auto-link.json"
             ),
-            "--provider-file",
-            str(provider),
-            "--client-secret-file",
-            str(secret),
-            *([mode] if mode else []),
+            *(
+                ["--default-group", "/reviewers"]
+                if mode == "--default-group"
+                else [
+                    "--provider-file",
+                    str(provider),
+                    "--client-secret-file",
+                    str(secret),
+                    *([mode] if mode else []),
+                ]
+            ),
         ],
     )
     admin = Mock(spec=KeycloakAdmin)
@@ -671,4 +678,184 @@ def test_cli_passes_the_three_state_linking_mode(
     monkeypatch.setattr(procore_linking, "reconcile", migration)
     assert procore_linking.main() == 0
     assert migration.call_args.kwargs["enabled"] is expected
+    assert migration.call_args.kwargs["default_group"] == (
+        "/reviewers" if mode == "--default-group" else None
+    )
     assert migration.call_args.kwargs["apply"] is False
+
+
+@pytest.fixture
+def mapper_admin(admin: Mock) -> Mock:
+    admin.mappers = []
+    admin.get_group_by_path.return_value = {"id": "reviewers-id", "path": "/reviewers"}
+    admin.get_idp_mappers.side_effect = lambda alias: copy.deepcopy(admin.mappers)
+    admin.add_mapper_to_idp.side_effect = lambda alias, payload: admin.mappers.append(
+        {"id": "mapper-id", **copy.deepcopy(payload)}
+    )
+    return admin
+
+
+def test_default_group_creates_one_mapper_without_changing_accounts(
+    mapper_admin: Mock, definition: FlowDefinition
+) -> None:
+    mapper_admin.provider["config"]["syncMode"] = "FORCE"
+    before = copy.deepcopy(mapper_admin.provider)
+    for _ in range(2):
+        reconcile(
+            mapper_admin,
+            definition,
+            enabled=None,
+            default_group="/reviewers",
+            apply=True,
+        )
+    assert mapper_admin.provider == before
+    assert mapper_admin.mappers == [
+        {
+            "id": "mapper-id",
+            "name": "default group",
+            "identityProviderAlias": "procore",
+            "identityProviderMapper": "oidc-hardcoded-group-idp-mapper",
+            "config": {"group": "/reviewers", "syncMode": "IMPORT"},
+        }
+    ]
+    assert writes(mapper_admin) == ["add_mapper_to_idp"]
+
+
+def test_default_group_adopts_existing_mapper_without_rewriting_custom_options(
+    mapper_admin: Mock, definition: FlowDefinition
+) -> None:
+    mapper_admin.mappers = [
+        {
+            "id": "custom-id",
+            "name": "custom reviewers",
+            "identityProviderAlias": "procore",
+            "identityProviderMapper": "oidc-hardcoded-group-idp-mapper",
+            "config": {
+                "group": "/reviewers",
+                "syncMode": "FORCE",
+                "custom": "preserved",
+            },
+        },
+        {
+            "id": "other-id",
+            "name": "unrelated",
+            "identityProviderAlias": "procore",
+            "identityProviderMapper": "custom-mapper",
+            "config": {"custom": "preserved"},
+        },
+    ]
+    before = copy.deepcopy(mapper_admin.mappers)
+    reconcile(
+        mapper_admin, definition, enabled=None, default_group="/reviewers", apply=True
+    )
+    assert mapper_admin.mappers == before
+    assert writes(mapper_admin) == []
+
+
+@pytest.mark.parametrize("change", ["type", "group", "alias", "duplicate"])
+def test_default_group_conflicts_stop_before_any_configuration_write(
+    mapper_admin: Mock, definition: FlowDefinition, change: str
+) -> None:
+    mapper = {
+        "name": "default group",
+        "identityProviderAlias": "procore",
+        "identityProviderMapper": "oidc-hardcoded-group-idp-mapper",
+        "config": {"group": "/reviewers", "syncMode": "INHERIT"},
+    }
+    mapper_admin.mappers = [mapper]
+    if change == "type":
+        mapper["identityProviderMapper"] = "custom-mapper"
+    elif change == "group":
+        mapper["config"] = {"group": "/administrators", "syncMode": "INHERIT"}
+    elif change == "alias":
+        mapper["identityProviderAlias"] = "unrelated"
+    else:
+        mapper_admin.mappers.append(copy.deepcopy(mapper))
+    with pytest.raises(MigrationConflict, match="mapper"):
+        reconcile(
+            mapper_admin,
+            definition,
+            enabled=True,
+            default_group="/reviewers",
+            apply=True,
+        )
+    assert writes(mapper_admin) == []
+
+
+def test_missing_default_group_stops_before_any_configuration_write(
+    mapper_admin: Mock, definition: FlowDefinition
+) -> None:
+    mapper_admin.get_group_by_path.side_effect = KeycloakGetError(response_code=404)
+    with pytest.raises(MigrationConflict, match="group does not exist"):
+        reconcile(
+            mapper_admin,
+            definition,
+            enabled=True,
+            default_group="/reviewers",
+            apply=True,
+        )
+    assert writes(mapper_admin) == []
+
+
+def test_default_group_dry_run_does_not_write(
+    mapper_admin: Mock, definition: FlowDefinition
+) -> None:
+    reconcile(mapper_admin, definition, enabled=True, default_group="/reviewers")
+    assert writes(mapper_admin) == []
+
+
+def test_unset_default_group_does_not_inspect_or_change_mappers(
+    admin: Mock, definition: FlowDefinition
+) -> None:
+    reconcile(admin, definition, enabled=None, apply=True)
+    admin.get_group_by_path.assert_not_called()
+    admin.get_idp_mappers.assert_not_called()
+    assert writes(admin) == []
+
+
+def test_mapper_creation_is_verified(
+    mapper_admin: Mock, definition: FlowDefinition
+) -> None:
+    mapper_admin.add_mapper_to_idp.side_effect = None
+    with pytest.raises(MigrationConflict, match="could not be verified"):
+        reconcile(
+            mapper_admin,
+            definition,
+            enabled=None,
+            default_group="/reviewers",
+            apply=True,
+        )
+
+
+def test_group_only_configuration_requires_an_existing_provider(
+    mapper_admin: Mock, definition: FlowDefinition
+) -> None:
+    mapper_admin.get_idp.side_effect = KeycloakGetError(response_code=404)
+    with pytest.raises(MigrationConflict, match="Configure the Procore provider"):
+        reconcile(
+            mapper_admin,
+            definition,
+            enabled=None,
+            default_group="/reviewers",
+            apply=True,
+        )
+    assert writes(mapper_admin) == []
+
+
+def test_mapper_creation_verifies_the_requested_sync_mode(
+    mapper_admin: Mock, definition: FlowDefinition
+) -> None:
+    def corrupt(alias: str, payload: dict[str, object]) -> None:
+        changed = copy.deepcopy(payload)
+        changed["config"] = {"group": "/reviewers", "syncMode": "FORCE"}
+        mapper_admin.mappers.append(changed)
+
+    mapper_admin.add_mapper_to_idp.side_effect = corrupt
+    with pytest.raises(MigrationConflict, match="could not be verified"):
+        reconcile(
+            mapper_admin,
+            definition,
+            enabled=None,
+            default_group="/reviewers",
+            apply=True,
+        )

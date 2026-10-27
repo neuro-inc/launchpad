@@ -11,6 +11,7 @@ from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from scripts.keycloak.procore_linking import (
     FLOW_ALIAS,
     FlowDefinition,
+    MigrationConflict,
     ProcoreProviderSettings,
     reconcile,
 )
@@ -39,8 +40,11 @@ def keycloak_admin() -> Iterator[KeycloakAdmin]:
 def account_snapshot(
     admin: KeycloakAdmin, user_id: str, client_id: str
 ) -> dict[str, object]:
+    user = admin.get_user(user_id)
+    # Keycloak omits empty identity links until the realm has an identity provider.
+    user.setdefault("federatedIdentities", [])
     return {
-        "user": admin.get_user(user_id),
+        "user": user,
         "direct_roles": admin.get_realm_roles_of_user(user_id),
         "groups": admin.get_user_groups(user_id),
         "inherited_roles": admin.get_composite_realm_roles_of_user(user_id),
@@ -227,3 +231,67 @@ def test_provider_creation_and_secret_rotation_preserve_existing_permissions(
     assert admin.get_idp("procore").get("firstBrokerLoginFlowAlias", "") == ""
     assert admin.get_idp("procore")["trustEmail"] is False
     assert account_snapshot(admin, user_id, client_id) == before
+
+
+@pytest.mark.parametrize("group_name", ["reviewers", "reviewers#west?%2F"])
+def test_default_group_mapper_restoration_preserves_accounts_and_permissions(
+    keycloak_admin: KeycloakAdmin,
+    group_name: str,
+) -> None:
+    admin = keycloak_admin
+    admin.change_current_realm("master")
+    realm_name = f"procore-default-group-{len(group_name)}"
+    admin.create_realm({"realm": realm_name, "enabled": True})
+    admin.change_current_realm(realm_name)
+    group_path = f"/{group_name}"
+    group_id = admin.create_group({"name": group_name})
+    assert group_id is not None
+    admin.create_realm_role({"name": "reviewer"})
+    admin.assign_group_realm_roles(group_id, [admin.get_realm_role("reviewer")])
+    client_id = admin.create_client({"clientId": "mapper-permissions"})
+    user_id = admin.create_user({"username": "reviewer@example.test", "enabled": True})
+    admin.group_user_add(user_id, group_id)
+    definition = FlowDefinition.model_validate_json(
+        (
+            Path(__file__).parents[2] / "charts/launchpad/files/procore-auto-link.json"
+        ).read_text()
+    )
+    settings = ProcoreProviderSettings(clientId="test-client", environment="sandbox")
+    existing_account = account_snapshot(admin, user_id, client_id)
+    reconcile(
+        admin,
+        definition,
+        enabled=None,
+        settings=settings,
+        client_secret="test",
+        default_group=group_path,
+        apply=True,
+    )
+    assert account_snapshot(admin, user_id, client_id) == existing_account
+    admin.add_user_social_login(
+        user_id, "procore", "existing-procore-user", "reviewer@example.test"
+    )
+    before = account_snapshot(admin, user_id, client_id)
+    links = admin.get_user_social_logins(user_id)
+    provider = admin.get_idp("procore")
+    with pytest.raises(MigrationConflict, match="group does not exist"):
+        reconcile(
+            admin,
+            definition,
+            enabled=None,
+            default_group="/missing",
+            settings=settings,
+            client_secret="not-applied",
+            apply=True,
+        )
+    assert admin.get_idp("procore") == provider
+    reconcile(admin, definition, enabled=None, default_group=group_path, apply=True)
+    mappers = admin.get_idp_mappers("procore")
+    assert len(mappers) == 1
+    assert mappers[0]["identityProviderMapper"] == "oidc-hardcoded-group-idp-mapper"
+    assert mappers[0]["config"] == {"group": group_path, "syncMode": "IMPORT"}
+    reconcile(admin, definition, enabled=None, default_group=group_path, apply=True)
+    assert admin.get_idp_mappers("procore") == mappers
+    assert admin.get_idp("procore") == provider
+    assert account_snapshot(admin, user_id, client_id) == before
+    assert admin.get_user_social_logins(user_id) == links

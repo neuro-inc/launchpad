@@ -144,6 +144,7 @@ postgresql:
 
 # Unset preserves existing provider settings. False restores the managed binding.
 procoreAutomaticLinking: null
+procoreDefaultGroup: null
 procoreProvider: null
 
 keycloak:
