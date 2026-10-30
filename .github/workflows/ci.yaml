@@ -129,7 +129,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python3 -m pip install mypy==1.18.2
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.16.3
       - name: Verify release checks in a tag dispatch context
@@ -161,7 +161,7 @@ jobs:
         run: cd hooks && poetry install --no-interaction --no-root
       - name: Install hook project
         run: cd hooks && poetry install --no-interaction
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.16.3
       - run: make test-hooks
@@ -202,7 +202,7 @@ jobs:
           FONTAWESOME_NPM_AUTH_TOKEN: ${{ secrets.FONTAWESOME_NPM_AUTH_TOKEN }}
         run: test -n "$FONTAWESOME_NPM_AUTH_TOKEN"
       - uses: actions/checkout@v7
-      - uses: azure/setup-helm@v4
+      - uses: azure/setup-helm@v5
         with:
           version: v3.16.3
       - uses: docker/setup-buildx-action@v4
