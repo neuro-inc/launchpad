@@ -9,6 +9,10 @@ pytest_plugins = [
 ]
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption("--update-goldens", action="store_true", default=False)
+
+
 @pytest.fixture
 def apolo_cluster_config():
     return Cluster(

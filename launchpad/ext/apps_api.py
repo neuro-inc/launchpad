@@ -3,7 +3,7 @@ import typing
 from typing import Any
 from uuid import UUID
 
-from aiohttp import ClientResponseError, ClientSession
+from aiohttp import ClientResponseError, ClientSession, ClientSSLError
 from pydantic import BaseModel, ValidationError
 
 from launchpad.hostnames import canonical_hostname
@@ -213,10 +213,9 @@ class AppsApiClient:
                 url,
                 *args,
                 headers=headers,
-                ssl=False,  # todo: check why requests are failing with SSL error
                 **kwargs,
             )
-        except TimeoutError as e:
+        except (TimeoutError, ClientSSLError) as e:
             raise AppsApiError() from e
 
         raw_response = await response.text(errors="ignore")

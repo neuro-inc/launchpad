@@ -158,7 +158,8 @@ keycloak:
   replicaCount: 1
   auth:
     adminUser: "admin"
-    adminPassword: "Passw0rd!123"  # todo: should be passed as an arg?
+    adminPassword: ""  # Set by the Apolo installer, or supply auth.existingSecret.
+    existingSecret: ""
   externalDatabase:
     user: "postgres"
     database: "keycloak"

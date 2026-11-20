@@ -197,61 +197,63 @@ async def token_from_string(
     """
     Extracts and decodes the token from the request
     """
-    # get header so we can get a proper JWKS and determine the hashing algorithm
     try:
         header = jwt.get_unverified_header(access_token)
     except jwt.PyJWTError:
         logger.exception("can't get token header")
         raise Unauthorized()
 
-    kid, alg = header["kid"], header["alg"]
-    alg_obj = jwt.get_algorithm_by_name(alg)
+    kid = header.get("kid")
+    if header.get("alg") != "RS256" or not isinstance(kid, str) or not kid:
+        raise Unauthorized()
 
     try:
         jwks = await _get_jwks(http=http, keycloak_config=keycloak_config, kid=kid)
-    except Exception:
+    except Exception as error:
         logger.exception("can't obtain JWKS")
-        raise Unauthorized()
-
-    # get a secret key from a JWKS
-    for key in jwks["keys"]:
-        if key["kid"] == kid:
-            secret_key = alg_obj.from_jwk(key)
-            break
-    else:
-        logger.error(
-            "unable to match a KID between a token and a JWKS",
-            extra={
-                "token_kid": kid,
-                "jwks_key_ids": [key.get("kid") for key in jwks["keys"]],
-            },
-        )
-        raise Unauthorized()
+        raise Unauthorized() from error
 
     try:
+        key = next(
+            (
+                entry
+                for entry in jwks["keys"]
+                if isinstance(entry, dict)
+                and entry.get("kid") == kid
+                and entry.get("use") in (None, "sig")
+            ),
+            None,
+        )
+        if key is None:
+            raise Unauthorized()
+        public_key = jwt.PyJWK.from_dict(key, algorithm="RS256")
         token: dict[str, Any] = jwt.decode(
             access_token,
-            secret_key,
-            algorithms=[alg],
+            public_key,
+            algorithms=["RS256"],
             issuer=f"{keycloak_config.url}/realms/{keycloak_config.realm}",
             audience="account",
         )
         return token
     except jwt.ExpiredSignatureError:
         raise Unauthorized()
-    except jwt.PyJWTError:
+    except (jwt.PyJWTError, KeyError, TypeError, ValueError):
         logger.exception("unable to decode a token")
         raise Unauthorized()
 
 
-def cache_key_getter(*args: Any, **kwargs: str) -> str:
-    """
-    JWKS cache key getter which considers only the `kid`
-    """
-    return kwargs["kid"]
+def cache_key_getter(
+    *, keycloak_config: KeycloakConfig, kid: str, **_: Any
+) -> tuple[str, str, str]:
+    return str(keycloak_config.url), keycloak_config.realm, kid
 
 
-@backoff.on_exception(wait_gen=backoff.expo, exception=aiohttp.ClientError, max_tries=5)
+@backoff.on_exception(
+    wait_gen=backoff.expo,
+    exception=aiohttp.ClientError,
+    max_tries=5,
+    giveup=lambda error: isinstance(error, aiohttp.ClientSSLError),
+)
 @cached(cache=LRUCache(maxsize=32), key=cache_key_getter)  # type: ignore
 async def _get_jwks(
     *,
@@ -265,9 +267,9 @@ async def _get_jwks(
     Therefore, we cache the response by a token `kid`.
     """
     url = f"{keycloak_config.url}/realms/{keycloak_config.realm}/protocol/openid-connect/certs"
-    response = await http.get(url, ssl=False)  # todo: see what we can do here with cert
-    response.raise_for_status()
-    return await response.json()
+    async with http.get(url) as response:
+        response.raise_for_status()
+        return await response.json()
 
 
 Auth = Annotated[User, Depends(auth_required)]

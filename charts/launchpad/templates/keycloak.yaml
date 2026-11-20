@@ -4,7 +4,9 @@
 {{- $db := $kc.externalDatabase -}}
 {{- $passwordKey := $auth.passwordSecretKey | default "admin-password" -}}
 {{- $image := printf "%s:%s@%s" $kc.image.repository $kc.image.tag $kc.image.digest -}}
+{{- $adminPassword := "" -}}
 {{- if not $auth.existingSecret }}
+{{- $adminPassword = required "Set keycloak.auth.adminPassword or keycloak.auth.existingSecret." $auth.adminPassword }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -13,7 +15,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 type: Opaque
 data:
-  {{ $passwordKey }}: {{ $auth.adminPassword | b64enc | quote }}
+  {{ $passwordKey }}: {{ $adminPassword | b64enc | quote }}
 ---
 {{- end }}
 apiVersion: v1
@@ -104,10 +106,13 @@ spec:
       {{- include "keycloak.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with $kc.podAnnotations }}
       annotations:
+        {{- if not $auth.existingSecret }}
+        checksum/keycloak-admin: {{ $adminPassword | sha256sum | quote }}
+        {{- end }}
+        {{- with $kc.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "keycloak.labels" . | nindent 8 }}
         service: keycloak

@@ -9,22 +9,26 @@ import signal
 import socket
 import ssl
 import subprocess
-from contextlib import suppress
+from contextlib import asynccontextmanager, suppress
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import AsyncIterator
 from unittest.mock import AsyncMock, patch
 from urllib.parse import urljoin, urlsplit
 
 import pytest
 import uvicorn
 import yaml
+from aiohttp import ClientConnectorCertificateError, ClientSession, TCPConnector
 from httpx2 import AsyncClient, RequestError
 from testcontainers.core.container import DockerContainer
 from testcontainers.core.wait_strategies import LogMessageWaitStrategy
 from testcontainers.postgres import PostgresContainer
 from yarl import URL
 
+from launchpad.app import Launchpad
 from launchpad.app_factory import create_app
+from launchpad.auth.dependencies import token_from_string
 from launchpad.config import (
     ApoloConfig,
     BrandingConfig,
@@ -32,6 +36,7 @@ from launchpad.config import (
     KeycloakConfig,
     PostgresConfig,
 )
+from launchpad.errors import Unauthorized
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -59,7 +64,9 @@ async def wait_for_http(client: AsyncClient, url: str) -> None:
             await asyncio.sleep(0.25)
 
 
-async def check_login(client: AsyncClient, frontend: str, api: str, kc: str) -> None:
+async def check_login(
+    client: AsyncClient, frontend: str, api: str, kc: str, tls: ssl.SSLContext
+) -> None:
     callback = f"{frontend}/api/auth/callback/keycloak"
     protected_url = f"{api}/api/v1/apps"
     assert (await client.get(protected_url)).status_code == 401
@@ -103,9 +110,19 @@ async def check_login(client: AsyncClient, frontend: str, api: str, kc: str) -> 
     assert session_data["user"]["email"] == "developer@example.test"
     assert "admin" in session_data["client_roles"]
     assert (await client.get(f"{frontend}/apps")).status_code == 200
+    access_token = session_data["accessToken"]
+
+    for context, issuer in ((True, URL(kc)), (tls, URL(kc).with_host("localhost"))):
+        async with ClientSession(connector=TCPConnector(ssl=context)) as http:
+            with pytest.raises(Unauthorized) as error:
+                await token_from_string(
+                    http, KeycloakConfig(url=issuer, realm="launchpad"), access_token
+                )
+            assert isinstance(error.value.__cause__, ClientConnectorCertificateError)
+
     authorized = await client.get(
         protected_url,
-        headers={"Authorization": f"Bearer {session_data['accessToken']}"},
+        headers={"Authorization": f"Bearer {access_token}"},
     )
     assert authorized.status_code == 200
     assert authorized.json()["items"] == []
@@ -157,6 +174,12 @@ async def test_keycloak_login_through_launchpad(
     key.chmod(0o644)
     tls = ssl.create_default_context(cafile=str(certificate))
 
+    @asynccontextmanager
+    async def trusted_http_session(app: Launchpad) -> AsyncIterator[None]:
+        async with ClientSession(connector=TCPConnector(ssl=tls)) as http:
+            app.http = http
+            yield
+
     # Next derives this API hostname in local mode. Resolve it only in the test process.
     resolver = tmp_path / "loopback.cjs"
     resolver.write_text(
@@ -182,6 +205,7 @@ async def test_keycloak_login_through_launchpad(
         ) as keycloak,
         socket.socket() as api_listener,
         patch("launchpad.lifespan.ApoloClientFactory") as apolo_factory,
+        patch("launchpad.lifespan.create_aiohttp_session", new=trusted_http_session),
         (tmp_path / "frontend.log").open("w+") as frontend_log,
     ):
         api_listener.bind(("127.0.0.1", 0))
@@ -246,7 +270,7 @@ async def test_keycloak_login_through_launchpad(
                     except TimeoutError as error:
                         frontend_log.seek(0)
                         raise AssertionError(frontend_log.read()[-2000:]) from error
-                    await check_login(client, frontend_url, api_url, keycloak_url)
+                    await check_login(client, frontend_url, api_url, keycloak_url, tls)
             finally:
                 with suppress(ProcessLookupError):
                     os.killpg(frontend.pid, signal.SIGTERM)
