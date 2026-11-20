@@ -61,6 +61,21 @@ platform.apolo.us/component: app
 {{- printf "%s-keycloak.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}
 
+{{/* Keep the Bitnami selectors so existing StatefulSets can be updated in place. */}}
+{{- define "keycloak.selectorLabels" -}}
+app.kubernetes.io/name: keycloak
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/component: keycloak
+{{- end -}}
+
+{{- define "keycloak.labels" -}}
+{{ include "keycloak.selectorLabels" . }}
+application: launchpad
+helm.sh/chart: {{ include "launchpad.chart" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/version: {{ .Values.keycloak.image.tag | quote }}
+{{- end -}}
+
 {{- define "launchpad.domainWithProtocol" -}}
 {{- if .Values.clientSubdomain }}
 {{- printf "https://%s.launchpad.%s" (include "launchpad.name" .) .Values.domain }}

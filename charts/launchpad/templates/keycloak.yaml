@@ -1,0 +1,254 @@
+{{- $kc := .Values.keycloak -}}
+{{- $name := $kc.fullnameOverride -}}
+{{- $auth := $kc.auth -}}
+{{- $db := $kc.externalDatabase -}}
+{{- $passwordKey := $auth.passwordSecretKey | default "admin-password" -}}
+{{- $image := printf "%s:%s@%s" $kc.image.repository $kc.image.tag $kc.image.digest -}}
+{{- if not $auth.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+type: Opaque
+data:
+  {{ $passwordKey }}: {{ $auth.adminPassword | b64enc | quote }}
+---
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    {{- $kc.service.extraLabels | default (dict "service" "keycloak") | toYaml | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "keycloak.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $kc.service.ports.http }}
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-headless
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "keycloak.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "keycloak.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - port: 8080
+        - port: 7800
+  egress: [{}]
+---
+apiVersion: {{ ternary "policy/v1" "policy/v1beta1" (semverCompare ">=1.21-0" .Capabilities.KubeVersion.Version) }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      {{- include "keycloak.selectorLabels" . | nindent 6 }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    service: keycloak
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  serviceName: {{ $name }}-headless
+  podManagementPolicy: Parallel
+  replicas: {{ $kc.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "keycloak.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with $kc.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "keycloak.labels" . | nindent 8 }}
+        service: keycloak
+        app.kubernetes.io/app-version: {{ $kc.image.tag | quote }}
+        {{- with $kc.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ $name }}
+      securityContext:
+        fsGroup: 1000
+      {{- with $kc.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $kc.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $kc.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: prepare-write-dirs
+          image: {{ $image | quote }}
+          # Quarkus augments the upstream image for PostgreSQL and health at startup.
+          command: ["/bin/sh", "-ec", "cp -R /opt/keycloak/lib/quarkus/. /quarkus/"]
+          securityContext: &keycloakSecurityContext
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: empty-dir
+              subPath: app-quarkus-dir
+              mountPath: /quarkus
+          resources:
+            {{- toYaml $kc.resources | nindent 12 }}
+        {{- with $kc.initContainers }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      containers:
+        - name: keycloak
+          image: {{ $image | quote }}
+          args:
+            - start
+            - --import-realm
+            - --spi-theme--static-max-age=-1
+            - --spi-theme--cache-themes=false
+            - --spi-theme--cache-templates=false
+          securityContext: *keycloakSecurityContext
+          resources:
+            {{- toYaml $kc.resources | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: discovery
+              containerPort: 7800
+            - name: management
+              containerPort: 9000
+          env:
+            - name: KC_HOSTNAME
+              value: {{ printf "https://%s" (include "keycloak.domain" .) | quote }}
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: "true"
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.existingSecret }}
+                  key: {{ $db.existingSecretHostKey }}
+            - name: KC_DB_URL_PORT
+              value: {{ $db.port | quote }}
+            - name: KC_DB_URL_DATABASE
+              value: {{ $db.database | quote }}
+            - name: KC_DB_USERNAME
+              value: {{ $db.user | quote }}
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $db.existingSecret }}
+                  key: {{ $db.existingSecretPasswordKey }}
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: {{ $auth.adminUser | quote }}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $auth.existingSecret | default $name }}
+                  key: {{ $passwordKey }}
+            {{- with $kc.extraEnvVars }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: management
+            periodSeconds: 5
+            failureThreshold: 84
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: management
+            periodSeconds: 10
+          volumeMounts:
+            - name: empty-dir
+              subPath: tmp-dir
+              mountPath: /tmp
+            - name: empty-dir
+              subPath: app-data-dir
+              mountPath: /opt/keycloak/data
+            - name: empty-dir
+              subPath: app-quarkus-dir
+              mountPath: /opt/keycloak/lib/quarkus
+            - name: empty-dir
+              subPath: app-themes-dir
+              mountPath: /opt/keycloak/themes
+              readOnly: true
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+      volumes:
+        - name: empty-dir
+          emptyDir: {}
+        - name: realm-import
+          configMap:
+            name: {{ .Values.keycloakRealmImportConfigMapName }}

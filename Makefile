@@ -40,6 +40,10 @@ test-unit:
 test-integration:
 	poetry run pytest -vv --cov=launchpad --cov-report xml:.coverage.integration.xml tests/integration
 
+.PHONY: test-auth-e2e
+test-auth-e2e:
+	poetry run pytest -vv tests/e2e
+
 .PHONY: test-hooks
 test-hooks:
 	cd hooks && \

@@ -68,19 +68,19 @@ BRANDING_DIR_LAUNCHPAD = "/etc/launchpad/branding"
 # keycloak-theme/apolo/ path on master. This is the authoritative copy of the
 # script; values.yaml carries the same script as a local-dev fallback.
 KEYCLOAK_CUSTOM_THEME_INIT_SCRIPT = """\
-set -euxo pipefail
+set -eu
 git clone --depth 1 --branch "{APOLO_APP_GIT_REVISION}" "{APOLO_APP_GIT_REPO}" /tmp/repo
-mkdir -p "/opt/bitnami/keycloak/themes/apolo"
-cp -R "/tmp/repo/kc-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
-chown -R 1001:0 /opt/bitnami/keycloak/themes
+mkdir -p "/opt/keycloak/themes/apolo"
+cp -R "/tmp/repo/kc-theme/apolo/." "/opt/keycloak/themes/apolo/"
+chown -R 1000:0 /opt/keycloak/themes
 """
 
 KEYCLOAK_DEFAULT_THEME_INIT_SCRIPT = """\
-set -euxo pipefail
+set -eu
 git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
-mkdir -p "/opt/bitnami/keycloak/themes/apolo"
-cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
-chown -R 1001:0 /opt/bitnami/keycloak/themes
+mkdir -p "/opt/keycloak/themes/apolo"
+cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/keycloak/themes/apolo/"
+chown -R 1000:0 /opt/keycloak/themes
 """
 
 
@@ -470,25 +470,11 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     "volumeMounts": [
                         {
                             "name": "empty-dir",
-                            "mountPath": "/opt/bitnami/keycloak/themes",
+                            "mountPath": "/opt/keycloak/themes",
                             "subPath": "app-themes-dir",
                         }
                     ],
                     "securityContext": {"runAsUser": 0},
-                }
-            ],
-            "extraVolumes": [
-                {
-                    "name": "realm-import",
-                    "configMap": {
-                        "name": kc_realm_import_config_map_name,
-                        "items": [
-                            {
-                                "key": "realm.json",
-                                "path": "realm.json",
-                            }
-                        ],
-                    },
                 }
             ],
         }
