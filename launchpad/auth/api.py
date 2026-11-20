@@ -148,13 +148,8 @@ async def get_token(
         "scope": token_request.scope,
     }
 
-    # Determine SSL verification setting (default True).
-    ssl_verify = keycloak_config.ssl_verify
-
     try:
-        async with request.app.http.post(
-            token_url, data=data, ssl=ssl_verify
-        ) as response:
+        async with request.app.http.post(token_url, data=data) as response:
             # Handle authentication errors (wrong credentials)
             if response.status == 401:
                 error_data = await response.json()

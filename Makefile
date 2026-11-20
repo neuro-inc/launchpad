@@ -49,6 +49,10 @@ test-hooks:
 	cd hooks && \
 	poetry run pytest -vv --cov=apolo_apps_launchpad --cov-report xml:.coverage.hooks.xml tests/unit
 
+.PHONY: update-goldens
+update-goldens:
+	cd hooks && poetry run pytest tests/unit/chart --update-goldens
+
 .PHONY: test-hooks-lint
 test-hooks-lint:
 	cd hooks && \

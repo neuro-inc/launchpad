@@ -94,13 +94,11 @@ async def test_launchpad_admin_api_delete_app_template_by_app_id() -> None:
     http.post.assert_awaited_once_with(
         "https://launchpad-api.example.com/auth/token",
         json={"username": "admin", "password": "password"},
-        ssl=False,
     )
     http.delete.assert_awaited_once_with(
         f"https://launchpad-api.example.com/api/v1/apps/templates/by-instance/{app_id}",
         params={"uninstall": "false"},
         headers={"Authorization": "Bearer token"},
-        ssl=False,
     )
 
 
@@ -156,7 +154,6 @@ async def test_launchpad_admin_api_gets_template_by_instance_directly() -> None:
     http.get.assert_awaited_once_with(
         f"https://launchpad-api.example.com/api/v1/apps/templates/by-instance/{app_id}",
         headers={"Authorization": "Bearer token"},
-        ssl=False,
     )
 
 

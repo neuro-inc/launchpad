@@ -1,12 +1,9 @@
 """Verify explicit Procore configuration and migration isolation."""
 
 import json
-import subprocess
 from pathlib import Path
-from typing import Any
 
 import pytest
-import yaml
 from apolo_app_types import ApoloSecret
 from apolo_app_types.protocols.common import Preset
 from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
@@ -20,28 +17,7 @@ from apolo_apps_launchpad.types import (
 )
 from apolo_sdk import Client
 
-
-ROOT = Path(__file__).resolve().parents[3]
-
-
-def render_chart(tmp_path: Path, overrides: dict[str, object]) -> list[dict[str, Any]]:
-    values = tmp_path / "values.yaml"
-    values.write_text(
-        yaml.safe_dump(
-            {
-                "apolo_app_id": "test-app",
-                "LAUNCHPAD_ADMIN_PASSWORD": "test-admin",
-                "dbPassword": "test-db",
-                "authResponseHeaders": ["X-Auth-Request-Email"],
-                **overrides,
-            }
-        )
-    )
-    rendered = subprocess.check_output(
-        ["helm", "template", "test", str(ROOT / "charts/launchpad"), "-f", str(values)],
-        text=True,
-    )
-    return [item for item in yaml.safe_load_all(rendered) if item]
+from .chart_helpers import CHART, render_chart
 
 
 def test_keycloak_upgrade_preserves_service_and_realm_contract(tmp_path: Path) -> None:
@@ -49,7 +25,10 @@ def test_keycloak_upgrade_preserves_service_and_realm_contract(tmp_path: Path) -
     resources = render_chart(
         tmp_path,
         {
-            "keycloak": {"fullnameOverride": name},
+            "keycloak": {
+                "fullnameOverride": name,
+                "auth": {"adminPassword": "test-keycloak-admin"},
+            },
             "keycloakRealmImportConfigMapName": f"{name}-realm",
             "procoreAutomaticLinking": False,
         },
@@ -91,6 +70,9 @@ def test_keycloak_upgrade_preserves_service_and_realm_contract(tmp_path: Path) -
         "name": name,
         "key": "admin-password",
     }
+    assert (
+        "checksum/keycloak-admin" in statefulset["template"]["metadata"]["annotations"]
+    )
 
 
 @pytest.mark.parametrize("enabled", [None, True, False])
@@ -127,9 +109,7 @@ def test_procore_chart_is_opt_in_and_mounts_only_keycloak_credentials(
             "image": {"digest": "sha256:" + "a" * 64},
         },
     )
-    definition = json.loads(
-        (ROOT / "charts/launchpad/files/procore-auto-link.json").read_text()
-    )
+    definition = json.loads((CHART / "files/procore-auto-link.json").read_text())
     realm_config = next(
         item
         for item in resources

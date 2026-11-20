@@ -1,6 +1,5 @@
 import json
 import os
-import random
 import re
 import secrets
 import string
@@ -89,7 +88,7 @@ def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
         err_msg = f"Password length must be at least {PASSWORD_MIN_LENGTH}"
         raise ValueError(err_msg)
 
-    return "".join([random.choice(PASSWORD_CHAR_POOL) for _ in range(length)])
+    return "".join(secrets.choice(PASSWORD_CHAR_POOL) for _ in range(length))
 
 
 class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
