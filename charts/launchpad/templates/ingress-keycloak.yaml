@@ -17,6 +17,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: {{ include "launchpad.name" $ }}-keycloak
+                name: {{ .Values.keycloak.fullnameOverride }}
                 port:
                   name: http

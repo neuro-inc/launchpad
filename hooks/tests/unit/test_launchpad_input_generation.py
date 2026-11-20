@@ -762,19 +762,10 @@ async def test_launchpad_values_generation__min(apolo_client):
                 "volumeMounts": [
                     {
                         "name": "empty-dir",
-                        "mountPath": "/opt/bitnami/keycloak/themes",
+                        "mountPath": "/opt/keycloak/themes",
                         "subPath": "app-themes-dir",
                     }
                 ],
-            },
-        ],
-        "extraVolumes": [
-            {
-                "name": "realm-import",
-                "configMap": {
-                    "name": f"launchpad-{APP_ID}-keycloak-realm",
-                    "items": [{"key": "realm.json", "path": "realm.json"}],
-                },
             },
         ],
     }
@@ -922,15 +913,6 @@ async def test_launchpad_values_generation__brand(apolo_client):
                 "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/background",
             },
         ],
-        "extraVolumes": [
-            {
-                "name": "realm-import",
-                "configMap": {
-                    "name": f"launchpad-{APP_ID}-keycloak-realm",
-                    "items": [{"key": "realm.json", "path": "realm.json"}],
-                },
-            },
-        ],
         "initContainers": [
             {
                 "name": "fetch-theme",
@@ -949,7 +931,7 @@ async def test_launchpad_values_generation__brand(apolo_client):
                 "volumeMounts": [
                     {
                         "name": "empty-dir",
-                        "mountPath": "/opt/bitnami/keycloak/themes",
+                        "mountPath": "/opt/keycloak/themes",
                         "subPath": "app-themes-dir",
                     }
                 ],

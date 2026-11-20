@@ -44,6 +44,55 @@ def render_chart(tmp_path: Path, overrides: dict[str, object]) -> list[dict[str,
     return [item for item in yaml.safe_load_all(rendered) if item]
 
 
+def test_keycloak_upgrade_preserves_service_and_realm_contract(tmp_path: Path) -> None:
+    name = "launchpad-test-app-keycloak"
+    resources = render_chart(
+        tmp_path,
+        {
+            "keycloak": {"fullnameOverride": name},
+            "keycloakRealmImportConfigMapName": f"{name}-realm",
+            "procoreAutomaticLinking": False,
+        },
+    )
+    indexed = {(item["kind"], item["metadata"]["name"]): item for item in resources}
+    statefulset = indexed["StatefulSet", name]["spec"]
+    selector = {
+        "app.kubernetes.io/name": "keycloak",
+        "app.kubernetes.io/instance": "test",
+        "app.kubernetes.io/component": "keycloak",
+    }
+    assert statefulset["selector"]["matchLabels"] == selector
+    assert statefulset["serviceName"] == f"{name}-headless"
+    assert statefulset["podManagementPolicy"] == "Parallel"
+    service = indexed["Service", name]
+    assert service["metadata"]["labels"]["service"] == "keycloak"
+    assert service["spec"]["selector"] == selector
+    assert service["spec"]["ports"] == [
+        {"name": "http", "port": 80, "targetPort": "http"}
+    ]
+    pod = statefulset["template"]["spec"]
+    (keycloak,) = pod["containers"]
+    assert keycloak["image"].startswith("quay.io/keycloak/keycloak:26.8.2-3@sha256:")
+    assert keycloak["readinessProbe"]["httpGet"]["port"] == "management"
+    assert {"name": "realm-import", "configMap": {"name": f"{name}-realm"}} in pod[
+        "volumes"
+    ]
+    assert keycloak["securityContext"]["readOnlyRootFilesystem"] is True
+    procore = indexed["Job", "launchpad-test-app-procore-linking"]["spec"]["template"][
+        "spec"
+    ]
+    assert procore["containers"][0]["args"][:2] == ["--server", f"http://{name}:80"]
+    password = next(
+        entry
+        for entry in keycloak["env"]
+        if entry["name"] == "KC_BOOTSTRAP_ADMIN_PASSWORD"
+    )
+    assert password["valueFrom"]["secretKeyRef"] == {
+        "name": name,
+        "key": "admin-password",
+    }
+
+
 @pytest.mark.parametrize("enabled", [None, True, False])
 async def test_procore_input_preserves_the_three_states(
     apolo_client: Client, enabled: bool | None
