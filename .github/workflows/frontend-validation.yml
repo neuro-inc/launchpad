@@ -39,6 +39,20 @@ jobs:
         run: npm run lint
         env:
           CI: true
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - name: Install Launchpad backend dependencies
+        working-directory: .
+        run: poetry install --no-interaction
+      - name: Test frontend login against Keycloak and Launchpad
+        working-directory: .
+        run: make test-auth-e2e
       - name: Validate the production build
         run: npm run build
         env:
