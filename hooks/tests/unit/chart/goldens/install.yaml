@@ -23,11 +23,11 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: launchpad-golden-app-keycloak-db
+  name: launchpad-golden-app-kc-db
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: launchpad-golden-app-keycloak-db
+      app.kubernetes.io/name: launchpad-golden-app-kc-db
   policyTypes: [Ingress]
   ingress:
     - from:
@@ -43,11 +43,11 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: launchpad-golden-app-launchpad-db
+  name: launchpad-golden-app-lp-db
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/name: launchpad-golden-app-launchpad-db
+      app.kubernetes.io/name: launchpad-golden-app-lp-db
   policyTypes: [Ingress]
   ingress:
     - from:
@@ -117,12 +117,12 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: launchpad-golden-app-keycloak-db-secret
+  name: launchpad-golden-app-kc-db-secret
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 type: Opaque
 stringData:
-  DB_HOST: "launchpad-golden-app-keycloak-db"
+  DB_HOST: "launchpad-golden-app-kc-db"
   DB_USER: "keycloak"
   DB_NAME: "keycloak"
   DB_PASSWORD: "keycloak-isolated-db-pswd-golden-app-value"
@@ -131,12 +131,12 @@ stringData:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: launchpad-golden-app-launchpad-db-secret
+  name: launchpad-golden-app-lp-db-secret
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 type: Opaque
 stringData:
-  DB_HOST: "launchpad-golden-app-launchpad-db"
+  DB_HOST: "launchpad-golden-app-lp-db"
   DB_USER: "launchpad"
   DB_NAME: "launchpad"
   DB_PASSWORD: "launchpad-isolated-db-pswd-golden-app-value"
@@ -2748,11 +2748,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: launchpad-golden-app-keycloak-db
+  name: launchpad-golden-app-kc-db
 spec:
   clusterIP: None
   selector:
-    app.kubernetes.io/name: launchpad-golden-app-keycloak-db
+    app.kubernetes.io/name: launchpad-golden-app-kc-db
   ports:
     - name: postgres
       port: 5432
@@ -2762,11 +2762,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: launchpad-golden-app-launchpad-db
+  name: launchpad-golden-app-lp-db
 spec:
   clusterIP: None
   selector:
-    app.kubernetes.io/name: launchpad-golden-app-launchpad-db
+    app.kubernetes.io/name: launchpad-golden-app-lp-db
   ports:
     - name: postgres
       port: 5432
@@ -2958,13 +2958,13 @@ spec:
             - name: PORT
               value: "8080"
             - name: DB_HOST
-              value: launchpad-golden-app-launchpad-db
+              value: launchpad-golden-app-lp-db
             - name: DB_USER
               value: "launchpad"
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: launchpad-golden-app-launchpad-db-secret
+                  name: launchpad-golden-app-lp-db-secret
                   key: DB_PASSWORD
             - name: DB_NAME
               value: "launchpad"
@@ -3177,7 +3177,7 @@ spec:
             - name: KC_DB_URL_HOST
               valueFrom:
                 secretKeyRef:
-                  name: launchpad-golden-app-keycloak-db-secret
+                  name: launchpad-golden-app-kc-db-secret
                   key: DB_HOST
             - name: KC_DB_URL_PORT
               value: "5432"
@@ -3188,7 +3188,7 @@ spec:
             - name: KC_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: launchpad-golden-app-keycloak-db-secret
+                  name: launchpad-golden-app-kc-db-secret
                   key: DB_PASSWORD
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
               value: "admin"
@@ -3241,17 +3241,17 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: launchpad-golden-app-keycloak-db
+  name: launchpad-golden-app-kc-db
 spec:
-  serviceName: launchpad-golden-app-keycloak-db
+  serviceName: launchpad-golden-app-kc-db
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: launchpad-golden-app-keycloak-db
+      app.kubernetes.io/name: launchpad-golden-app-kc-db
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: launchpad-golden-app-keycloak-db
+        app.kubernetes.io/name: launchpad-golden-app-kc-db
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -3295,7 +3295,7 @@ spec:
               exec docker-entrypoint.sh postgres
           envFrom:
             - secretRef:
-                name: launchpad-golden-app-keycloak-db-secret
+                name: launchpad-golden-app-kc-db-secret
           env:
             - name: POSTGRES_DB
               value: "keycloak"
@@ -3341,17 +3341,17 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: launchpad-golden-app-launchpad-db
+  name: launchpad-golden-app-lp-db
 spec:
-  serviceName: launchpad-golden-app-launchpad-db
+  serviceName: launchpad-golden-app-lp-db
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: launchpad-golden-app-launchpad-db
+      app.kubernetes.io/name: launchpad-golden-app-lp-db
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: launchpad-golden-app-launchpad-db
+        app.kubernetes.io/name: launchpad-golden-app-lp-db
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -3395,7 +3395,7 @@ spec:
               exec docker-entrypoint.sh postgres
           envFrom:
             - secretRef:
-                name: launchpad-golden-app-launchpad-db-secret
+                name: launchpad-golden-app-lp-db-secret
           env:
             - name: POSTGRES_DB
               value: "launchpad"

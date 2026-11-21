@@ -1,8 +1,8 @@
 {{- $dbHost := .Values.postgresql.fullnameOverride -}}
 {{- $dbSecret := .Values.dbSecretName -}}
 {{- $dbUser := "postgres" -}}
-{{- if not .Values.postgresql.enabled -}}
-{{- $dbHost = include "launchpad.isolatedDatabaseName" (dict "root" . "app" "launchpad") -}}
+{{- if .Values.isolatedDatabases.enabled -}}
+{{- $dbHost = .Values.isolatedDatabases.names.launchpad -}}
 {{- $dbSecret = printf "%s-secret" $dbHost -}}
 {{- $dbUser = "launchpad" -}}
 {{- end -}}
@@ -57,6 +57,7 @@ spec:
           env:
             - name: PORT
               value: {{ .Values.port | quote }}
+            {{- if or .Values.postgresql.enabled .Values.isolatedDatabases.enabled }}
             - name: DB_HOST
               value: {{ $dbHost }}
             - name: DB_USER
@@ -68,6 +69,16 @@ spec:
                   key: DB_PASSWORD
             - name: DB_NAME
               value: "launchpad"
+            {{- else }}
+            {{- $externalSecret := required "Set externalDatabase.existingSecret." .Values.externalDatabase.existingSecret }}
+            {{- range $key := list "DB_HOST" "DB_PORT" "DB_USER" "DB_PASSWORD" "DB_NAME" }}
+            - name: {{ $key }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $externalSecret }}
+                  key: {{ $key }}
+            {{- end }}
+            {{- end }}
             - name: KEYCLOAK_URL
               value: {{ include "keycloak.domain" . }}
             - name: KEYCLOAK_REALM

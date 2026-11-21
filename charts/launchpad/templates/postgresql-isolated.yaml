@@ -1,4 +1,7 @@
-{{- if not .Values.postgresql.enabled -}}
+{{- if .Values.isolatedDatabases.enabled -}}
+{{- if .Values.postgresql.enabled -}}
+{{- fail "Enable only one bundled PostgreSQL option." -}}
+{{- end -}}
 {{- $settings := .Values.isolatedDatabases -}}
 {{- $launchpadPassword := required "Set isolatedDatabases.passwords.launchpad." $settings.passwords.launchpad -}}
 {{- $keycloakPassword := required "Set isolatedDatabases.passwords.keycloak." $settings.passwords.keycloak -}}
@@ -16,7 +19,7 @@ data:
   init.sh: |-
     {{- .Files.Get "files/init-postgresql.sh" | nindent 4 }}
 {{- range $app, $password := dict "launchpad" $launchpadPassword "keycloak" $keycloakPassword }}
-{{- $name := include "launchpad.isolatedDatabaseName" (dict "root" $ "app" $app) }}
+{{- $name := required (printf "Set isolatedDatabases.names.%s." $app) (index $settings.names $app) }}
 ---
 apiVersion: v1
 kind: Secret
