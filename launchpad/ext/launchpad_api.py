@@ -127,7 +127,6 @@ class LaunchpadAdminApi:
         response = await self._http.post(
             f"{self._base_url}/auth/token",
             json={"username": self._username, "password": self._password},
-            ssl=False,
         )
         raw_response = await response.text(errors="ignore")
         try:
@@ -159,7 +158,6 @@ class LaunchpadAdminApi:
         response = await self._http.delete(
             f"{self._base_url}{path}",
             headers={"Authorization": f"Bearer {access_token}"},
-            ssl=False,
             **kwargs,
         )
         if response.status == 404:
@@ -186,7 +184,6 @@ class LaunchpadAdminApi:
         response = await self._http.get(
             f"{self._base_url}{path}",
             headers={"Authorization": f"Bearer {access_token}"},
-            ssl=False,
             **kwargs,
         )
         if response.status == 404:

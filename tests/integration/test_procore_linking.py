@@ -19,9 +19,13 @@ from scripts.keycloak.procore_linking import (
 @pytest.fixture(scope="module")
 def keycloak_admin() -> Iterator[KeycloakAdmin]:
     with (
-        DockerContainer("quay.io/keycloak/keycloak:26.3.0")
+        DockerContainer(
+            "quay.io/keycloak/keycloak:26.8.2-3"
+            "@sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3"
+        )
         .with_env("KC_BOOTSTRAP_ADMIN_USERNAME", "test-admin")
         .with_env("KC_BOOTSTRAP_ADMIN_PASSWORD", "test-password")
+        .with_env("KC_PROXY_HEADERS", "xforwarded")
         .with_exposed_ports(8080)
         .with_command("start-dev")
         .waiting_for(LogMessageWaitStrategy("Listening on:").with_startup_timeout(180))
@@ -31,6 +35,7 @@ def keycloak_admin() -> Iterator[KeycloakAdmin]:
             username="test-admin",
             password="test-password",
             realm_name="master",
+            custom_headers={"X-Forwarded-Proto": "https"},
             timeout=20,
         )
         yield admin

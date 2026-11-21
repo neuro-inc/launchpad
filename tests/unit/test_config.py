@@ -73,6 +73,21 @@ def test_environ_config_factory_create_postgres(mock_environ: None) -> None:
     )
 
 
+def test_postgres_password_with_uri_delimiters() -> None:
+    config = EnvironConfigFactory(
+        {
+            "DB_HOST": "db",
+            "DB_USER": "launchpad",
+            "DB_PASSWORD": "secret@:/%",
+            "DB_NAME": "launchpad",
+        }
+    ).create_postgres()
+    assert (
+        config.dsn
+        == "postgresql+asyncpg://launchpad:secret%40%3A%2F%25@db:5432/launchpad"
+    )
+
+
 def test_environ_config_factory_create_keycloak(mock_environ: None) -> None:
     factory = EnvironConfigFactory()
     config = factory.create_keycloak()

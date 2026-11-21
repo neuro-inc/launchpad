@@ -1,12 +1,9 @@
 """Verify explicit Procore configuration and migration isolation."""
 
 import json
-import subprocess
 from pathlib import Path
-from typing import Any
 
 import pytest
-import yaml
 from apolo_app_types import ApoloSecret
 from apolo_app_types.protocols.common import Preset
 from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
@@ -20,28 +17,62 @@ from apolo_apps_launchpad.types import (
 )
 from apolo_sdk import Client
 
+from .chart_helpers import CHART, render_chart
 
-ROOT = Path(__file__).resolve().parents[3]
 
-
-def render_chart(tmp_path: Path, overrides: dict[str, object]) -> list[dict[str, Any]]:
-    values = tmp_path / "values.yaml"
-    values.write_text(
-        yaml.safe_dump(
-            {
-                "apolo_app_id": "test-app",
-                "LAUNCHPAD_ADMIN_PASSWORD": "test-admin",
-                "dbPassword": "test-db",
-                "authResponseHeaders": ["X-Auth-Request-Email"],
-                **overrides,
-            }
-        )
+def test_keycloak_upgrade_preserves_service_and_realm_contract(tmp_path: Path) -> None:
+    name = "launchpad-test-app-keycloak"
+    resources = render_chart(
+        tmp_path,
+        {
+            "keycloak": {
+                "fullnameOverride": name,
+                "auth": {"adminPassword": "test-keycloak-admin"},
+            },
+            "keycloakRealmImportConfigMapName": f"{name}-realm",
+            "procoreAutomaticLinking": False,
+        },
     )
-    rendered = subprocess.check_output(
-        ["helm", "template", "test", str(ROOT / "charts/launchpad"), "-f", str(values)],
-        text=True,
+    indexed = {(item["kind"], item["metadata"]["name"]): item for item in resources}
+    statefulset = indexed["StatefulSet", name]["spec"]
+    selector = {
+        "app.kubernetes.io/name": "keycloak",
+        "app.kubernetes.io/instance": "test",
+        "app.kubernetes.io/component": "keycloak",
+    }
+    assert statefulset["selector"]["matchLabels"] == selector
+    assert statefulset["serviceName"] == f"{name}-headless"
+    assert statefulset["podManagementPolicy"] == "Parallel"
+    service = indexed["Service", name]
+    assert service["metadata"]["labels"]["service"] == "keycloak"
+    assert service["spec"]["selector"] == selector
+    assert service["spec"]["ports"] == [
+        {"name": "http", "port": 80, "targetPort": "http"}
+    ]
+    pod = statefulset["template"]["spec"]
+    (keycloak,) = pod["containers"]
+    assert keycloak["image"].startswith("quay.io/keycloak/keycloak:26.8.2-3@sha256:")
+    assert keycloak["readinessProbe"]["httpGet"]["port"] == "management"
+    assert {"name": "realm-import", "configMap": {"name": f"{name}-realm"}} in pod[
+        "volumes"
+    ]
+    assert keycloak["securityContext"]["readOnlyRootFilesystem"] is True
+    procore = indexed["Job", "launchpad-test-app-procore-linking"]["spec"]["template"][
+        "spec"
+    ]
+    assert procore["containers"][0]["args"][:2] == ["--server", f"http://{name}:80"]
+    password = next(
+        entry
+        for entry in keycloak["env"]
+        if entry["name"] == "KC_BOOTSTRAP_ADMIN_PASSWORD"
     )
-    return [item for item in yaml.safe_load_all(rendered) if item]
+    assert password["valueFrom"]["secretKeyRef"] == {
+        "name": name,
+        "key": "admin-password",
+    }
+    assert (
+        "checksum/keycloak-admin" in statefulset["template"]["metadata"]["annotations"]
+    )
 
 
 @pytest.mark.parametrize("enabled", [None, True, False])
@@ -78,9 +109,7 @@ def test_procore_chart_is_opt_in_and_mounts_only_keycloak_credentials(
             "image": {"digest": "sha256:" + "a" * 64},
         },
     )
-    definition = json.loads(
-        (ROOT / "charts/launchpad/files/procore-auto-link.json").read_text()
-    )
+    definition = json.loads((CHART / "files/procore-auto-link.json").read_text())
     realm_config = next(
         item
         for item in resources

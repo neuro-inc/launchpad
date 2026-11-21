@@ -8,7 +8,12 @@ from typing import TYPE_CHECKING, Annotated
 from urllib.parse import urlencode
 
 import backoff
-from aiohttp import ClientConnectionError, ClientResponseError, ClientSession
+from aiohttp import (
+    ClientConnectionError,
+    ClientResponseError,
+    ClientSession,
+    ClientSSLError,
+)
 from fastapi import Depends
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
@@ -115,7 +120,12 @@ class Oauth:
             "redirect_uri": self._callback_url,
             "code_verifier": code_verifier,
         }
-        access_token = await self._fetch_token(data)
+        try:
+            access_token = await self._fetch_token(data)
+        except ClientSSLError as error:
+            raise OauthError(
+                "Could not establish a trusted connection to Keycloak"
+            ) from error
 
         response = RedirectResponse(original_url)
         self.set_auth_cookie(response, access_token)
@@ -133,9 +143,10 @@ class Oauth:
     @backoff.on_exception(
         wait_gen=backoff.expo,
         exception=(ClientConnectionError, Retry),
+        giveup=lambda error: isinstance(error, ClientSSLError),
     )
     async def _fetch_token(self, data: dict[str, str]) -> str:
-        async with self._http.post(self._token_url, data=data, ssl=False) as response:
+        async with self._http.post(self._token_url, data=data) as response:
             try:
                 response.raise_for_status()
             except ClientResponseError as e:

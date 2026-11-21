@@ -5,7 +5,6 @@ Name of this particular launchpad instance
 {{- printf "launchpad-%s" .Values.apolo_app_id | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-
 {{/*
 Create chart name and version as used by the chart label.
 */}}
@@ -60,6 +59,21 @@ platform.apolo.us/component: app
 {{- define "keycloak.domain" -}}
 {{- printf "%s-keycloak.%s" (include "launchpad.name" .) .Values.domain }}
 {{- end }}
+
+{{/* Keep the Bitnami selectors so existing StatefulSets can be updated in place. */}}
+{{- define "keycloak.selectorLabels" -}}
+app.kubernetes.io/name: keycloak
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/component: keycloak
+{{- end -}}
+
+{{- define "keycloak.labels" -}}
+{{ include "keycloak.selectorLabels" . }}
+application: launchpad
+helm.sh/chart: {{ include "launchpad.chart" . }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/version: {{ .Values.keycloak.image.tag | quote }}
+{{- end -}}
 
 {{- define "launchpad.domainWithProtocol" -}}
 {{- if .Values.clientSubdomain }}

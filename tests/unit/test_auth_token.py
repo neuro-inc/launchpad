@@ -2,18 +2,35 @@ from __future__ import annotations
 
 import uuid
 from typing import Callable, Iterable, Optional
+from unittest.mock import MagicMock
 
+import jwt
 import pytest
 from starlette.requests import Request
+from yarl import URL
 
 from launchpad.auth.dependencies import (
     get_raw_token_from_request as _token_from_request,
+    token_from_string,
 )
 from launchpad.auth.oauth import Oauth
+from launchpad.config import KeycloakConfig
+from launchpad.errors import Unauthorized
 
 
 _TEST_APP_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 _TEST_COOKIE_TOKEN = f"launchpad-{_TEST_APP_ID.hex}-token"
+
+
+async def test_token_verifier_rejects_non_rs256_before_loading_jwks() -> None:
+    http = MagicMock()
+    config = KeycloakConfig(url=URL("https://keycloak.example.test"), realm="launchpad")
+    token = jwt.encode({}, "test-key-" * 4, algorithm="HS256", headers={"kid": "test"})
+
+    with pytest.raises(Unauthorized):
+        await token_from_string(http, config, token)
+
+    http.get.assert_not_called()
 
 
 def _normalize_headers(
