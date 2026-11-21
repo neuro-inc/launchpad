@@ -4,9 +4,16 @@ dbSecretName: launchpad-db-secret  # in real app will be f"launchpad-{apolo_app_
 keycloakRealmImportConfigMapName: launchpad-keycloak-realm  # in real app will be f"launchpad-{apolo_app_id}-keycloak-realm"
 
 isolatedDatabases:
+  enabled: false
   image: docker.io/library/postgres:17.12-bookworm@sha256:837bed18782820fe967067cb5328b02b0d9992c1be9a37ee0c9c492cfc03af3b
   storage: 8Gi
+  names: {}
   passwords: {}
+
+# Used by Launchpad when both bundled PostgreSQL options are disabled.
+externalDatabase:
+  # Secret keys are DB_HOST, DB_PORT, DB_NAME, DB_USER and DB_PASSWORD.
+  existingSecret: ""
 
 image:
   repository: "ghcr.io/neuro-inc/launchpad"
@@ -102,7 +109,7 @@ LAUNCHPAD_INITIAL_CONFIG: >
 # A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) * + , = @ skips the check; every other path needs a login.
 LAUNCHPAD_AUTH_BYPASS_PATH_PREFIXES: "/public,/api/webhooks"
 
-# Keep enabled for existing installations. The Apolo installer disables it on fresh installs.
+# The Apolo installer enables the shared database for legacy installations.
 postgresql:
   global:
     security:
@@ -110,7 +117,7 @@ postgresql:
   image:
     repository: bitnamilegacy/postgresql
     tag: 17.5.0-debian-12-r18
-  enabled: true
+  enabled: false
   fullnameOverride: launchpad-db  # in real app will be f"launchpad-{apolo_app_id}-db"
   commonAnnotations:
     argocd.argoproj.io/sync-wave: "0"
@@ -170,7 +177,7 @@ keycloak:
     user: "postgres"
     database: "keycloak"
     port: 5432
-    existingSecret: launchpad-db-secret # in real app will be f"launchpad-{apolo_app_id}-db-secret"
+    existingSecret: "" # Required when using an external database.
     existingSecretHostKey: "DB_HOST"
     existingSecretPasswordKey: "DB_PASSWORD"
   service:

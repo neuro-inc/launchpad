@@ -5,11 +5,6 @@ Name of this particular launchpad instance
 {{- printf "launchpad-%s" .Values.apolo_app_id | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
-{{- define "launchpad.isolatedDatabaseName" -}}
-{{- printf "%s-%s-db" (include "launchpad.name" .root | trunc 48 | trimSuffix "-") .app }}
-{{- end }}
-
-
 {{/*
 Create chart name and version as used by the chart label.
 */}}

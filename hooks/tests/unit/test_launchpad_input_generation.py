@@ -1,8 +1,10 @@
 import json
 import os
+from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
-from apolo_sdk import Cluster
+from apolo_sdk import Client, Cluster, ResourceNotFound
 
 from apolo_app_types import ApoloSecret, HuggingFaceToken
 from apolo_app_types.protocols.common import Preset
@@ -787,6 +789,7 @@ async def test_launchpad_values_generation__min(apolo_client):
         "dbPassword": f"keycloak-db-pswd-{APP_ID}-value",
         "dbSecretName": f"launchpad-{APP_ID}-db-secret",
         "postgresql": {
+            "enabled": True,
             "auth": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
             "fullnameOverride": f"launchpad-{APP_ID}-db",
         },
@@ -988,6 +991,7 @@ async def test_launchpad_values_generation__brand(apolo_client):
         "dbPassword": f"keycloak-db-pswd-{APP_ID}-value",
         "dbSecretName": f"launchpad-{APP_ID}-db-secret",
         "postgresql": {
+            "enabled": True,
             "auth": {"existingSecret": f"launchpad-{APP_ID}-db-secret"},
             "fullnameOverride": f"launchpad-{APP_ID}-db",
         },
@@ -1033,3 +1037,82 @@ async def test_launchpad_values_generation__subdomain(
     )
 
     assert helm_params["clientSubdomain"] is True
+
+
+@pytest.mark.parametrize("installation", ["fresh", "legacy", "missing-legacy-password"])
+async def test_installer_selects_databases_from_saved_credentials(
+    apolo_client: Client, monkeypatch: pytest.MonkeyPatch, installation: str
+) -> None:
+    app_id = "01234567-89ab-cdef-0123-456789abcdef"
+    stored = {}
+    if installation != "fresh":
+        stored[f"launchpad-admin-pswd-{app_id}"] = b"existing-admin"
+    if installation == "legacy":
+        stored[f"keycloak-db-pswd-{app_id}"] = b"shared-password"
+        stored[f"keycloak-isolated-db-pswd-{app_id}"] = b"unused-isolated-password"
+
+    async def get(key: str) -> bytes:
+        if key not in stored:
+            raise ResourceNotFound("Test secret is missing")
+        return stored[key]
+
+    async def add(key: str, value: bytes) -> None:
+        stored[key] = value
+
+    writer = AsyncMock(side_effect=add)
+    monkeypatch.setattr(apolo_client.secrets, "get", get)
+    monkeypatch.setattr(apolo_client.secrets, "add", writer)
+    monkeypatch.delenv("FRONTEND_IMAGE_DIGEST", raising=False)
+    processor = LaunchpadInputsProcessor(apolo_client)
+
+    async def values() -> dict[str, Any]:
+        return await processor.gen_extra_values(
+            input_=LaunchpadAppInputs(
+                launchpad_web_app_config=LaunchpadWebAppConfig(
+                    preset=Preset(name="cpu-small")
+                ),
+                apps_config=AppsConfig(
+                    quick_start_config=NoQuickStartConfig(no_quickstart=True)
+                ),
+            ),
+            app_name="test",
+            namespace="platform",
+            app_secrets_name="test-secrets",
+            app_id=app_id,
+        )
+
+    if installation == "missing-legacy-password":
+        with pytest.raises(
+            ValueError, match="Recover the saved PostgreSQL credentials"
+        ):
+            await values()
+        writer.assert_not_awaited()
+        return
+
+    first = await values()
+    if installation == "legacy":
+        assert first["dbPassword"] == "shared-password"
+        assert first["postgresql"]["enabled"] is True
+        assert first["postgresql"]["fullnameOverride"] == f"launchpad-{app_id}-db"
+        assert first["dbSecretName"] == f"launchpad-{app_id}-db-secret"
+        assert "isolatedDatabases" not in first
+        writer.assert_not_awaited()
+        return
+
+    stored[f"launchpad-admin-pswd-{app_id}"] = b"existing-admin"
+    second = await values()
+    assert second["postgresql"]["enabled"] is False
+    assert first["isolatedDatabases"]["enabled"] is True
+    assert second["isolatedDatabases"]["enabled"] is True
+    assert "dbPassword" not in second
+    names = first["isolatedDatabases"]["names"]
+    assert names == second["isolatedDatabases"]["names"]
+    assert names == {
+        "keycloak": f"launchpad-{app_id}-kc-db",
+        "launchpad": f"launchpad-{app_id}-lp-db",
+    }
+    assert all(len(f"{name}-0123456789") <= 63 for name in names.values())
+    passwords = first["isolatedDatabases"]["passwords"]
+    assert passwords == second["isolatedDatabases"]["passwords"]
+    assert passwords["launchpad"] != passwords["keycloak"]
+    assert writer.await_count == 2

@@ -17,6 +17,7 @@ def render_chart(tmp_path: Path, overrides: dict[str, object]) -> list[dict[str,
                 "LAUNCHPAD_ADMIN_PASSWORD": "test-admin",
                 "keycloak": {"auth": {"adminPassword": "test-keycloak-admin"}},
                 "dbPassword": "test-db",
+                "postgresql": {"enabled": True},
                 "authResponseHeaders": ["X-Auth-Request-Email"],
                 **overrides,
             }

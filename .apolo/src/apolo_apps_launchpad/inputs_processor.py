@@ -426,6 +426,7 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         database_values: dict[str, t.Any] = {
             "dbSecretName": db_secret_name,
             "postgresql": {
+                "enabled": shared_db_password is not None,
                 "fullnameOverride": f"launchpad-{app_id}-db",
                 "auth": {"existingSecret": db_secret_name},
             },
@@ -450,8 +451,14 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 raise ValueError(
                     "Recover the saved PostgreSQL credentials before upgrading this installation."
                 )
-            database_values["postgresql"]["enabled"] = False
+            # The StatefulSet name must leave room for the 11-character revision suffix.
+            db_name_prefix = f"launchpad-{app_id}"[:46].removesuffix("-")
             database_values["isolatedDatabases"] = {
+                "enabled": True,
+                "names": {
+                    "keycloak": f"{db_name_prefix}-kc-db",
+                    "launchpad": f"{db_name_prefix}-lp-db",
+                },
                 "passwords": {
                     "keycloak": await _isolated_db_password(
                         app_id, isolated_keycloak_key, saved_isolated_keycloak
