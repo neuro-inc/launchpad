@@ -3,6 +3,8 @@ APP_SECRET_KEYS = {
     "LAUNCHPAD": "launchpad-admin-pswd",
     "KEYCLOAK": "keycloak-admin-pswd",
     "KEYCLOAK_DB": "keycloak-db-pswd",
+    "KEYCLOAK_ISOLATED_DB": "keycloak-isolated-db-pswd",
+    "LAUNCHPAD_ISOLATED_DB": "launchpad-isolated-db-pswd",
 }
 
 # Keep synchronized with AUTH_RESPONSE_HEADERS in launchpad/auth/__init__.py.

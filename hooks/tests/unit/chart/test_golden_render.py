@@ -12,7 +12,7 @@ from apolo_apps_launchpad.types import (
     LaunchpadWebAppConfig,
     NoQuickStartConfig,
 )
-from apolo_sdk import Client
+from apolo_sdk import Client, ResourceNotFound
 
 
 CHART = Path(__file__).resolve().parents[4] / "charts/launchpad"
@@ -30,6 +30,13 @@ async def test_launchpad_chart_render_matches_golden(
     monkeypatch.setenv("APP_IMAGE_TAG", "0.0.0")
     monkeypatch.setenv("APP_IMAGE_DIGEST", "sha256:" + "a" * 64)
     monkeypatch.setenv("FRONTEND_IMAGE_DIGEST", "sha256:" + "b" * 64)
+
+    async def get_secret(key: str) -> bytes:
+        if key == "keycloak-db-pswd-golden-app":
+            raise ResourceNotFound("Fresh install has no shared database secret")
+        return f"{key}-value".encode()
+
+    monkeypatch.setattr(apolo_client.secrets, "get", get_secret)
     release = "launchpad-golden"
     namespace = "platform--test-org--test-project"
     values = await LaunchpadInputsProcessor(apolo_client).gen_extra_values(

@@ -1,34 +1,4 @@
 ---
-# Source: launchpad/charts/postgresql/templates/primary/networkpolicy.yaml
-kind: NetworkPolicy
-apiVersion: networking.k8s.io/v1
-metadata:
-  name: launchpad-golden-app-db
-  namespace: "platform--test-org--test-project"
-  labels:
-    app.kubernetes.io/instance: launchpad-golden
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 17.5.0
-    helm.sh/chart: postgresql-16.7.19
-    app.kubernetes.io/component: primary
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/instance: launchpad-golden
-      app.kubernetes.io/name: postgresql
-      app.kubernetes.io/component: primary
-  policyTypes:
-    - Ingress
-    - Egress
-  egress:
-    - {}
-  ingress:
-    - ports:
-        - port: 5432
----
 # Source: launchpad/templates/keycloak.yaml
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -49,28 +19,45 @@ spec:
         - port: 7800
   egress: [{}]
 ---
-# Source: launchpad/charts/postgresql/templates/primary/pdb.yaml
-apiVersion: policy/v1
-kind: PodDisruptionBudget
+# Source: launchpad/templates/postgresql-isolated.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
 metadata:
-  name: launchpad-golden-app-db
-  namespace: "platform--test-org--test-project"
-  labels:
-    app.kubernetes.io/instance: launchpad-golden
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 17.5.0
-    helm.sh/chart: postgresql-16.7.19
-    app.kubernetes.io/component: primary
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
+  name: launchpad-golden-app-keycloak-db
 spec:
-  maxUnavailable: 1
-  selector:
+  podSelector:
     matchLabels:
-      app.kubernetes.io/instance: launchpad-golden
-      app.kubernetes.io/name: postgresql
-      app.kubernetes.io/component: primary
+      app.kubernetes.io/name: launchpad-golden-app-keycloak-db
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: keycloak
+              app.kubernetes.io/instance: launchpad-golden
+              app.kubernetes.io/component: keycloak
+      ports:
+        - port: 5432
+---
+# Source: launchpad/templates/postgresql-isolated.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: launchpad-golden-app-launchpad-db
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: launchpad-golden-app-launchpad-db
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: launchpad-golden-app
+              app.kubernetes.io/instance: launchpad-golden
+              service: launchpad
+      ports:
+        - port: 5432
 ---
 # Source: launchpad/templates/keycloak.yaml
 apiVersion: policy/v1
@@ -86,22 +73,6 @@ spec:
       app.kubernetes.io/name: keycloak
       app.kubernetes.io/instance: launchpad-golden
       app.kubernetes.io/component: keycloak
----
-# Source: launchpad/charts/postgresql/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: launchpad-golden-app-db
-  namespace: "platform--test-org--test-project"
-  labels:
-    app.kubernetes.io/instance: launchpad-golden
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 17.5.0
-    helm.sh/chart: postgresql-16.7.19
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-automountServiceAccountToken: false
 ---
 # Source: launchpad/templates/keycloak.yaml
 apiVersion: v1
@@ -142,39 +113,33 @@ type: Opaque
 data:
   admin-password: "a2V5Y2xvYWstYWRtaW4tcHN3ZC1nb2xkZW4tYXBwLXZhbHVl"
 ---
-# Source: launchpad/templates/secret-db.yaml
+# Source: launchpad/templates/postgresql-isolated.yaml
 apiVersion: v1
 kind: Secret
 metadata:
-  name: launchpad-golden-app-db-secret
+  name: launchpad-golden-app-keycloak-db-secret
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 type: Opaque
 stringData:
-  DB_HOST: "launchpad-golden-app-db"
-  DB_PORT: "5432"
-  DB_USER: "postgres"
-  DB_NAME: "postgres"
-  DB_PASSWORD: "keycloak-db-pswd-golden-app-value"
+  DB_HOST: "launchpad-golden-app-keycloak-db"
+  DB_USER: "keycloak"
+  DB_NAME: "keycloak"
+  DB_PASSWORD: "keycloak-isolated-db-pswd-golden-app-value"
 ---
-# Source: launchpad/charts/postgresql/templates/primary/initialization-configmap.yaml
+# Source: launchpad/templates/postgresql-isolated.yaml
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: launchpad-golden-app-db-init-scripts
-  namespace: "platform--test-org--test-project"
-  labels:
-    app.kubernetes.io/instance: launchpad-golden
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 17.5.0
-    helm.sh/chart: postgresql-16.7.19
+  name: launchpad-golden-app-launchpad-db-secret
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
-data:
-  create_dbs.sql: |
-    CREATE DATABASE keycloak;
-    CREATE DATABASE launchpad;
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+stringData:
+  DB_HOST: "launchpad-golden-app-launchpad-db"
+  DB_USER: "launchpad"
+  DB_NAME: "launchpad"
+  DB_PASSWORD: "launchpad-isolated-db-pswd-golden-app-value"
 ---
 # Source: launchpad/templates/configmap-keycloak-realm.yaml
 # NOTE:
@@ -2711,64 +2676,27 @@ data:
       }
     }
 ---
-# Source: launchpad/charts/postgresql/templates/primary/svc-headless.yaml
+# Source: launchpad/templates/postgresql-isolated.yaml
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: launchpad-golden-app-db-hl
-  namespace: "platform--test-org--test-project"
-  labels:
-    app.kubernetes.io/instance: launchpad-golden
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 17.5.0
-    helm.sh/chart: postgresql-16.7.19
-    app.kubernetes.io/component: primary
+  name: launchpad-golden-app-postgresql-init
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
-spec:
-  type: ClusterIP
-  clusterIP: None
-  # We want all pods in the StatefulSet to have their addresses published for
-  # the sake of the other Postgresql pods even before they're ready, since they
-  # have to be able to talk to each other in order to become ready.
-  publishNotReadyAddresses: true
-  ports:
-    - name: tcp-postgresql
-      port: 5432
-      targetPort: tcp-postgresql
-  selector:
-    app.kubernetes.io/instance: launchpad-golden
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: primary
----
-# Source: launchpad/charts/postgresql/templates/primary/svc.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: launchpad-golden-app-db
-  namespace: "platform--test-org--test-project"
-  labels:
-    app.kubernetes.io/instance: launchpad-golden
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 17.5.0
-    helm.sh/chart: postgresql-16.7.19
-    app.kubernetes.io/component: primary
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-spec:
-  type: ClusterIP
-  sessionAffinity: None
-  ports:
-    - name: tcp-postgresql
-      port: 5432
-      targetPort: tcp-postgresql
-      nodePort: null
-  selector:
-    app.kubernetes.io/instance: launchpad-golden
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: primary
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  init.sh: |-
+    #!/bin/sh
+    set -eu
+
+    psql -Xw --username postgres --dbname "$POSTGRES_DB" --set ON_ERROR_STOP=1 --single-transaction --file - <<'SQL'
+    \getenv app_role DB_USER
+    \getenv app_password DB_PASSWORD
+    \getenv app_db POSTGRES_DB
+    CREATE ROLE :"app_role" LOGIN NOSUPERUSER NOCREATEROLE NOCREATEDB PASSWORD :'app_password';
+    ALTER DATABASE :"app_db" OWNER TO :"app_role";
+    REVOKE CONNECT ON DATABASE postgres, template1 FROM PUBLIC;
+    ALTER ROLE postgres PASSWORD NULL;
+    SQL
 ---
 # Source: launchpad/templates/keycloak.yaml
 apiVersion: v1
@@ -2815,6 +2743,34 @@ spec:
     - name: http
       port: 8080
       targetPort: http
+---
+# Source: launchpad/templates/postgresql-isolated.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: launchpad-golden-app-keycloak-db
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: launchpad-golden-app-keycloak-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+# Source: launchpad/templates/postgresql-isolated.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: launchpad-golden-app-launchpad-db
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: launchpad-golden-app-launchpad-db
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
 ---
 # Source: launchpad/templates/service-client.yaml
 apiVersion: v1
@@ -3002,13 +2958,13 @@ spec:
             - name: PORT
               value: "8080"
             - name: DB_HOST
-              value: launchpad-golden-app-db
+              value: launchpad-golden-app-launchpad-db
             - name: DB_USER
-              value: "postgres"
+              value: "launchpad"
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: launchpad-golden-app-db-secret
+                  name: launchpad-golden-app-launchpad-db-secret
                   key: DB_PASSWORD
             - name: DB_NAME
               value: "launchpad"
@@ -3065,203 +3021,6 @@ spec:
           key: node.kubernetes.io/unreachable
           operator: Exists
           tolerationSeconds: 300
----
-# Source: launchpad/charts/postgresql/templates/primary/statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: launchpad-golden-app-db
-  namespace: "platform--test-org--test-project"
-  labels:
-    app.kubernetes.io/instance: launchpad-golden
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/version: 17.5.0
-    helm.sh/chart: postgresql-16.7.19
-    app.kubernetes.io/component: primary
-  annotations:
-    argocd.argoproj.io/sync-wave: "0"
-spec:
-  replicas: 1
-  serviceName: launchpad-golden-app-db-hl
-  updateStrategy:
-    rollingUpdate: {}
-    type: RollingUpdate
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: launchpad-golden
-      app.kubernetes.io/name: postgresql
-      app.kubernetes.io/component: primary
-  template:
-    metadata:
-      name: launchpad-golden-app-db
-      labels:
-        app.kubernetes.io/instance: launchpad-golden
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/name: postgresql
-        app.kubernetes.io/version: 17.5.0
-        helm.sh/chart: postgresql-16.7.19
-        app.kubernetes.io/component: primary
-    spec:
-      serviceAccountName: launchpad-golden-app-db
-
-      automountServiceAccountToken: false
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: platform.neuromation.io/job
-                operator: In
-                values:
-                - "true"
-      tolerations:
-        - effect: NoSchedule
-          key: platform.neuromation.io/job
-          operator: Exists
-        - effect: NoExecute
-          key: node.kubernetes.io/not-ready
-          operator: Exists
-          tolerationSeconds: 300
-        - effect: NoExecute
-          key: node.kubernetes.io/unreachable
-          operator: Exists
-          tolerationSeconds: 300
-      securityContext:
-        fsGroup: 1001
-        fsGroupChangePolicy: Always
-        supplementalGroups: []
-        sysctls: []
-      hostNetwork: false
-      hostIPC: false
-      containers:
-        - name: postgresql
-          image: docker.io/bitnamilegacy/postgresql:17.5.0-debian-12-r18
-          imagePullPolicy: "IfNotPresent"
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-              - ALL
-            privileged: false
-            readOnlyRootFilesystem: true
-            runAsGroup: 1001
-            runAsNonRoot: true
-            runAsUser: 1001
-            seLinuxOptions: {}
-            seccompProfile:
-              type: RuntimeDefault
-          env:
-            - name: BITNAMI_DEBUG
-              value: "false"
-            - name: POSTGRESQL_PORT_NUMBER
-              value: "5432"
-            - name: POSTGRESQL_VOLUME_DIR
-              value: "/bitnami/postgresql"
-            - name: PGDATA
-              value: "/bitnami/postgresql/data"
-            # Authentication
-            - name: POSTGRES_PASSWORD_FILE
-              value: /opt/bitnami/postgresql/secrets/DB_PASSWORD
-            - name: POSTGRES_DATABASE
-              value: "postgres"
-            # LDAP
-            - name: POSTGRESQL_ENABLE_LDAP
-              value: "no"
-            # TLS
-            - name: POSTGRESQL_ENABLE_TLS
-              value: "no"
-            # Audit
-            - name: POSTGRESQL_LOG_HOSTNAME
-              value: "false"
-            - name: POSTGRESQL_LOG_CONNECTIONS
-              value: "false"
-            - name: POSTGRESQL_LOG_DISCONNECTIONS
-              value: "false"
-            - name: POSTGRESQL_PGAUDIT_LOG_CATALOG
-              value: "off"
-            # Others
-            - name: POSTGRESQL_CLIENT_MIN_MESSAGES
-              value: "error"
-            - name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES
-              value: "pgaudit"
-          ports:
-            - name: tcp-postgresql
-              containerPort: 5432
-          livenessProbe:
-            failureThreshold: 6
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 5
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - exec pg_isready -U "postgres" -d "dbname=postgres" -h 127.0.0.1 -p 5432
-          readinessProbe:
-            failureThreshold: 6
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 5
-            exec:
-              command:
-                - /bin/sh
-                - -c
-                - -e
-                - |
-                  exec pg_isready -U "postgres" -d "dbname=postgres" -h 127.0.0.1 -p 5432
-          resources:
-            limits:
-              cpu: 150m
-              ephemeral-storage: 2Gi
-              memory: 192Mi
-            requests:
-              cpu: 100m
-              ephemeral-storage: 50Mi
-              memory: 128Mi
-          volumeMounts:
-            - name: empty-dir
-              mountPath: /tmp
-              subPath: tmp-dir
-            - name: empty-dir
-              mountPath: /opt/bitnami/postgresql/conf
-              subPath: app-conf-dir
-            - name: empty-dir
-              mountPath: /opt/bitnami/postgresql/tmp
-              subPath: app-tmp-dir
-            - name: custom-init-scripts
-              mountPath: /docker-entrypoint-initdb.d/
-            - name: postgresql-password
-              mountPath: /opt/bitnami/postgresql/secrets/
-            - name: dshm
-              mountPath: /dev/shm
-            - name: data
-              mountPath: /bitnami/postgresql
-      volumes:
-        - name: empty-dir
-          emptyDir: {}
-        - name: postgresql-password
-          secret:
-            secretName: launchpad-golden-app-db-secret
-        - name: custom-init-scripts
-          configMap:
-            name: launchpad-golden-app-db-init-scripts
-        - name: dshm
-          emptyDir:
-            medium: Memory
-  volumeClaimTemplates:
-    - apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
-        name: data
-      spec:
-        accessModes:
-          - "ReadWriteOnce"
-        resources:
-          requests:
-            storage: "8Gi"
 ---
 # Source: launchpad/templates/keycloak.yaml
 apiVersion: apps/v1
@@ -3418,18 +3177,18 @@ spec:
             - name: KC_DB_URL_HOST
               valueFrom:
                 secretKeyRef:
-                  name: launchpad-golden-app-db-secret
+                  name: launchpad-golden-app-keycloak-db-secret
                   key: DB_HOST
             - name: KC_DB_URL_PORT
               value: "5432"
             - name: KC_DB_URL_DATABASE
               value: "keycloak"
             - name: KC_DB_USERNAME
-              value: "postgres"
+              value: "keycloak"
             - name: KC_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: launchpad-golden-app-db-secret
+                  name: launchpad-golden-app-keycloak-db-secret
                   key: DB_PASSWORD
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
               value: "admin"
@@ -3477,6 +3236,206 @@ spec:
         - name: realm-import
           configMap:
             name: launchpad-golden-app-keycloak-realm
+---
+# Source: launchpad/templates/postgresql-isolated.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: launchpad-golden-app-keycloak-db
+spec:
+  serviceName: launchpad-golden-app-keycloak-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: launchpad-golden-app-keycloak-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: launchpad-golden-app-keycloak-db
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: platform.neuromation.io/job
+                operator: In
+                values:
+                - "true"
+      tolerations:
+        - effect: NoSchedule
+          key: platform.neuromation.io/job
+          operator: Exists
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      containers:
+        - name: postgres
+          image: "docker.io/library/postgres:17.12-bookworm@sha256:837bed18782820fe967067cb5328b02b0d9992c1be9a37ee0c9c492cfc03af3b"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          command: ["/bin/bash", "-euc"]
+          args:
+            - |
+              # The official entrypoint requires a bootstrap password. Init removes it before TCP starts.
+              export POSTGRES_PASSWORD="$(head -c 32 /dev/urandom | base64)"
+              exec docker-entrypoint.sh postgres
+          envFrom:
+            - secretRef:
+                name: launchpad-golden-app-keycloak-db-secret
+          env:
+            - name: POSTGRES_DB
+              value: "keycloak"
+            - name: POSTGRES_INITDB_ARGS
+              value: "--auth-local=peer --auth-host=scram-sha-256"
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - PGPASSWORD="$DB_PASSWORD" psql -Xw -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -Atqc 'SELECT 1'
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init
+          configMap:
+            name: launchpad-golden-app-postgresql-init
+            defaultMode: 0555
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: "8Gi"
+---
+# Source: launchpad/templates/postgresql-isolated.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: launchpad-golden-app-launchpad-db
+spec:
+  serviceName: launchpad-golden-app-launchpad-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: launchpad-golden-app-launchpad-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: launchpad-golden-app-launchpad-db
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: platform.neuromation.io/job
+                operator: In
+                values:
+                - "true"
+      tolerations:
+        - effect: NoSchedule
+          key: platform.neuromation.io/job
+          operator: Exists
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 300
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 300
+      containers:
+        - name: postgres
+          image: "docker.io/library/postgres:17.12-bookworm@sha256:837bed18782820fe967067cb5328b02b0d9992c1be9a37ee0c9c492cfc03af3b"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          command: ["/bin/bash", "-euc"]
+          args:
+            - |
+              # The official entrypoint requires a bootstrap password. Init removes it before TCP starts.
+              export POSTGRES_PASSWORD="$(head -c 32 /dev/urandom | base64)"
+              exec docker-entrypoint.sh postgres
+          envFrom:
+            - secretRef:
+                name: launchpad-golden-app-launchpad-db-secret
+          env:
+            - name: POSTGRES_DB
+              value: "launchpad"
+            - name: POSTGRES_INITDB_ARGS
+              value: "--auth-local=peer --auth-host=scram-sha-256"
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - PGPASSWORD="$DB_PASSWORD" psql -Xw -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -Atqc 'SELECT 1'
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init
+          configMap:
+            name: launchpad-golden-app-postgresql-init
+            defaultMode: 0555
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: "8Gi"
 ---
 # Source: launchpad/templates/cleanup-job-apps.yaml
 apiVersion: batch/v1

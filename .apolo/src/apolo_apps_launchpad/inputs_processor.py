@@ -91,6 +91,23 @@ def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
     return "".join(secrets.choice(PASSWORD_CHAR_POOL) for _ in range(length))
 
 
+async def _stored_secret(app_id: str, key: str) -> str | None:
+    try:
+        return await get_apolo_secret(app_instance_id=app_id, key=key)
+    except apolo_sdk.ResourceNotFound:
+        return None
+
+
+async def _isolated_db_password(app_id: str, key: str, stored: str | None) -> str:
+    if stored is not None:
+        return stored
+    password = _generate_password(32)
+    await create_apolo_secret_with_retry(
+        app_instance_id=app_id, key=key, value=password
+    )
+    return password
+
+
 class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
     async def get_vllm_inputs(
         self,
@@ -389,26 +406,63 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 extra_env["BRANDING_BACKGROUND"] = input_.branding.background.hex_code
 
         ### KEYCLOAK CONFIGURATION ###
-        try:
-            keycloak_admin_password = await get_apolo_secret(
-                app_instance_id=app_id, key=APP_SECRET_KEYS["KEYCLOAK"]
+        saved_keycloak_admin = await _stored_secret(app_id, APP_SECRET_KEYS["KEYCLOAK"])
+        keycloak_admin_password = (
+            saved_keycloak_admin
+            if saved_keycloak_admin is not None
+            else _generate_password()
+        )
+        shared_db_password = await _stored_secret(
+            app_id, APP_SECRET_KEYS["KEYCLOAK_DB"]
+        )
+        saved_launchpad_admin = await _stored_secret(
+            app_id, APP_SECRET_KEYS["LAUNCHPAD"]
+        )
+        launchpad_admin_password = (
+            saved_launchpad_admin
+            if saved_launchpad_admin is not None
+            else _generate_password()
+        )
+        database_values: dict[str, t.Any] = {
+            "dbSecretName": db_secret_name,
+            "postgresql": {
+                "fullnameOverride": f"launchpad-{app_id}-db",
+                "auth": {"existingSecret": db_secret_name},
+            },
+        }
+        # The legacy output secret identifies installs already using the shared PVC.
+        if shared_db_password is not None:
+            if not shared_db_password:
+                raise ValueError("The saved shared PostgreSQL password is empty.")
+            database_values["dbPassword"] = shared_db_password
+        else:
+            isolated_keycloak_key = APP_SECRET_KEYS["KEYCLOAK_ISOLATED_DB"]
+            isolated_launchpad_key = APP_SECRET_KEYS["LAUNCHPAD_ISOLATED_DB"]
+            saved_isolated_keycloak = await _stored_secret(
+                app_id, isolated_keycloak_key
             )
-        except apolo_sdk.ResourceNotFound:
-            keycloak_admin_password = _generate_password()
-
-        try:
-            keycloak_db_password = await get_apolo_secret(
-                app_instance_id=app_id, key=APP_SECRET_KEYS["KEYCLOAK_DB"]
+            saved_isolated_launchpad = await _stored_secret(
+                app_id, isolated_launchpad_key
             )
-        except apolo_sdk.ResourceNotFound:
-            keycloak_db_password = _generate_password()
-
-        try:
-            launchpad_admin_password = await get_apolo_secret(
-                app_instance_id=app_id, key=APP_SECRET_KEYS["LAUNCHPAD"]
-            )
-        except apolo_sdk.ResourceNotFound:
-            launchpad_admin_password = _generate_password()
+            if (
+                saved_keycloak_admin is not None or saved_launchpad_admin is not None
+            ) and not (saved_isolated_keycloak and saved_isolated_launchpad):
+                raise ValueError(
+                    "Recover the saved PostgreSQL credentials before upgrading this installation."
+                )
+            database_values["postgresql"]["enabled"] = False
+            database_values["isolatedDatabases"] = {
+                "passwords": {
+                    "keycloak": await _isolated_db_password(
+                        app_id, isolated_keycloak_key, saved_isolated_keycloak
+                    ),
+                    "launchpad": await _isolated_db_password(
+                        app_id,
+                        isolated_launchpad_key,
+                        saved_isolated_launchpad,
+                    ),
+                },
+            }
 
         backend_image = {"tag": os.getenv("APP_IMAGE_TAG", "latest")}
         backend_digest = os.getenv("APP_IMAGE_DIGEST", "")
@@ -540,18 +594,11 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         return {
             **values,
             **frontend_values,
+            **database_values,
             "authResponseHeaders": list(AUTH_RESPONSE_HEADERS),
             "image": backend_image,
-            "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": kc_realm_import_config_map_name,
             "procoreAutomaticLinking": input_.procore_settings.automatic_linking,
-            "postgresql": {
-                "fullnameOverride": f"launchpad-{app_id}-db",
-                "auth": {
-                    "existingSecret": db_secret_name,
-                },
-            },
-            "dbPassword": keycloak_db_password,
             "extraEnv": extra_env,
             "domain": domain,
             "keycloak": keycloak_values,  # keeping this for backwards compatibility

@@ -42,6 +42,11 @@ class ReleaseWorkflowTests(unittest.TestCase):
         self.outputs.unlink(missing_ok=True)
         self.requests.unlink(missing_ok=True)
         mock = """
+            git() {
+              [ "$*" = "show $RELEASE_REVISION:CHANGELOG.md" ] || return 99
+              [ -n "$MOCK_CHANGELOG" ] || return 128
+              printf '%s\\n' "$MOCK_CHANGELOG"
+            }
             gh() {
               printf '%s\\n' "$*" >> "$REQUESTS"
               case "$1 $2" in
@@ -72,6 +77,7 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 "MOCK_RUN_ID": "42",
                 "MOCK_RUN": json.dumps(self.run_metadata),
                 "MOCK_ARTIFACT_IDS": "123",
+                "MOCK_CHANGELOG": "",
                 "RUNNER_TEMP": str(self.root),
                 "RELEASE_TAG": "v1.2.3",
                 "REQUESTS": str(self.requests),
@@ -160,16 +166,48 @@ class ReleaseWorkflowTests(unittest.TestCase):
                 if create == "true":
                     self.assertTrue(requests[0].startswith("release create v1.2.3 "))
                     self.assertIn("--verify-tag --draft", requests[0])
+                    self.assertEqual(
+                        (upload.parent / "notes.md").read_text().strip(),
+                        "Publish the tested Launchpad App image and chart combination.",
+                    )
                 else:
                     self.assertTrue(requests[0].startswith("release upload v1.2.3 "))
 
     def test_release_storage_errors_fail_the_step(self) -> None:
+        (self.root / "launchpad-release").mkdir()
         result = self.execute(
             "Save the original release assets",
             CREATE_RELEASE="true",
             MOCK_RELEASE_FAILURE="1",
         )
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(self.requests.read_text().startswith("release create "))
+
+    def test_release_notes_use_only_the_tagged_versions_changelog_section(self) -> None:
+        notes = self.root / "launchpad-release/notes.md"
+        notes.parent.mkdir()
+        result = self.execute(
+            "Save the original release assets",
+            CREATE_RELEASE="true",
+            MOCK_CHANGELOG=textwrap.dedent("""\
+                # Apolo Launchpad 1.2.30 (2026-11-21)
+
+                Later changes
+
+                # Apolo Launchpad 1.2.3 (2026-11-20)
+
+                ## Features
+
+                - Tagged changes
+
+                # Apolo Launchpad 1.2.2 (2026-11-19)
+
+                Earlier changes
+                """),
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(notes.read_text().strip(), "## Features\n\n- Tagged changes")
+        self.assertIn(f"--notes-file {notes}", self.requests.read_text())
 
 
 if __name__ == "__main__":

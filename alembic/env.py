@@ -103,7 +103,7 @@ def update_config_with_asyncpg_schema():
     sqlalchemy_url = config.get_main_option("sqlalchemy.url")
     if not sqlalchemy_url:
         db_config = EnvironConfigFactory().create_postgres()
-        config.set_main_option("sqlalchemy.url", db_config.dsn)
+        config.set_main_option("sqlalchemy.url", db_config.dsn.replace("%", "%%"))
 
 
 def update_config_with_plain_schema() -> None:
@@ -112,7 +112,7 @@ def update_config_with_plain_schema() -> None:
 
     db_config = EnvironConfigFactory().create_postgres()
     postgres_dsn = DSN.with_plain_schema(db_config.dsn)
-    config.set_main_option("sqlalchemy.url", postgres_dsn)
+    config.set_main_option("sqlalchemy.url", postgres_dsn.replace("%", "%%"))
 
 
 if context.is_offline_mode():

@@ -7,6 +7,7 @@ from base64 import b64decode
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
 from dotenv import load_dotenv
@@ -140,7 +141,7 @@ class EnvironConfigFactory:
         try:
             db_host = self._environ["DB_HOST"]
             db_user = self._environ["DB_USER"]
-            db_password = self._environ["DB_PASSWORD"]
+            db_password = quote(self._environ["DB_PASSWORD"], safe="")
             db_name = self._environ["DB_NAME"]
             db_port = self._environ.get("DB_PORT", 5432)
             postgres_dsn = (

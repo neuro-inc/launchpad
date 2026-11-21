@@ -1,0 +1,1 @@
+Upgrade bundled Keycloak to the official Quay image for 26.8.2-3 to remediate Java4Shell (CVE-2026-114938). Remove the default Keycloak bootstrap password, restore TLS certificate verification for upstream calls, and restrict Keycloak token verification to RS256.

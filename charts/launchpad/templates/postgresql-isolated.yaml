@@ -1,0 +1,150 @@
+{{- if not .Values.postgresql.enabled -}}
+{{- $settings := .Values.isolatedDatabases -}}
+{{- $launchpadPassword := required "Set isolatedDatabases.passwords.launchpad." $settings.passwords.launchpad -}}
+{{- $keycloakPassword := required "Set isolatedDatabases.passwords.keycloak." $settings.passwords.keycloak -}}
+{{- if eq $launchpadPassword $keycloakPassword -}}
+{{- fail "The isolated databases require distinct passwords." -}}
+{{- end -}}
+{{- $initScript := printf "%s-postgresql-init" (include "launchpad.name" .) -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $initScript }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  init.sh: |-
+    {{- .Files.Get "files/init-postgresql.sh" | nindent 4 }}
+{{- range $app, $password := dict "launchpad" $launchpadPassword "keycloak" $keycloakPassword }}
+{{- $name := include "launchpad.isolatedDatabaseName" (dict "root" $ "app" $app) }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}-secret
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+stringData:
+  DB_HOST: {{ $name | quote }}
+  DB_USER: {{ $app | quote }}
+  DB_NAME: {{ $app | quote }}
+  DB_PASSWORD: {{ $password | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- if eq $app "keycloak" }}
+              {{- include "keycloak.selectorLabels" $ | nindent 14 }}
+              {{- else }}
+              {{- include "launchpad.selectorLabels" $ | nindent 14 }}
+              {{- end }}
+      ports:
+        - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $name }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      affinity:
+        {{- toYaml $.Values.postgresql.primary.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml $.Values.postgresql.primary.tolerations | nindent 8 }}
+      containers:
+        - name: postgres
+          image: {{ $settings.image | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          command: ["/bin/bash", "-euc"]
+          args:
+            - |
+              # The official entrypoint requires a bootstrap password. Init removes it before TCP starts.
+              export POSTGRES_PASSWORD="$(head -c 32 /dev/urandom | base64)"
+              exec docker-entrypoint.sh postgres
+          envFrom:
+            - secretRef:
+                name: {{ $name }}-secret
+          env:
+            - name: POSTGRES_DB
+              value: {{ $app | quote }}
+            - name: POSTGRES_INITDB_ARGS
+              value: "--auth-local=peer --auth-host=scram-sha-256"
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -ec
+                - PGPASSWORD="$DB_PASSWORD" psql -Xw -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -Atqc 'SELECT 1'
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+      volumes:
+        - name: init
+          configMap:
+            name: {{ $initScript }}
+            defaultMode: 0555
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ $settings.storage | quote }}
+{{- end }}
+{{- end }}
