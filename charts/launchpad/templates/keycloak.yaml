@@ -2,6 +2,10 @@
 {{- $name := $kc.fullnameOverride -}}
 {{- $auth := $kc.auth -}}
 {{- $db := $kc.externalDatabase -}}
+{{- if not .Values.postgresql.enabled -}}
+{{- $dbHost := include "launchpad.isolatedDatabaseName" (dict "root" . "app" "keycloak") -}}
+{{- $db = dict "existingSecret" (printf "%s-secret" $dbHost) "existingSecretHostKey" "DB_HOST" "existingSecretPasswordKey" "DB_PASSWORD" "user" "keycloak" "database" "keycloak" "port" 5432 -}}
+{{- end -}}
 {{- $passwordKey := $auth.passwordSecretKey | default "admin-password" -}}
 {{- $image := printf "%s:%s@%s" $kc.image.repository $kc.image.tag $kc.image.digest -}}
 {{- $adminPassword := "" -}}

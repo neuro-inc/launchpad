@@ -1,3 +1,11 @@
+{{- $dbHost := .Values.postgresql.fullnameOverride -}}
+{{- $dbSecret := .Values.dbSecretName -}}
+{{- $dbUser := "postgres" -}}
+{{- if not .Values.postgresql.enabled -}}
+{{- $dbHost = include "launchpad.isolatedDatabaseName" (dict "root" . "app" "launchpad") -}}
+{{- $dbSecret = printf "%s-secret" $dbHost -}}
+{{- $dbUser = "launchpad" -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -50,13 +58,13 @@ spec:
             - name: PORT
               value: {{ .Values.port | quote }}
             - name: DB_HOST
-              value: {{ .Values.postgresql.fullnameOverride }}
+              value: {{ $dbHost }}
             - name: DB_USER
-              value: "postgres"
+              value: {{ $dbUser | quote }}
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.dbSecretName }}
+                  name: {{ $dbSecret }}
                   key: DB_PASSWORD
             - name: DB_NAME
               value: "launchpad"

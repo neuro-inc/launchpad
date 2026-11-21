@@ -1,0 +1,6 @@
+[tool.towncrier]
+    directory = "CHANGELOG.D"
+    filename = "CHANGELOG.md"
+    name = "Apolo Launchpad"
+    issue_format = "[#{issue}](https://github.com/neuro-inc/launchpad/pull/{issue})"
+    start_string = "[comment]: # (towncrier release notes start)\n"

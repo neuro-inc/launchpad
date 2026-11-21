@@ -1,5 +1,5 @@
 import pytest
-from apolo_sdk import Client, Cluster, AppsConfig
+from apolo_sdk import Client, Cluster, AppsConfig, ResourceNotFound
 from yarl import URL
 
 # Register pytest plugins for fixtures
@@ -36,6 +36,8 @@ def apolo_client(setup_clients: Client, apolo_cluster_config: Cluster):
     apolo_sdk_client = setup_clients
 
     async def _get_secret(key: str) -> bytes:
+        if "-isolated-db-pswd-" in key:
+            raise ResourceNotFound(f"Test fixture has no {key} secret")
         return f"{key}-value".encode()
 
     apolo_sdk_client.config.clusters = {apolo_cluster_config.name: apolo_cluster_config}

@@ -8,5 +8,5 @@ def sync_db(dsn: str) -> None:
     alembic_cfg = Config()
     script_location = str(Path(__file__).parent.parent.parent / "alembic")
     alembic_cfg.set_main_option("script_location", script_location)
-    alembic_cfg.set_main_option("sqlalchemy.url", dsn)
+    alembic_cfg.set_main_option("sqlalchemy.url", dsn.replace("%", "%%"))
     command.upgrade(alembic_cfg, "head")
