@@ -79,7 +79,7 @@ jobs:
         uses: codecov/codecov-action@v7
         if: always()
         with:
-          files: .coverage.unit.xml
+          files: coverage-unit.xml
           flags: unit
           name: unit-tests
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -89,7 +89,7 @@ jobs:
         uses: codecov/codecov-action@v7
         if: always()
         with:
-          files: .coverage.integration.xml
+          files: coverage-integration.xml
           flags: integration
           name: integration-tests
           token: ${{ secrets.CODECOV_TOKEN }}

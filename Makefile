@@ -34,11 +34,11 @@ lint: format
 
 .PHONY: test-unit
 test-unit:
-	poetry run pytest -vvs --cov=launchpad --cov-report xml:.coverage.unit.xml tests/unit
+	poetry run pytest -vvs --cov=launchpad --cov-report xml:coverage-unit.xml tests/unit
 
 .PHONY: test-integration
 test-integration:
-	poetry run pytest -vv --cov=launchpad --cov-report xml:.coverage.integration.xml tests/integration
+	poetry run pytest -vv --cov=launchpad --cov-report xml:coverage-integration.xml tests/integration
 
 .PHONY: test-hooks
 test-hooks:
