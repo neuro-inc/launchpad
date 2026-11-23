@@ -129,6 +129,8 @@ async def test_view_post_authorize_forwards_groups_and_roles_separately(
         ("/api/webhooksx", ["/api/webhooks"], False),
         ("/x", ["/public", "/api/webhooks"], False),
         ("/public", ["public/"], True),
+        ("/", ["/"], True),
+        ("/", ["/public"], False),
     ],
 )
 def test_is_auth_bypass_path(path: str, prefixes: list[str], expected: bool) -> None:
