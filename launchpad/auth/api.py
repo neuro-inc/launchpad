@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Any, Mapping
 from urllib.parse import urlparse, urlsplit, urlunsplit
 
@@ -59,8 +60,27 @@ def _normalize_prefix(prefix: str) -> str:
     return normalized
 
 
-def _is_auth_bypass_path(request_path: str, prefixes: list[str]) -> bool:
-    if not request_path:
+_CANONICAL_PATH_SEGMENT = re.compile(r"[A-Za-z0-9._~!$&'()*+,=@-]+")
+
+
+def _canonical_path(request_uri: str) -> str | None:
+    path = request_uri.partition("?")[0]
+    if path == "/":
+        return path
+    if not path.startswith("/"):
+        return None
+    segments = path[1:].split("/")
+    if len(segments) > 1 and segments[-1] == "":
+        segments.pop()
+    for segment in segments:
+        if segment in (".", "..") or not _CANONICAL_PATH_SEGMENT.fullmatch(segment):
+            return None
+    return path
+
+
+def _is_auth_bypass_path(request_uri: str, prefixes: list[str]) -> bool:
+    request_path = _canonical_path(request_uri)
+    if request_path is None:
         return False
     for raw_prefix in prefixes:
         prefix = _normalize_prefix(raw_prefix)

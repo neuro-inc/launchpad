@@ -93,6 +93,8 @@ LAUNCHPAD_INITIAL_CONFIG: >
 
 # Comma-separated auth bypass path prefixes.
 # Empty string disables bypass entirely.
+# Only a path whose segments are non-empty, are not . or .., and use only
+# A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) * + , = @ skips the check; every other path needs a login.
 LAUNCHPAD_AUTH_BYPASS_PATH_PREFIXES: "/public,/api/webhooks"
 
 postgresql:
