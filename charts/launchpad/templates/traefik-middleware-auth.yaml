@@ -12,6 +12,6 @@ metadata:
 spec:
   forwardAuth:
     address: {{ include "launchpad.apiDomainWithProtocol" . }}/auth/authorize
-    trustForwardHeader: true
+    trustForwardHeader: false
     authResponseHeaders:
       {{- toYaml $authResponseHeaders | nindent 6 }}
