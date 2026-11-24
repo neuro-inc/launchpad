@@ -47,7 +47,7 @@ test-auth-e2e:
 .PHONY: test-hooks
 test-hooks:
 	cd hooks && \
-	poetry run pytest -vv --cov=apolo_apps_launchpad --cov-report xml:.coverage.hooks.xml tests/unit
+	poetry run pytest -vv --cov=apolo_apps_launchpad --cov-report xml:coverage-hooks.xml tests/unit
 
 .PHONY: update-goldens
 update-goldens:

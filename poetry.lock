@@ -504,21 +504,6 @@ files = [
 ]
 
 [[package]]
-name = "asyncache"
-version = "0.3.1"
-description = "Helpers to use cachetools with async code."
-optional = false
-python-versions = ">=3.8,<4.0"
-groups = ["main"]
-files = [
-    {file = "asyncache-0.3.1-py3-none-any.whl", hash = "sha256:ef20a1024d265090dd1e0785c961cf98b9c32cc7d9478973dcf25ac1b80011f5"},
-    {file = "asyncache-0.3.1.tar.gz", hash = "sha256:9a1e60a75668e794657489bdea6540ee7e3259c483517b934670db7600bf5035"},
-]
-
-[package.dependencies]
-cachetools = ">=5.2.0,<6.0.0"
-
-[[package]]
 name = "asyncpg"
 version = "0.32.0"
 description = "An asyncio PostgreSQL driver"
@@ -4869,4 +4854,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "4823fdb0af5621e75d91ed962dbb87dd94be443d7667b50a0d5b7de7eae96af9"
+content-hash = "67ce4d3d75831a58d163c1fc1c6145d80a7472ab3643f1ce36ac9ea0a2ac0dd1"

@@ -1,8 +1,9 @@
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import UUID
 
-from aiohttp import ClientResponseError, ClientSession
+from aiohttp import ClientResponse, ClientResponseError, ClientSession, ClientSSLError
 from apolo_sdk import Client as ApoloClient
 
 
@@ -123,9 +124,21 @@ class LaunchpadAdminApi:
             password=password,
         )
 
+    async def _request(
+        self,
+        request: Callable[..., Awaitable[ClientResponse]],
+        path: str,
+        **kwargs: Any,
+    ) -> ClientResponse:
+        try:
+            return await request(f"{self._base_url}{path}", **kwargs)
+        except ClientSSLError as e:
+            raise LaunchpadApiError("Launchpad TLS verification failed") from e
+
     async def _login(self) -> str:
-        response = await self._http.post(
-            f"{self._base_url}/auth/token",
+        response = await self._request(
+            self._http.post,
+            "/auth/token",
             json={"username": self._username, "password": self._password},
         )
         raw_response = await response.text(errors="ignore")
@@ -155,8 +168,9 @@ class LaunchpadAdminApi:
 
     async def _authorized_delete(self, path: str, **kwargs: Any) -> bool:
         access_token = await self._get_access_token()
-        response = await self._http.delete(
-            f"{self._base_url}{path}",
+        response = await self._request(
+            self._http.delete,
+            path,
             headers={"Authorization": f"Bearer {access_token}"},
             **kwargs,
         )
@@ -181,8 +195,9 @@ class LaunchpadAdminApi:
         self, path: str, **kwargs: Any
     ) -> dict[str, Any] | None:
         access_token = await self._get_access_token()
-        response = await self._http.get(
-            f"{self._base_url}{path}",
+        response = await self._request(
+            self._http.get,
+            path,
             headers={"Authorization": f"Bearer {access_token}"},
             **kwargs,
         )

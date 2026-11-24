@@ -3,28 +3,29 @@
 {{- fail "Enable only one bundled PostgreSQL option." -}}
 {{- end -}}
 {{- $settings := .Values.isolatedDatabases -}}
+{{- $name := required "Set isolatedDatabases.name." $settings.name -}}
 {{- $launchpadPassword := required "Set isolatedDatabases.passwords.launchpad." $settings.passwords.launchpad -}}
 {{- $keycloakPassword := required "Set isolatedDatabases.passwords.keycloak." $settings.passwords.keycloak -}}
 {{- if eq $launchpadPassword $keycloakPassword -}}
 {{- fail "The isolated databases require distinct passwords." -}}
 {{- end -}}
-{{- $initScript := printf "%s-postgresql-init" (include "launchpad.name" .) -}}
+{{- $initName := printf "%s-postgresql-init" (include "launchpad.name" .) -}}
+{{- $initScript := .Files.Get "files/init-postgresql.sh" -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $initScript }}
+  name: {{ $initName }}
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 data:
   init.sh: |-
-    {{- .Files.Get "files/init-postgresql.sh" | nindent 4 }}
+    {{- $initScript | nindent 4 }}
 {{- range $app, $password := dict "launchpad" $launchpadPassword "keycloak" $keycloakPassword }}
-{{- $name := required (printf "Set isolatedDatabases.names.%s." $app) (index $settings.names $app) }}
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: {{ $name }}-secret
+  name: {{ $name }}-{{ $app }}-secret
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 type: Opaque
@@ -33,6 +34,7 @@ stringData:
   DB_USER: {{ $app | quote }}
   DB_NAME: {{ $app | quote }}
   DB_PASSWORD: {{ $password | quote }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -55,17 +57,13 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: {{ $name }}
-  policyTypes: [Ingress]
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - {}
   ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              {{- if eq $app "keycloak" }}
-              {{- include "keycloak.selectorLabels" $ | nindent 14 }}
-              {{- else }}
-              {{- include "launchpad.selectorLabels" $ | nindent 14 }}
-              {{- end }}
-      ports:
+    - ports:
         - port: 5432
 ---
 apiVersion: apps/v1
@@ -80,6 +78,8 @@ spec:
       app.kubernetes.io/name: {{ $name }}
   template:
     metadata:
+      annotations:
+        checksum/postgresql-init: {{ $initScript | sha256sum | quote }}
       labels:
         app.kubernetes.io/name: {{ $name }}
     spec:
@@ -89,10 +89,12 @@ spec:
         runAsUser: 999
         runAsGroup: 999
         fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       affinity:
-        {{- toYaml $.Values.postgresql.primary.affinity | nindent 8 }}
+        {{- toYaml .Values.postgresql.primary.affinity | nindent 8 }}
       tolerations:
-        {{- toYaml $.Values.postgresql.primary.tolerations | nindent 8 }}
+        {{- toYaml .Values.postgresql.primary.tolerations | nindent 8 }}
       containers:
         - name: postgres
           image: {{ $settings.image | quote }}
@@ -100,18 +102,16 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ALL]
-          command: ["/bin/bash", "-euc"]
-          args:
-            - |
-              # The official entrypoint requires a bootstrap password. Init removes it before TCP starts.
-              export POSTGRES_PASSWORD="$(head -c 32 /dev/urandom | base64)"
-              exec docker-entrypoint.sh postgres
-          envFrom:
-            - secretRef:
-                name: {{ $name }}-secret
+          command: ["/docker-entrypoint-initdb.d/init.sh"]
+          args: ["postgres"]
           env:
-            - name: POSTGRES_DB
-              value: {{ $app | quote }}
+            {{- range $app := list "keycloak" "launchpad" }}
+            - name: {{ $app | upper }}_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $name }}-{{ $app }}-secret
+                  key: DB_PASSWORD
+            {{- end }}
             - name: POSTGRES_INITDB_ARGS
               value: "--auth-local=peer --auth-host=scram-sha-256"
             - name: PGDATA
@@ -119,17 +119,22 @@ spec:
           ports:
             - name: postgres
               containerPort: 5432
+          startupProbe:
+            tcpSocket:
+              port: postgres
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            tcpSocket:
+              port: postgres
           readinessProbe:
             exec:
               command:
-                - /bin/sh
-                - -ec
-                - PGPASSWORD="$DB_PASSWORD" psql -Xw -h 127.0.0.1 -U "$DB_USER" -d "$DB_NAME" -Atqc 'SELECT 1'
+                - /docker-entrypoint-initdb.d/init.sh
+                - ready
             timeoutSeconds: 3
           resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
+            {{- toYaml $settings.resources | nindent 12 }}
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
@@ -139,7 +144,7 @@ spec:
       volumes:
         - name: init
           configMap:
-            name: {{ $initScript }}
+            name: {{ $initName }}
             defaultMode: 0555
   volumeClaimTemplates:
     - metadata:
@@ -149,5 +154,4 @@ spec:
         resources:
           requests:
             storage: {{ $settings.storage | quote }}
-{{- end }}
 {{- end }}

@@ -1,8 +1,9 @@
+import ssl
 import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from aiohttp import ClientResponseError
+from aiohttp import ClientResponseError, ClientSSLError
 
 from launchpad.ext.launchpad_api import (
     LaunchpadAdminApi,
@@ -218,6 +219,32 @@ async def test_launchpad_admin_api_get_rejects_http_error() -> None:
 
     with pytest.raises(LaunchpadApiError, match="admin GET request failed"):
         await admin_api._authorized_get_json("/test")
+
+
+@pytest.mark.parametrize("method", ["post", "get", "delete"])
+async def test_launchpad_admin_api_maps_tls_errors(method: str) -> None:
+    http = AsyncMock()
+    tls_error = ClientSSLError(
+        MagicMock(), ssl.SSLError("certificate verification failed")
+    )
+    getattr(http, method).side_effect = tls_error
+    admin_api = LaunchpadAdminApi(
+        http=http,
+        base_url="https://launchpad-api.example.com",
+        username="admin",
+        password="password",
+    )
+    if method != "post":
+        admin_api._access_token = "token"
+
+    with pytest.raises(LaunchpadApiError, match="TLS verification failed") as error:
+        if method == "delete":
+            await admin_api.delete_app(uuid.uuid4(), uninstall=False)
+        else:
+            await admin_api.get_app_template(uuid.uuid4())
+
+    assert error.value.__cause__ is tls_error
+    assert "ssl" not in getattr(http, method).await_args.kwargs
 
 
 async def test_launchpad_admin_api_get_rejects_non_object_response() -> None:

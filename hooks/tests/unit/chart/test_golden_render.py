@@ -33,7 +33,7 @@ async def test_launchpad_chart_render_matches_golden(
 
     async def get_secret(key: str) -> bytes:
         if key == "keycloak-db-pswd-golden-app":
-            raise ResourceNotFound("Fresh install has no shared database secret")
+            raise ResourceNotFound("No legacy database secret")
         return f"{key}-value".encode()
 
     monkeypatch.setattr(apolo_client.secrets, "get", get_secret)

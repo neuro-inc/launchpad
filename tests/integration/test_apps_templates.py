@@ -1,9 +1,10 @@
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
-from launchpad.ext.launchpad_api import LaunchpadAdminApi
+from launchpad.ext.launchpad_api import LaunchpadAdminApi, LaunchpadApiError
 
 
 class TestTemplateImport:
@@ -418,8 +419,12 @@ class TestAppImport:
         )  # From Apps API, not "my-imported-app"
         assert data["is_shared"] is True  # Always true for imported apps
 
+    @pytest.mark.parametrize("cleanup_tls_failure", [False, True])
     def test_import_app_copies_source_template_branding(
-        self, app_client: TestClient, mock_apps_api_client: AsyncMock
+        self,
+        app_client: TestClient,
+        mock_apps_api_client: AsyncMock,
+        cleanup_tls_failure: bool,
     ) -> None:
         app_id = uuid4()
         previous_launchpad_id = uuid4()
@@ -463,6 +468,10 @@ class TestAppImport:
             "position": 7,
         }
         source_admin.delete_app_template_by_app_id.return_value = True
+        if cleanup_tls_failure:
+            error = LaunchpadApiError("Launchpad TLS verification failed")
+            source_admin.delete_app_template_by_app_id.side_effect = error
+            source_admin.delete_app.side_effect = error
         mock_apps_api_client.list_instances.return_value = {
             "items": [
                 {
@@ -512,6 +521,13 @@ class TestAppImport:
             )
 
         assert response.status_code == 200, response.text
+        warnings = response.json()["warnings"]
+        if cleanup_tls_failure:
+            assert len(warnings) == 1
+            assert "Launchpad TLS verification failed" in warnings[0]
+            assert "Please perform cleanup manually" in warnings[0]
+        else:
+            assert warnings == []
         templates = app_client.get("/api/v1/apps/templates").json()["items"]
         imported = next(item for item in templates if item["name"] == f"app-{app_id}")
         assert imported["verbose_name"] == "Source title"

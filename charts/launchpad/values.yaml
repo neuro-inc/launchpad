@@ -7,8 +7,17 @@ isolatedDatabases:
   enabled: false
   image: docker.io/library/postgres:17.12-bookworm@sha256:837bed18782820fe967067cb5328b02b0d9992c1be9a37ee0c9c492cfc03af3b
   storage: 8Gi
-  names: {}
+  name: ""
   passwords: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+      ephemeral-storage: 50Mi
+    limits:
+      cpu: 150m
+      memory: 192Mi
+      ephemeral-storage: 2Gi
 
 # Used by Launchpad when both bundled PostgreSQL options are disabled.
 externalDatabase:
@@ -22,6 +31,21 @@ image:
 
 replicas: 1
 port: 8080
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+maintenanceResources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
 
 # passed to lauchpad API deployment
 extraEnv: {}
@@ -42,6 +66,7 @@ frontend:
       cpu: 100m
       memory: 256Mi
     limits:
+      cpu: 500m
       memory: 512Mi
 
 # apolo specific values
@@ -196,33 +221,8 @@ keycloak:
     - effect: NoSchedule
       key: platform.neuromation.io/job
       operator: Exists
-  initContainers:
-    - name: fetch-theme
-      image: alpine/git:2.45.2
-      imagePullPolicy: IfNotPresent
-      command: [ "/bin/sh","-lc" ]
-      # Keep the theme mount in sync with the installer in inputs_processor.py.
-      args:
-        - |
-          set -eu
-          if [ -n "$APOLO_APP_GIT_REPO" ] && [ -n "$APOLO_APP_GIT_REVISION" ]; then
-            git clone --depth 1 --branch "$APOLO_APP_GIT_REVISION" "$APOLO_APP_GIT_REPO" /tmp/repo
-            THEME_SRC="/tmp/repo/kc-theme/apolo"
-          else
-            git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
-            THEME_SRC="/tmp/repo/keycloak-theme/apolo"
-          fi
-          mkdir -p "/opt/keycloak/themes/apolo"
-          cp -R "$THEME_SRC/." "/opt/keycloak/themes/apolo/"
-          chown -R 1000:0 /opt/keycloak/themes
-      volumeMounts:
-        - name: empty-dir
-          mountPath: /opt/keycloak/themes
-          subPath: app-themes-dir
-      env:
-        - name: APOLO_APP_GIT_REPO
-          value: ""
-        - name: APOLO_APP_GIT_REVISION
-          value: ""
-      securityContext:
-        runAsUser: 0
+  theme:
+    repository: https://github.com/neuro-inc/launchpad.git
+    revision: master
+    path: keycloak-theme/apolo
+  initContainers: null

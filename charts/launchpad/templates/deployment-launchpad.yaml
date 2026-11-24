@@ -2,8 +2,8 @@
 {{- $dbSecret := .Values.dbSecretName -}}
 {{- $dbUser := "postgres" -}}
 {{- if .Values.isolatedDatabases.enabled -}}
-{{- $dbHost = .Values.isolatedDatabases.names.launchpad -}}
-{{- $dbSecret = printf "%s-secret" $dbHost -}}
+{{- $dbHost = .Values.isolatedDatabases.name -}}
+{{- $dbSecret = printf "%s-launchpad-secret" $dbHost -}}
 {{- $dbUser = "launchpad" -}}
 {{- end -}}
 apiVersion: apps/v1

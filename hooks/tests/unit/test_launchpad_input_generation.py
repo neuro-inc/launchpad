@@ -1,43 +1,36 @@
 import json
-import os
 from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
-from apolo_sdk import Client, Cluster, ResourceNotFound
-
 from apolo_app_types import ApoloSecret, HuggingFaceToken
 from apolo_app_types.protocols.common import Preset
 from apolo_app_types.protocols.common.storage import ApoloFilesPath
-from apolo_apps_launchpad.inputs_processor import (
-    LaunchpadInputsProcessor,
-    KEYCLOAK_CUSTOM_THEME_INIT_SCRIPT,
-    KEYCLOAK_DEFAULT_THEME_INIT_SCRIPT,
+from apolo_app_types_fixtures.constants import (
+    APP_ID,
+    APP_SECRETS_NAME,
 )
+from apolo_apps_launchpad.inputs_processor import LaunchpadInputsProcessor
 from apolo_apps_launchpad.types import (
     AppsConfig,
+    BackgroundApoloFilesImagePath,
     CustomLLMModel,
+    FavIconFileApoloFilesImagePath,
     HuggingFaceLLMModel,
+    LauchpadBrandingConfig,
     LaunchpadAppInputs,
     LaunchpadWebAppConfig,
     LLMConfig,
-    OpenWebUIConfig,
-    NoQuickStartConfig,
-    LauchpadBrandingConfig,
     LogoFileApoloFilesImagePath,
-    FavIconFileApoloFilesImagePath,
-    BackgroundApoloFilesImagePath,
+    NoQuickStartConfig,
+    OpenWebUIConfig,
     PostgresConfig,
     PreConfiguredEmbeddingsModels,
     PreConfiguredHuggingFaceLLMModel,
     PreConfiguredLLMModels,
     TextEmbeddingsConfig,
 )
-
-from apolo_app_types_fixtures.constants import (
-    APP_ID,
-    APP_SECRETS_NAME,
-)
+from apolo_sdk import Client, Cluster, ResourceNotFound
 
 
 @pytest.mark.asyncio
@@ -751,25 +744,6 @@ async def test_launchpad_values_generation__min(apolo_client):
             "application": "launchpad",
         },
         "service": {"extraLabels": {"service": "keycloak"}},
-        "initContainers": [
-            {
-                "name": "fetch-theme",
-                "image": "alpine/git:2.45.2",
-                "imagePullPolicy": "IfNotPresent",
-                "command": ["/bin/sh", "-lc"],
-                "securityContext": {
-                    "runAsUser": 0,
-                },
-                "args": [KEYCLOAK_DEFAULT_THEME_INIT_SCRIPT],
-                "volumeMounts": [
-                    {
-                        "name": "empty-dir",
-                        "mountPath": "/opt/keycloak/themes",
-                        "subPath": "app-themes-dir",
-                    }
-                ],
-            },
-        ],
     }
 
     expected_helm_values = {
@@ -808,10 +782,10 @@ async def test_launchpad_values_generation__min(apolo_client):
     assert helm_params == expected_helm_values
 
 
-async def test_launchpad_values_generation__brand(apolo_client):
+async def test_launchpad_values_generation__brand(apolo_client, monkeypatch):
     processor = LaunchpadInputsProcessor(client=apolo_client)
-    os.environ["APOLO_APP_GIT_REPO"] = "somerepo"
-    os.environ["APOLO_APP_GIT_REVISION"] = "somerevision"
+    monkeypatch.setenv("APOLO_APP_GIT_REPO", "somerepo")
+    monkeypatch.setenv("APOLO_APP_GIT_REVISION", "somerevision")
     helm_params = await processor.gen_extra_values(
         input_=LaunchpadAppInputs(
             launchpad_web_app_config=LaunchpadWebAppConfig(
@@ -916,30 +890,11 @@ async def test_launchpad_values_generation__brand(apolo_client):
                 "value": f"https://launchpad-{APP_ID}-api.apps.some.org.neu.ro/branding/background",
             },
         ],
-        "initContainers": [
-            {
-                "name": "fetch-theme",
-                "image": "alpine/git:2.45.2",
-                "imagePullPolicy": "IfNotPresent",
-                "command": ["/bin/sh", "-lc"],
-                "securityContext": {
-                    "runAsUser": 0,
-                },
-                "args": [
-                    KEYCLOAK_CUSTOM_THEME_INIT_SCRIPT.format(
-                        APOLO_APP_GIT_REPO="somerepo",
-                        APOLO_APP_GIT_REVISION="somerevision",
-                    )
-                ],
-                "volumeMounts": [
-                    {
-                        "name": "empty-dir",
-                        "mountPath": "/opt/keycloak/themes",
-                        "subPath": "app-themes-dir",
-                    }
-                ],
-            },
-        ],
+        "theme": {
+            "repository": "somerepo",
+            "revision": "somerevision",
+            "path": "kc-theme/apolo",
+        },
     }
 
     expected_helm_values = {
@@ -1049,7 +1004,6 @@ async def test_installer_selects_databases_from_saved_credentials(
         stored[f"launchpad-admin-pswd-{app_id}"] = b"existing-admin"
     if installation == "legacy":
         stored[f"keycloak-db-pswd-{app_id}"] = b"shared-password"
-        stored[f"keycloak-isolated-db-pswd-{app_id}"] = b"unused-isolated-password"
 
     async def get(key: str) -> bytes:
         if key not in stored:
@@ -1104,15 +1058,18 @@ async def test_installer_selects_databases_from_saved_credentials(
     assert second["postgresql"]["enabled"] is False
     assert first["isolatedDatabases"]["enabled"] is True
     assert second["isolatedDatabases"]["enabled"] is True
-    assert "dbPassword" not in second
-    names = first["isolatedDatabases"]["names"]
-    assert names == second["isolatedDatabases"]["names"]
-    assert names == {
-        "keycloak": f"launchpad-{app_id}-kc-db",
-        "launchpad": f"launchpad-{app_id}-lp-db",
+    assert first["isolatedDatabases"]["resources"] == {
+        "requests": {"cpu": "100m", "memory": "128Mi", "ephemeral-storage": "50Mi"},
+        "limits": {"cpu": "150m", "memory": "192Mi", "ephemeral-storage": "2Gi"},
     }
-    assert all(len(f"{name}-0123456789") <= 63 for name in names.values())
+    assert "dbPassword" not in second
+    name = first["isolatedDatabases"]["name"]
+    assert name == second["isolatedDatabases"]["name"] == f"launchpad-{app_id}-pg-db"
+    assert len(f"{name}-0123456789") <= 63
     passwords = first["isolatedDatabases"]["passwords"]
     assert passwords == second["isolatedDatabases"]["passwords"]
     assert passwords["launchpad"] != passwords["keycloak"]
     assert writer.await_count == 2
+    assert {request.kwargs["key"] for request in writer.await_args_list} == {
+        f"{app}-dedicated-db-pswd-{app_id}" for app in ("keycloak", "launchpad")
+    }

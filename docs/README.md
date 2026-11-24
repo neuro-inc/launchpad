@@ -7,3 +7,4 @@
 | Operations | [Static hostname authentication deployment and validation](operations/static-hostname-authentication.md): prerequisites, regression checks, and browser verification |
 | Operations | [Frontend hosting](operations/frontend-hosting.md): image promotion, App ownership, migration, and rollback |
 | Operations | [Procore account linking](operations/procore-account-linking.md): opt-in, migration, validation, and rollback |
+| Operations | [Database backup and restore](operations/database-backup-and-restore.md) before a Launchpad or Keycloak upgrade |

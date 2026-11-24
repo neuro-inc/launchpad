@@ -140,7 +140,7 @@ async def get_launchpad_outputs(
     )
     if not helm_values.get("postgresql", {}).get("enabled", True):
         keycloak_db_secret = ApoloSecret(
-            key=f"{APP_SECRET_KEYS['KEYCLOAK_ISOLATED_DB']}-{apolo_app_id}"
+            key=f"{APP_SECRET_KEYS['KEYCLOAK_DEDICATED_DB']}-{apolo_app_id}"
         )
     else:
         keycloak_db_secret = await create_apolo_secret_with_retry(

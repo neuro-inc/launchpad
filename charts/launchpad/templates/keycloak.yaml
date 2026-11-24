@@ -1,10 +1,11 @@
 {{- $kc := .Values.keycloak -}}
 {{- $name := $kc.fullnameOverride -}}
+{{- $headlessName := printf "%s-headless" $name | trunc 63 | trimSuffix "-" -}}
 {{- $auth := $kc.auth -}}
 {{- $db := $kc.externalDatabase -}}
 {{- if .Values.isolatedDatabases.enabled -}}
-{{- $dbHost := .Values.isolatedDatabases.names.keycloak -}}
-{{- $db = dict "existingSecret" (printf "%s-secret" $dbHost) "existingSecretHostKey" "DB_HOST" "existingSecretPasswordKey" "DB_PASSWORD" "user" "keycloak" "database" "keycloak" "port" 5432 -}}
+{{- $dbSecret := printf "%s-keycloak-secret" .Values.isolatedDatabases.name -}}
+{{- $db = dict "existingSecret" $dbSecret "existingSecretHostKey" "DB_HOST" "existingSecretPasswordKey" "DB_PASSWORD" "user" "keycloak" "database" "keycloak" "port" 5432 -}}
 {{- end -}}
 {{- $dbSecret := $db.existingSecret -}}
 {{- if .Values.postgresql.enabled -}}
@@ -55,7 +56,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $name }}-headless
+  name: {{ $headlessName }}
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
@@ -107,7 +108,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  serviceName: {{ $name }}-headless
+  serviceName: {{ $headlessName }}
   podManagementPolicy: Parallel
   replicas: {{ $kc.replicaCount }}
   selector:
@@ -166,8 +167,33 @@ spec:
               mountPath: /quarkus
           resources:
             {{- toYaml $kc.resources | nindent 12 }}
+        {{- if ne $kc.initContainers nil }}
         {{- with $kc.initContainers }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- else }}
+        - name: fetch-theme
+          image: alpine/git:2.45.2
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |-
+              {{- .Files.Get "files/fetch-keycloak-theme.sh" | nindent 14 }}
+          env:
+            - name: THEME_REPOSITORY
+              value: {{ $kc.theme.repository | quote }}
+            - name: THEME_REVISION
+              value: {{ $kc.theme.revision | quote }}
+            - name: THEME_PATH
+              value: {{ $kc.theme.path | quote }}
+          volumeMounts:
+            - name: empty-dir
+              mountPath: /opt/keycloak/themes
+              subPath: app-themes-dir
+          securityContext:
+            runAsUser: 0
+          resources:
+            {{- toYaml .Values.maintenanceResources | nindent 12 }}
         {{- end }}
       containers:
         - name: keycloak
@@ -175,9 +201,6 @@ spec:
           args:
             - start
             - --import-realm
-            - --spi-theme--static-max-age=-1
-            - --spi-theme--cache-themes=false
-            - --spi-theme--cache-templates=false
           securityContext: *keycloakSecurityContext
           resources:
             {{- toYaml $kc.resources | nindent 12 }}

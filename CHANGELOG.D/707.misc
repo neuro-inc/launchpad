@@ -1,1 +1,1 @@
-Add golden Helm rendering and end-to-end OIDC login coverage.
+Add golden Helm rendering and end-to-end OIDC login coverage. Keep unit, integration, and hook coverage reports available for Codecov.

@@ -72,11 +72,7 @@ spec:
             {{- end }}
             - --apply
           resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              memory: 256Mi
+            {{- toYaml .Values.maintenanceResources | nindent 12 }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

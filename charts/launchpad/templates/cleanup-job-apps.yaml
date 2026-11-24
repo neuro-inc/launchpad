@@ -24,6 +24,8 @@ spec:
       - name: cleanup
         image: {{ include "launchpad.image" . | quote }}
         command: ["python3", "/app/scripts/cleanup-apps.py"]
+        resources:
+          {{- toYaml .Values.maintenanceResources | nindent 10 }}
         env:
         - name: APOLO_PASSED_CONFIG
           value: {{ .Values.APOLO_PASSED_CONFIG | quote }}

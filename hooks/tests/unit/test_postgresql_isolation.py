@@ -7,11 +7,9 @@ from .chart_helpers import render_chart
 
 
 @pytest.mark.parametrize("shared", [True, False])
-def test_database_wiring_for_shared_and_isolated_installs(
-    tmp_path: Path, shared: bool
-) -> None:
+def test_database_wiring(tmp_path: Path, shared: bool) -> None:
     app_id = "01234567-89ab-cdef-0123-456789abcdef"
-    names = {"launchpad": "test-lp-db", "keycloak": "test-kc-db"}
+    service = "test-pg-db"
     manifests = render_chart(
         tmp_path,
         {
@@ -19,7 +17,7 @@ def test_database_wiring_for_shared_and_isolated_installs(
             "postgresql": {"enabled": shared},
             "isolatedDatabases": {
                 "enabled": not shared,
-                "names": names,
+                "name": service,
                 "passwords": {
                     "launchpad": "launchpad-db-test",
                     "keycloak": "kc-db-test",
@@ -30,35 +28,67 @@ def test_database_wiring_for_shared_and_isolated_installs(
     resources = {(doc["kind"], doc["metadata"]["name"]): doc for doc in manifests}
     assert (("StatefulSet", "launchpad-db") in resources) is shared
     assert (("Secret", "launchpad-db-secret") in resources) is shared
+    db_statefulsets = {
+        name
+        for kind, name in resources
+        if kind == "StatefulSet" and name != "launchpad-keycloak"
+    }
+    db_name = "launchpad-db" if shared else service
+    assert db_statefulsets == {db_name}
+    db = resources["StatefulSet", db_name]["spec"]
+    db_policy = resources["NetworkPolicy", db_name]["spec"]
+    assert db_policy["policyTypes"] == ["Ingress", "Egress"]
+    assert db_policy["ingress"] == [{"ports": [{"port": 5432}]}]
+    assert db_policy["egress"] == [{}]
+    assert db_policy["podSelector"]["matchLabels"].items() <= (
+        db["template"]["metadata"]["labels"].items()
+    )
+    for manifest in manifests:
+        if manifest["kind"] not in {"Deployment", "StatefulSet", "Job"}:
+            continue
+        pod = manifest["spec"]["template"]["spec"]
+        for container in pod["containers"] + pod.get("initContainers", []):
+            assert {"cpu", "memory"} <= container["resources"]["limits"].keys()
+
     for app, kind, app_name, prefix in (
         ("launchpad", "Deployment", f"launchpad-{app_id}", "DB_"),
         ("keycloak", "StatefulSet", "launchpad-keycloak", "KC_DB_"),
     ):
-        service = names[app]
-        assert (("StatefulSet", service) in resources) is (not shared)
+        secret_name = f"{service}-{app}-secret"
         if not shared:
-            db = resources["StatefulSet", service]["spec"]
             assert db["serviceName"] == service
+            db_pod = db["template"]["spec"]
+            assert (
+                db_pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
+            )
+            assert (
+                db_pod["containers"][0]["livenessProbe"]["tcpSocket"]["port"]
+                == "postgres"
+            )
             assert ("Service", service) in resources
             assert db["volumeClaimTemplates"][0]["spec"]["accessModes"] == [
                 "ReadWriteOnce"
             ]
-            secret = resources["Secret", f"{service}-secret"]["stringData"]
+            secret = resources["Secret", secret_name]["stringData"]
             assert secret["DB_HOST"] == service
             assert secret["DB_USER"] == secret["DB_NAME"] == app
-            db_policy = resources["NetworkPolicy", service]["spec"]["ingress"]
-            allowed = db_policy[0]["from"][0]["podSelector"]["matchLabels"]
-            app_labels = resources[kind, app_name]["spec"]["template"]["metadata"][
-                "labels"
-            ]
-            assert all(app_labels[key] == value for key, value in allowed.items())
+            assert (
+                secret["DB_PASSWORD"]
+                == {"launchpad": "launchpad-db-test", "keycloak": "kc-db-test"}[app]
+            )
+            postgres_env = {
+                entry["name"]: entry for entry in db_pod["containers"][0]["env"]
+            }
+            assert postgres_env[f"{app.upper()}_DB_PASSWORD"]["valueFrom"] == {
+                "secretKeyRef": {"name": secret_name, "key": "DB_PASSWORD"}
+            }
         pod = resources[kind, app_name]["spec"]["template"]["spec"]
         env = {entry["name"]: entry for entry in pod["containers"][0]["env"]}
         user = "USER" if app == "launchpad" else "USERNAME"
         assert env[f"{prefix}{user}"]["value"] == ("postgres" if shared else app)
         secret_ref = env[f"{prefix}PASSWORD"]["valueFrom"]["secretKeyRef"]
         assert secret_ref == {
-            "name": "launchpad-db-secret" if shared else f"{service}-secret",
+            "name": "launchpad-db-secret" if shared else secret_name,
             "key": "DB_PASSWORD",
         }
         if app == "launchpad":
