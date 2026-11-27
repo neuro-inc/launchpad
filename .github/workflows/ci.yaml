@@ -170,7 +170,7 @@ jobs:
       - uses: codecov/codecov-action@v7
         if: always()
         with:
-          files: hooks/.coverage.hooks.xml
+          files: hooks/coverage-hooks.xml
           disable_search: true
           flags: hooks
           name: hooks-tests

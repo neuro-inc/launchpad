@@ -91,11 +91,22 @@ jobs:
         if: steps.assets.outputs.upload == 'true'
         env:
           CREATE_RELEASE: ${{ steps.assets.outputs.create }}
+          RELEASE_REVISION: ${{ steps.restore.outputs.revision }}
         run: |
           if [ "$CREATE_RELEASE" = true ]; then
+            notes_file="$RUNNER_TEMP/launchpad-release/notes.md"
+            changelog=$(git show "$RELEASE_REVISION:CHANGELOG.md" 2>/dev/null || true)
+            awk -v heading="# Apolo Launchpad ${RELEASE_TAG#v} (" '
+              index($0, heading) == 1 { section = 1; next }
+              section && /^# / { exit }
+              section { print }
+            ' <<< "$changelog" > "$notes_file"
+            if ! grep -q '[^[:space:]]' "$notes_file"; then
+              printf '%s\n' 'Publish the tested Launchpad App image and chart combination.' > "$notes_file"
+            fi
             gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/launchpad-release/upload/"* \
               --verify-tag --draft --title "$RELEASE_TAG" \
-              --notes 'Publish the tested Launchpad App image and chart combination.'
+              --notes-file "$notes_file"
           else
             gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "$RUNNER_TEMP/launchpad-release/upload/"*
           fi

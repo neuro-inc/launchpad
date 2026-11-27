@@ -1,6 +1,5 @@
 import json
 import os
-import random
 import re
 import secrets
 import string
@@ -62,34 +61,86 @@ PASSWORD_MIN_LENGTH = 4
 # Branding path on the Launchpad pod — files served from here via the API
 BRANDING_DIR_LAUNCHPAD = "/etc/launchpad/branding"
 
-# Init container script for fetching the Keycloak theme.
-# When APOLO_APP_GIT_REPO + APOLO_APP_GIT_REVISION are set (injected by this
-# preprocessor), the versioned kc-theme/ folder is used instead of the legacy
-# keycloak-theme/apolo/ path on master. This is the authoritative copy of the
-# script; values.yaml carries the same script as a local-dev fallback.
-KEYCLOAK_CUSTOM_THEME_INIT_SCRIPT = """\
-set -euxo pipefail
-git clone --depth 1 --branch "{APOLO_APP_GIT_REVISION}" "{APOLO_APP_GIT_REPO}" /tmp/repo
-mkdir -p "/opt/bitnami/keycloak/themes/apolo"
-cp -R "/tmp/repo/kc-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
-chown -R 1001:0 /opt/bitnami/keycloak/themes
-"""
-
-KEYCLOAK_DEFAULT_THEME_INIT_SCRIPT = """\
-set -euxo pipefail
-git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
-mkdir -p "/opt/bitnami/keycloak/themes/apolo"
-cp -R "/tmp/repo/keycloak-theme/apolo/." "/opt/bitnami/keycloak/themes/apolo/"
-chown -R 1001:0 /opt/bitnami/keycloak/themes
-"""
-
 
 def _generate_password(length: int = PASSWORD_DEFAULT_LENGTH) -> str:
     if length < PASSWORD_MIN_LENGTH:
         err_msg = f"Password length must be at least {PASSWORD_MIN_LENGTH}"
         raise ValueError(err_msg)
 
-    return "".join([random.choice(PASSWORD_CHAR_POOL) for _ in range(length)])
+    return "".join(secrets.choice(PASSWORD_CHAR_POOL) for _ in range(length))
+
+
+async def _stored_secret(app_id: str, key: str) -> str | None:
+    try:
+        return await get_apolo_secret(app_instance_id=app_id, key=key)
+    except apolo_sdk.ResourceNotFound:
+        return None
+
+
+async def _isolated_db_password(app_id: str, key: str, stored: str | None) -> str:
+    if stored is not None:
+        return stored
+    password = _generate_password(32)
+    await create_apolo_secret_with_retry(
+        app_instance_id=app_id, key=key, value=password
+    )
+    return password
+
+
+async def _database_values(
+    app_id: str, db_secret_name: str, *, has_saved_admin: bool
+) -> dict[str, t.Any]:
+    shared_key = APP_SECRET_KEYS["KEYCLOAK_DB"]
+    shared_password = await _stored_secret(app_id, shared_key)
+    values: dict[str, t.Any] = {
+        "dbSecretName": db_secret_name,
+        "postgresql": {
+            "enabled": shared_password is not None,
+            "fullnameOverride": f"launchpad-{app_id}-db",
+            "auth": {"existingSecret": db_secret_name},
+        },
+    }
+    # The legacy output secret identifies installs already using the shared PVC.
+    if shared_password is not None:
+        if not shared_password:
+            raise ValueError("The saved shared PostgreSQL password is empty.")
+        values["dbPassword"] = shared_password
+        return values
+
+    keycloak_key = APP_SECRET_KEYS["KEYCLOAK_DEDICATED_DB"]
+    launchpad_key = APP_SECRET_KEYS["LAUNCHPAD_DEDICATED_DB"]
+    keycloak_password = await _stored_secret(app_id, keycloak_key)
+    launchpad_password = await _stored_secret(app_id, launchpad_key)
+    if (
+        (has_saved_admin and not (keycloak_password and launchpad_password))
+        or keycloak_password == ""
+        or launchpad_password == ""
+    ):
+        raise ValueError(
+            "Recover the saved PostgreSQL credentials before upgrading this installation. "
+            f"Restore '{shared_key}-{app_id}' for a legacy installation, or both "
+            f"'{keycloak_key}-{app_id}' and '{launchpad_key}-{app_id}' for dedicated roles."
+        )
+
+    # The StatefulSet name must leave room for the 11-character revision suffix.
+    prefix = f"launchpad-{app_id}"[:46].removesuffix("-")
+    values["isolatedDatabases"] = {
+        "enabled": True,
+        "name": f"{prefix}-pg-db",
+        "passwords": {
+            "keycloak": await _isolated_db_password(
+                app_id, keycloak_key, keycloak_password
+            ),
+            "launchpad": await _isolated_db_password(
+                app_id, launchpad_key, launchpad_password
+            ),
+        },
+        "resources": {
+            "requests": {"cpu": "100m", "memory": "128Mi", "ephemeral-storage": "50Mi"},
+            "limits": {"cpu": "150m", "memory": "192Mi", "ephemeral-storage": "2Gi"},
+        },
+    }
+    return values
 
 
 class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
@@ -335,16 +386,6 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     )
                 )
 
-        app_repo = os.getenv("APOLO_APP_GIT_REPO")
-        app_revision = os.getenv("APOLO_APP_GIT_REVISION")
-        if app_repo and app_revision:
-            fetch_theme_script = KEYCLOAK_CUSTOM_THEME_INIT_SCRIPT.format(
-                APOLO_APP_GIT_REPO=app_repo,
-                APOLO_APP_GIT_REVISION=app_revision,
-            )
-        else:
-            fetch_theme_script = KEYCLOAK_DEFAULT_THEME_INIT_SCRIPT
-
         ### LAUCHPAD CONFIGURATION ###
         values = await gen_extra_values(
             apolo_client=self.client,
@@ -390,26 +431,26 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                 extra_env["BRANDING_BACKGROUND"] = input_.branding.background.hex_code
 
         ### KEYCLOAK CONFIGURATION ###
-        try:
-            keycloak_admin_password = await get_apolo_secret(
-                app_instance_id=app_id, key=APP_SECRET_KEYS["KEYCLOAK"]
-            )
-        except apolo_sdk.ResourceNotFound:
-            keycloak_admin_password = _generate_password()
-
-        try:
-            keycloak_db_password = await get_apolo_secret(
-                app_instance_id=app_id, key=APP_SECRET_KEYS["KEYCLOAK_DB"]
-            )
-        except apolo_sdk.ResourceNotFound:
-            keycloak_db_password = _generate_password()
-
-        try:
-            launchpad_admin_password = await get_apolo_secret(
-                app_instance_id=app_id, key=APP_SECRET_KEYS["LAUNCHPAD"]
-            )
-        except apolo_sdk.ResourceNotFound:
-            launchpad_admin_password = _generate_password()
+        saved_keycloak_admin = await _stored_secret(app_id, APP_SECRET_KEYS["KEYCLOAK"])
+        keycloak_admin_password = (
+            saved_keycloak_admin
+            if saved_keycloak_admin is not None
+            else _generate_password()
+        )
+        saved_launchpad_admin = await _stored_secret(
+            app_id, APP_SECRET_KEYS["LAUNCHPAD"]
+        )
+        launchpad_admin_password = (
+            saved_launchpad_admin
+            if saved_launchpad_admin is not None
+            else _generate_password()
+        )
+        database_values = await _database_values(
+            app_id,
+            db_secret_name,
+            has_saved_admin=saved_keycloak_admin is not None
+            or saved_launchpad_admin is not None,
+        )
 
         backend_image = {"tag": os.getenv("APP_IMAGE_TAG", "latest")}
         backend_digest = os.getenv("APP_IMAGE_DIGEST", "")
@@ -460,38 +501,15 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
                     "service": "keycloak",
                 }
             },
-            "initContainers": [
-                {
-                    "name": "fetch-theme",
-                    "image": "alpine/git:2.45.2",
-                    "imagePullPolicy": "IfNotPresent",
-                    "command": ["/bin/sh", "-lc"],
-                    "args": [fetch_theme_script],
-                    "volumeMounts": [
-                        {
-                            "name": "empty-dir",
-                            "mountPath": "/opt/bitnami/keycloak/themes",
-                            "subPath": "app-themes-dir",
-                        }
-                    ],
-                    "securityContext": {"runAsUser": 0},
-                }
-            ],
-            "extraVolumes": [
-                {
-                    "name": "realm-import",
-                    "configMap": {
-                        "name": kc_realm_import_config_map_name,
-                        "items": [
-                            {
-                                "key": "realm.json",
-                                "path": "realm.json",
-                            }
-                        ],
-                    },
-                }
-            ],
         }
+        app_repo = os.getenv("APOLO_APP_GIT_REPO")
+        app_revision = os.getenv("APOLO_APP_GIT_REVISION")
+        if app_repo and app_revision:
+            keycloak_values["theme"] = {
+                "repository": app_repo,
+                "revision": app_revision,
+                "path": "kc-theme/apolo",
+            }
 
         if "podAnnotations" in keycloak_values:
             keycloak_values["podAnnotations"] = {}
@@ -555,18 +573,11 @@ class LaunchpadInputsProcessor(BaseChartValueProcessor[LaunchpadAppInputs]):
         return {
             **values,
             **frontend_values,
+            **database_values,
             "authResponseHeaders": list(AUTH_RESPONSE_HEADERS),
             "image": backend_image,
-            "dbSecretName": db_secret_name,
             "keycloakRealmImportConfigMapName": kc_realm_import_config_map_name,
             "procoreAutomaticLinking": input_.procore_settings.automatic_linking,
-            "postgresql": {
-                "fullnameOverride": f"launchpad-{app_id}-db",
-                "auth": {
-                    "existingSecret": db_secret_name,
-                },
-            },
-            "dbPassword": keycloak_db_password,
             "extraEnv": extra_env,
             "domain": domain,
             "keycloak": keycloak_values,  # keeping this for backwards compatibility

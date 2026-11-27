@@ -8,6 +8,7 @@ from apolo_app_types.outputs.utils.apolo_secrets import create_apolo_secret_with
 from apolo_app_types.outputs.utils.ingress import get_ingress_host_port
 from apolo_app_types.protocols.common.middleware import AuthIngressMiddleware
 from apolo_app_types.protocols.common.networking import HttpApi, ServiceAPI, WebApp
+from apolo_app_types.protocols.common.secrets_ import ApoloSecret
 
 from .consts import APP_SECRET_KEYS
 from .types import (
@@ -122,9 +123,6 @@ async def get_launchpad_outputs(
             protocol="http",
         )
 
-    keycloak_password = helm_values["keycloak"]["auth"]["adminPassword"]
-    keycloak_db_password = helm_values["dbPassword"]
-
     # -------------- MIDDLEWARE ----------------
     # Construct middleware name using helm chart logic: launchpad-{apolo_app_id}-auth-middleware
     launchpad_name = get_launchpad_name(helm_values.get("apolo_app_id", ""))
@@ -135,6 +133,21 @@ async def get_launchpad_outputs(
     print(f"Full middleware name: {middleware_name}")
 
     # -------------- FINAL OUTPUT ----------------
+    keycloak_admin_secret = await create_apolo_secret_with_retry(
+        app_instance_id=apolo_app_id,
+        key=APP_SECRET_KEYS["KEYCLOAK"],
+        value=helm_values["keycloak"]["auth"]["adminPassword"],
+    )
+    if not helm_values.get("postgresql", {}).get("enabled", True):
+        keycloak_db_secret = ApoloSecret(
+            key=f"{APP_SECRET_KEYS['KEYCLOAK_DEDICATED_DB']}-{apolo_app_id}"
+        )
+    else:
+        keycloak_db_secret = await create_apolo_secret_with_retry(
+            app_instance_id=apolo_app_id,
+            key=APP_SECRET_KEYS["KEYCLOAK_DB"],
+            value=helm_values["dbPassword"],
+        )
     outputs = LaunchpadAppOutputs(
         app_url=ServiceAPI[WebApp](
             internal_url=internal_web_app_url,
@@ -145,16 +158,8 @@ async def get_launchpad_outputs(
                 internal_url=keycloak_internal_web_app_url,
                 external_url=keycloak_external_web_app_url,
             ),
-            auth_admin_password=await create_apolo_secret_with_retry(
-                app_instance_id=apolo_app_id,
-                key=APP_SECRET_KEYS["KEYCLOAK"],
-                value=keycloak_password,
-            ),
-            db_password=await create_apolo_secret_with_retry(
-                app_instance_id=apolo_app_id,
-                key=APP_SECRET_KEYS["KEYCLOAK_DB"],
-                value=keycloak_db_password,
-            ),
+            auth_admin_password=keycloak_admin_secret,
+            db_password=keycloak_db_secret,
         ),
         installed_apps=None,
         auth_middleware=AuthIngressMiddleware(name=middleware_name),

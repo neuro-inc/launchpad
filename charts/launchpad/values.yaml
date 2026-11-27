@@ -3,6 +3,27 @@ dbPassword: null
 dbSecretName: launchpad-db-secret  # in real app will be f"launchpad-{apolo_app_id}-db-secret"
 keycloakRealmImportConfigMapName: launchpad-keycloak-realm  # in real app will be f"launchpad-{apolo_app_id}-keycloak-realm"
 
+isolatedDatabases:
+  enabled: false
+  image: docker.io/library/postgres:17.12-bookworm@sha256:837bed18782820fe967067cb5328b02b0d9992c1be9a37ee0c9c492cfc03af3b
+  storage: 8Gi
+  name: ""
+  passwords: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+      ephemeral-storage: 50Mi
+    limits:
+      cpu: 150m
+      memory: 192Mi
+      ephemeral-storage: 2Gi
+
+# Used by Launchpad when both bundled PostgreSQL options are disabled.
+externalDatabase:
+  # Secret keys are DB_HOST, DB_PORT, DB_NAME, DB_USER and DB_PASSWORD.
+  existingSecret: ""
+
 image:
   repository: "ghcr.io/neuro-inc/launchpad"
   tag: "latest"
@@ -10,6 +31,21 @@ image:
 
 replicas: 1
 port: 8080
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+maintenanceResources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
 
 # passed to lauchpad API deployment
 extraEnv: {}
@@ -30,6 +66,7 @@ frontend:
       cpu: 100m
       memory: 256Mi
     limits:
+      cpu: 500m
       memory: 512Mi
 
 # apolo specific values
@@ -97,6 +134,7 @@ LAUNCHPAD_INITIAL_CONFIG: >
 # A-Z a-z 0-9 - . _ ~ ! $ & ' ( ) * + , = @ skips the check; every other path needs a login.
 LAUNCHPAD_AUTH_BYPASS_PATH_PREFIXES: "/public,/api/webhooks"
 
+# The Apolo installer enables the shared database for legacy installations.
 postgresql:
   global:
     security:
@@ -104,7 +142,7 @@ postgresql:
   image:
     repository: bitnamilegacy/postgresql
     tag: 17.5.0-debian-12-r18
-  enabled: true
+  enabled: false
   fullnameOverride: launchpad-db  # in real app will be f"launchpad-{apolo_app_id}-db"
   commonAnnotations:
     argocd.argoproj.io/sync-wave: "0"
@@ -149,85 +187,42 @@ procoreAutomaticLinking: null
 procoreProvider: null
 
 keycloak:
-  global:
-    security:
-      allowInsecureImages: true
   image:
-    repository: bitnamilegacy/keycloak
-    tag: 26.3.0-debian-12-r0
+    repository: quay.io/keycloak/keycloak
+    tag: 26.8.2-3
+    digest: sha256:7e66a96e4739239070aeaf72e4c5decf0f7f682cfc725b9f7ea2b336eaba38b3
   defaultRealm: "launchpad" # internal variable
   fullnameOverride: launchpad-keycloak  # in real app will be f"launchpad-{apolo_app_id}-keycloak"
-  replicas: 1
-  commonAnnotations:
-    argocd.argoproj.io/sync-wave: "1"
+  replicaCount: 1
   auth:
     adminUser: "admin"
-    adminPassword: "Passw0rd!123"  # todo: should be passed as an arg?
-  postgresql:
-    enabled: false
+    adminPassword: ""  # Set by the Apolo installer, or supply auth.existingSecret.
+    existingSecret: ""
   externalDatabase:
     user: "postgres"
     database: "keycloak"
-    existingSecret: launchpad-db-secret # in real app will be f"launchpad-{apolo_app_id}-db-secret"
+    port: 5432
+    existingSecret: "" # Required when using an external database.
     existingSecretHostKey: "DB_HOST"
     existingSecretPasswordKey: "DB_PASSWORD"
-  proxy: "edge"
-  readinessProbe:
-    initialDelaySeconds: 120
-    periodSeconds: 30
-    failureThreshold: 5
-  startupProbe:
-    enabled: true
-    initialDelaySeconds: 120
+  service:
+    ports:
+      http: 80
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+      ephemeral-storage: 50Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi
+      ephemeral-storage: 2Gi
   tolerations:
     - effect: NoSchedule
       key: platform.neuromation.io/job
       operator: Exists
-  commonLabels:
-    service: keycloak
-    application: launchpad
-  extraVolumes:
-    - name: realm-import
-      configMap:
-        name: launchpad-keycloak-realm  # in real app will be f"launchpad-{apolo_app_id}-keycloak-realm"
-        items:
-          - key: realm.json
-            path: realm.json
-  extraVolumeMounts:
-    - name: realm-import
-      mountPath: /opt/bitnami/keycloak/data/import
-      readOnly: true
-  initContainers:
-    - name: fetch-theme
-      image: alpine/git:2.45.2
-      imagePullPolicy: IfNotPresent
-      command: [ "/bin/sh","-lc" ]
-      # NOTE: this script is duplicated from KEYCLOAK_THEME_INIT_SCRIPT in
-      # inputs_processor.py, which is the authoritative copy used in production.
-      # Keep them in sync when making changes.
-      args:
-        - |
-          set -euxo pipefail
-          if [ -n "$APOLO_APP_GIT_REPO" ] && [ -n "$APOLO_APP_GIT_REVISION" ]; then
-            git clone --depth 1 --branch "$APOLO_APP_GIT_REVISION" "$APOLO_APP_GIT_REPO" /tmp/repo
-            THEME_SRC="/tmp/repo/kc-theme/apolo"
-          else
-            git clone --depth 1 --branch "master" "https://github.com/neuro-inc/launchpad.git" /tmp/repo
-            THEME_SRC="/tmp/repo/keycloak-theme/apolo"
-          fi
-          mkdir -p "/opt/bitnami/keycloak/themes/apolo"
-          cp -R "$THEME_SRC/." "/opt/bitnami/keycloak/themes/apolo/"
-          chown -R 1001:0 /opt/bitnami/keycloak/themes
-      volumeMounts:
-        - name: empty-dir
-          mountPath: /opt/bitnami/keycloak/themes
-          subPath: app-themes-dir
-      env:
-        - name: APOLO_APP_GIT_REPO
-          value: ""
-        - name: APOLO_APP_GIT_REVISION
-          value: ""
-      securityContext:
-        runAsUser: 0
-  extraStartupArgs: >-
-    --import-realm --spi-theme-static-max-age=-1 --spi-theme-cache-themes=false --spi-theme-cache-templates=false
+  theme:
+    repository: https://github.com/neuro-inc/launchpad.git
+    revision: master
+    path: keycloak-theme/apolo
+  initContainers: null

@@ -126,10 +126,14 @@ Run the repository checks from the repository root in another terminal:
 make lint
 make test-unit
 make test-integration
+make test-auth-e2e
 (cd frontend && npm run lint)
 ```
 
 Integration tests start their own PostgreSQL containers.
+The authentication test also starts a disposable Keycloak container and the Next.js frontend.
+It signs in through the frontend and checks that the Launchpad API accepts the session’s access token.
+Install frontend dependencies and OpenSSL first. The test does not need an Apolo profile.
 
 ## Apolo integration limits
 

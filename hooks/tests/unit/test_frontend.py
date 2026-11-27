@@ -134,7 +134,9 @@ def test_frontend_chart_replaces_only_its_own_route(tmp_path: Path) -> None:
             {
                 "apolo_app_id": "test-app",
                 "LAUNCHPAD_ADMIN_PASSWORD": "test-admin",
+                "keycloak": {"auth": {"adminPassword": "test-keycloak-admin"}},
                 "dbPassword": "test-db",
+                "postgresql": {"enabled": True},
                 "authResponseHeaders": ["X-Auth-Request-Email"],
                 "frontend": {
                     "image": {"digest": "sha256:" + "a" * 64},
@@ -202,7 +204,9 @@ async def test_backend_digest_reaches_the_deployment_and_lifecycle_jobs(
                 "image": generated["image"],
                 "apolo_app_id": "test-app",
                 "LAUNCHPAD_ADMIN_PASSWORD": "test-admin",
+                "keycloak": {"auth": {"adminPassword": "test-keycloak-admin"}},
                 "dbPassword": "test-db",
+                "postgresql": {"enabled": True},
                 "authResponseHeaders": ["X-Auth-Request-Email"],
             }
         )

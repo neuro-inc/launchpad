@@ -1,13 +1,15 @@
+import asyncio
 import logging
 import os
+from dataclasses import dataclass, field
+from time import monotonic
 from typing import TYPE_CHECKING, Annotated, Any, Mapping, Optional
 from uuid import UUID
+from weakref import WeakValueDictionary
 
 import aiohttp
-import backoff
 import jwt
 from aiohttp import ClientSession
-from asyncache import cached
 from cachetools import LRUCache
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -28,6 +30,21 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+_JWKS_TTL = 60
+_JWKS_REFRESH_INTERVAL = 5
+
+
+@dataclass
+class _IssuerKeys:
+    keys: dict[str, jwt.PyJWK] = field(default_factory=dict)
+    expires_at: float = 0
+    refresh_after: float = 0
+
+
+_CacheKey = tuple[ClientSession, str]
+_issuer_keys: LRUCache[_CacheKey, _IssuerKeys] = LRUCache(maxsize=32)
+_issuer_locks: WeakValueDictionary[_CacheKey, asyncio.Lock] = WeakValueDictionary()
 
 
 def authorize_app_email(installed_app: "InstalledApp", token: Mapping[str, Any]) -> str:
@@ -197,77 +214,101 @@ async def token_from_string(
     """
     Extracts and decodes the token from the request
     """
-    # get header so we can get a proper JWKS and determine the hashing algorithm
     try:
         header = jwt.get_unverified_header(access_token)
     except jwt.PyJWTError:
         logger.exception("can't get token header")
         raise Unauthorized()
 
-    kid, alg = header["kid"], header["alg"]
-    alg_obj = jwt.get_algorithm_by_name(alg)
-
-    try:
-        jwks = await _get_jwks(http=http, keycloak_config=keycloak_config, kid=kid)
-    except Exception:
-        logger.exception("can't obtain JWKS")
+    kid = header.get("kid")
+    if header.get("alg") != "RS256" or not isinstance(kid, str) or not kid:
         raise Unauthorized()
 
-    # get a secret key from a JWKS
-    for key in jwks["keys"]:
-        if key["kid"] == kid:
-            secret_key = alg_obj.from_jwk(key)
-            break
-    else:
-        logger.error(
-            "unable to match a KID between a token and a JWKS",
-            extra={
-                "token_kid": kid,
-                "jwks_key_ids": [key.get("kid") for key in jwks["keys"]],
-            },
-        )
+    issuer = f"{keycloak_config.url}/realms/{keycloak_config.realm}"
+    try:
+        public_key = await _get_signing_key(http, issuer, kid)
+    except (aiohttp.ClientError, TimeoutError, ValueError) as error:
+        logger.exception("can't obtain JWKS")
+        raise Unauthorized() from error
+
+    if public_key is None:
         raise Unauthorized()
 
     try:
         token: dict[str, Any] = jwt.decode(
             access_token,
-            secret_key,
-            algorithms=[alg],
-            issuer=f"{keycloak_config.url}/realms/{keycloak_config.realm}",
+            public_key,
+            algorithms=["RS256"],
+            issuer=issuer,
             audience="account",
+            options={"require": ["exp"]},
         )
         return token
     except jwt.ExpiredSignatureError:
         raise Unauthorized()
-    except jwt.PyJWTError:
+    except (jwt.PyJWTError, KeyError, TypeError, ValueError):
         logger.exception("unable to decode a token")
         raise Unauthorized()
 
 
-def cache_key_getter(*args: Any, **kwargs: str) -> str:
-    """
-    JWKS cache key getter which considers only the `kid`
-    """
-    return kwargs["kid"]
+async def _get_signing_key(
+    http: ClientSession, issuer: str, kid: str
+) -> jwt.PyJWK | None:
+    # Sessions can use different TLS trust settings.
+    cache_key = (http, issuer)
+    cached_keys = _issuer_keys.get(cache_key)
+    if cached_keys and monotonic() < cached_keys.expires_at:
+        if key := cached_keys.keys.get(kid):
+            return key
+
+    lock = _issuer_locks.setdefault(cache_key, asyncio.Lock())
+    async with lock:
+        cached_keys = _issuer_keys.setdefault(cache_key, _IssuerKeys())
+        now = monotonic()
+        if now < cached_keys.expires_at:
+            if key := cached_keys.keys.get(kid):
+                return key
+        if now < cached_keys.refresh_after:
+            return None
+
+        try:
+            cached_keys.keys = await _fetch_signing_keys(http, issuer)
+            cached_keys.expires_at = monotonic() + _JWKS_TTL
+        finally:
+            # Throttle unknown kids and failed refreshes across the entire issuer.
+            cached_keys.refresh_after = monotonic() + _JWKS_REFRESH_INTERVAL
+
+        return cached_keys.keys.get(kid)
 
 
-@backoff.on_exception(wait_gen=backoff.expo, exception=aiohttp.ClientError, max_tries=5)
-@cached(cache=LRUCache(maxsize=32), key=cache_key_getter)  # type: ignore
-async def _get_jwks(
-    *,
-    http: ClientSession,
-    keycloak_config: KeycloakConfig,
-    kid: str,
-) -> Any:
-    """
-    Returns JWKS.
-    Generally JWKS should not change, but it's still possible;
-    Therefore, we cache the response by a token `kid`.
-    """
-    url = f"{keycloak_config.url}/realms/{keycloak_config.realm}/protocol/openid-connect/certs"
-    response = await http.get(url, ssl=False)  # todo: see what we can do here with cert
-    response.raise_for_status()
-    return await response.json()
+async def _fetch_signing_keys(http: ClientSession, issuer: str) -> dict[str, jwt.PyJWK]:
+    url = f"{issuer}/protocol/openid-connect/certs"
+    async with http.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
+        response.raise_for_status()
+        jwks = await response.json()
+
+    if not isinstance(jwks, dict) or not isinstance(jwks.get("keys"), list):
+        raise ValueError("Invalid Keycloak JWKS")
+
+    keys: dict[str, jwt.PyJWK] = {}
+    for entry in jwks["keys"]:
+        if not isinstance(entry, dict):
+            continue
+        kid = entry.get("kid")
+        if (
+            not isinstance(kid, str)
+            or not kid
+            or kid in keys
+            or entry.get("kty") != "RSA"
+            or entry.get("use") not in (None, "sig")
+            or entry.get("alg") not in (None, "RS256")
+        ):
+            continue
+        try:
+            keys[kid] = jwt.PyJWK.from_dict(entry, algorithm="RS256")
+        except (jwt.PyJWTError, TypeError, ValueError):
+            logger.warning("Ignoring invalid RSA signing key from %s", issuer)
+    return keys
 
 
 Auth = Annotated[User, Depends(auth_required)]

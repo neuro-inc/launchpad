@@ -26,6 +26,8 @@ spec:
         image: {{ include "launchpad.image" . | quote }}
         imagePullPolicy: Always
         command: ["python3", "/app/scripts/netlify-cleanup.py"]
+        resources:
+          {{- toYaml .Values.maintenanceResources | nindent 10 }}
         args:
           - "delete"
           - "--site-id"

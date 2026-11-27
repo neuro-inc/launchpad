@@ -7,6 +7,7 @@ from base64 import b64decode
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
 from dotenv import load_dotenv
@@ -33,7 +34,6 @@ class KeycloakConfig:
     url: URL
     realm: str
     client_id: str = "frontend"
-    ssl_verify: bool = True
 
 
 @dataclass
@@ -141,7 +141,7 @@ class EnvironConfigFactory:
         try:
             db_host = self._environ["DB_HOST"]
             db_user = self._environ["DB_USER"]
-            db_password = self._environ["DB_PASSWORD"]
+            db_password = quote(self._environ["DB_PASSWORD"], safe="")
             db_name = self._environ["DB_NAME"]
             db_port = self._environ.get("DB_PORT", 5432)
             postgres_dsn = (
@@ -155,12 +155,9 @@ class EnvironConfigFactory:
 
     def create_keycloak(self) -> KeycloakConfig:
         try:
-            raw_ssl = self._environ.get("KEYCLOAK_SSL_VERIFY", "true").lower()
-            ssl_verify = raw_ssl in ("1", "true", "yes", "on")
             return KeycloakConfig(
                 url=URL(f"https://{self._environ['KEYCLOAK_URL']}"),
                 realm=self._environ["KEYCLOAK_REALM"],
-                ssl_verify=ssl_verify,
             )
         except KeyError as e:
             logger.exception("Missing required Keycloak environment variable: %s", e)

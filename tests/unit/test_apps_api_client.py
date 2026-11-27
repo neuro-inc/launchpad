@@ -379,7 +379,6 @@ async def test_configure_app_sends_reconfigure_payload(
         "PUT",
         f"https://api.example.com/v1/cluster/test-cluster/org/test-org/project/test-project/instances/{app_id}",
         headers={"Authorization": "Bearer test-token"},
-        ssl=False,
         json={
             "input": inputs,
             "comment": "Import into Launchpad abc: change auth middleware",

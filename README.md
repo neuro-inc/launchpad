@@ -181,3 +181,7 @@ curl -X GET "${LAUNCHPAD_URL}/instances" \
 ## Development
 
 See [local development](docs/engineering/local-development.md) to run the full stack with Docker Compose, Python, and Next.js.
+
+Add changelog fragments with `poetry run towncrier create <PR>.(bugfix|feature|doc|removal|misc) --edit`. Use `misc` for internal changes that only need a PR reference in the rendered notes.
+
+Before tagging a release, run `poetry run towncrier build --draft --version <version>` to preview the notes. Run `poetry run towncrier build --version <version>` to update [CHANGELOG.md](CHANGELOG.md), then include the changelog and consumed fragments in the release commit. Use the tag version without its `v` prefix.

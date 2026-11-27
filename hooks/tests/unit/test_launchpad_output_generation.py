@@ -76,6 +76,32 @@ async def test_output_secret_failure_uses_the_shared_retry_policy(
     assert sleeper.await_args_list == [call(delay) for delay in (2, 4, 8, 16)]
 
 
+async def test_output_references_the_saved_dedicated_keycloak_role(
+    setup_clients: Client,
+    mock_kubernetes_client: object,
+    app_instance_id: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    creator = AsyncMock(return_value=ApoloSecret(key="secret-key"))
+    monkeypatch.setattr(
+        "apolo_app_types.outputs.utils.apolo_secrets.create_apolo_secret", creator
+    )
+    helm_values = {
+        **KEYCLOAK_HELM_VALUES,
+        "postgresql": {"enabled": False},
+        "isolatedDatabases": {"enabled": True, "name": "pg-db"},
+    }
+    del helm_values["dbPassword"]
+    result = await get_launchpad_outputs(helm_values, app_instance_id)
+    assert result["keycloak_config"]["db_password"]["key"] == (
+        "keycloak-dedicated-db-pswd-test-app-id"
+    )
+    assert [request.kwargs["key"] for request in creator.await_args_list] == [
+        "keycloak-admin-pswd",
+        "launchpad-admin-pswd",
+    ]
+
+
 @pytest.mark.asyncio
 async def test_launchpad_output_generation(
     setup_clients, mock_kubernetes_client, app_instance_id, monkeypatch

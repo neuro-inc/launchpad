@@ -104,7 +104,7 @@ For the managed App, use its configuration input instead of maintaining a separa
 ## Validation and rollback
 
 Run `make test-unit`, `make test-integration`, and `make test-hooks` before release.
-The integration test uses disposable Keycloak 26.3.0 and requires Docker.
+The integration test uses the same Quay Keycloak image as the chart and requires Docker.
 It verifies idempotency, fresh realm import, rollback, and preservation of users, roles, groups, and unrelated provider settings.
 
 After deployment, test Procore login with an existing account and a new account.
